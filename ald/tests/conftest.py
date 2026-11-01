@@ -209,6 +209,7 @@ class FakeCoordinator:
         self.ping_resp: dict[str, Any] = {"ok": True, "min_client_version": "0.0.1",
                                           "latest_client_version": "0.1.0", "wheel_url": None}
         self.lease_status: int | None = None
+        self.unknown_stages: set[str] = set()
         self.lock = threading.Lock()
 
     def set_registry(self, raw: dict[str, Any], etag: str) -> None:
@@ -243,6 +244,9 @@ class FakeCoordinator:
                 return httpx.Response(self.lease_status, json={"error": "upgrade"})
             body = json.loads(req.content)
             self.leases.append(body)
+            bad = [x for x in body["stages"] if x in self.unknown_stages]
+            if bad:
+                return httpx.Response(400, json={"error": f"unknown stage(s): {','.join(bad)}"})
             out = []
             for jid, j in self.jobs.items():
                 if len(out) >= body["max_jobs"]:

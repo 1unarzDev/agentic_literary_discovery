@@ -211,7 +211,7 @@ def doctor(
                             accel=hw.accel, log=(lambda m: None) if as_json else (lambda m: err.print(m)))
             for s, r in res.items():
                 if "passages_per_hour" in r:
-                    r["eta"] = eta_for_share(status, s, r["passages_per_hour"])
+                    r["eta"] = eta_for_share(status or report.get("ping"), s, r["passages_per_hour"])
             report["bench"] = res
             if save:
                 cfg.bench = {s: {k: r[k] for k in ("best_concurrency", "passages_per_hour", "tok_s")}

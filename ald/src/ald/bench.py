@@ -131,8 +131,13 @@ def eta_for_share(status: dict[str, Any] | None, stage: str, my_pph: float | Non
     if not status or not my_pph:
         return {"eta_hours": None}
     q = (status.get("queue") or {}).get(stage) or {}
-    remaining_jobs = int(q.get("queued", 0)) + int(q.get("leased", 0))
-    remaining = remaining_jobs * passages_per_job
+    # /v1/ping exposes {status: {jobs, passages}}; admin /v1/status exposes {status: count}
+    def _jobs(v):
+        return int(v.get("jobs", 0)) if isinstance(v, dict) else int(v or 0)
+    def _pass(v):
+        return int(v.get("passages", 0)) if isinstance(v, dict) else int(v or 0) * passages_per_job
+    remaining_jobs = _jobs(q.get("queued")) + _jobs(q.get("leased"))
+    remaining = _pass(q.get("queued")) + _pass(q.get("leased"))
     workers = status.get("workers") or []
     active = [w for w in workers if (w.get("passages_1h") or 0) > 0]
     n = max(1, len(active) + 1)

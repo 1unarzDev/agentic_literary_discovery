@@ -46,6 +46,31 @@ def item_id(pid: str) -> str:
     return "it_" + hashlib.sha256(f"{SEED}:{pid}".encode()).hexdigest()[:12]
 
 
+def draw_audit(lab: pd.DataFrame, teaching_authors: set, rng: np.random.Generator,
+               n_target: int = 200) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Probability sample for DSL/PPI. `lab` needs era, group, split, stratum, author_key, passage_id.
+
+    Returns (audit, frame). `frame` lists EVERY pool passage with its audit cell and first-order
+    inclusion probability pi_audit = n_cell / N_cell (0 for passages outside the pool); DSL needs
+    pi for unaudited passages too, so the frame must be persisted (analysis/stats/README.md).
+    """
+    pool = lab[~lab.author_key.isin(teaching_authors) & (lab.stratum == "random")]
+    cells = pool.groupby(["era", "group", "split"])
+    n_cells = cells.ngroups
+    per = max(2, int(np.ceil(n_target / n_cells)))
+    rows, frame = [], []
+    for key, g in cells:
+        k = min(per, len(g))
+        s = g.sample(n=k, random_state=int(rng.integers(1e9)))
+        s = s.assign(audit_cell="|".join(key), cell_N=len(g), cell_n=k, weight=len(g) / k)
+        rows.append(s)
+        frame.append(pd.DataFrame({"passage_id": g.passage_id.values, "audit_cell": "|".join(key),
+                                   "pi_audit": k / len(g)}))
+    audit = pd.concat(rows)
+    audit = audit.sample(frac=1, random_state=SEED)
+    return audit, pd.concat(frame, ignore_index=True)
+
+
 def main(lab_path: str, alt_path: str | None = None) -> None:
     rng = np.random.default_rng(SEED)
     lab = pd.read_parquet(lab_path)  # columns: passage_id, work_id, author_key, decade, split, stratum, text, ctx_*, has_obstacle, domains, locus, confidence, quote_status
@@ -78,24 +103,15 @@ def main(lab_path: str, alt_path: str | None = None) -> None:
     teaching_authors = set(teaching.author_key)
 
     # ---------------- audit (probability sample; exclude teaching authors)
-    pool = lab[~lab.author_key.isin(teaching_authors) & (lab.stratum == "random")]
-    cells = pool.groupby(["era", "group", "split"])
-    n_cells = cells.ngroups
-    per = max(2, int(np.ceil(200 / n_cells)))
-    rows = []
-    for key, g in cells:
-        k = min(per, len(g))
-        s = g.sample(n=k, random_state=int(rng.integers(1e9)))
-        s = s.assign(audit_cell="|".join(key), cell_N=len(g), cell_n=k, weight=len(g) / k)
-        rows.append(s)
-    audit = pd.concat(rows)
-    audit = audit.sample(frac=1, random_state=SEED)
+    audit, frame = draw_audit(lab, teaching_authors, rng)
+    n_cells = frame.audit_cell.nunique()
     dbl = set(audit.passage_id.iloc[:40])
     rest = list(audit.passage_id.iloc[40:])
 
     OUT.mkdir(parents=True, exist_ok=True)
     teaching.to_parquet(OUT / "teaching.parquet", index=False)
     audit.to_parquet(OUT / "audit.parquet", index=False)
+    frame.to_parquet(OUT / "audit_frame.parquet", index=False)  # pi_audit for every pool passage (DSL)
 
     items = []
     for _, r in teaching.iterrows():

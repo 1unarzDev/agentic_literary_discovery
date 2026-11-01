@@ -42,8 +42,21 @@ workerRoutes.get("/v1/ping", async (c) => {
     latest_client_version: cfg[CFG.latestClientVersion] ?? null,
     wheel_url: wheelUrl(new URL(c.req.url).origin, cfg[CFG.wheelFile]),
     registry_version: parseInt(cfg[CFG.registryVersion] ?? "0", 10),
+    queue: await queueSummary(c.env),
   });
 });
+
+// Worker-visible queue summary (no per-worker detail): remaining passages per stage, used for client ETA.
+async function queueSummary(env: { DB: D1Database }) {
+  const rs = await env.DB.prepare(
+    "SELECT stage, status, COUNT(*) AS n, COALESCE(SUM(n_passages),0) AS p FROM jobs GROUP BY stage, status",
+  ).all<{ stage: string; status: string; n: number; p: number }>();
+  const out: Record<string, Record<string, { jobs: number; passages: number }>> = {};
+  for (const r of rs.results ?? []) {
+    (out[r.stage] ??= {})[r.status] = { jobs: r.n, passages: r.p };
+  }
+  return out;
+}
 
 workerRoutes.get("/v1/registry", async (c) => {
   const cfg = await getConfig(c.env);

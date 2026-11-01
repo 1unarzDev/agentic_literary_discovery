@@ -73,16 +73,18 @@ REGISTRY_SCHEMA: dict[str, Any] = {
                     "vram_gb_required": {"type": "number", "minimum": 0},
                     "kv_gb_per_slot": {"type": "number", "minimum": 0},
                     "ollama_version_range": {"type": "string"},
-                    "codebook_version": {"type": "string"},
+                    "codebook_version": {"type": ["string", "null"]},
                     "num_ctx": {"type": "integer", "minimum": 128},
-                    "num_predict": {"type": "integer", "minimum": 1},
+                    "num_predict": {"type": "integer", "minimum": 0},
                     "temperature": {"type": "number"},
                     "seed": {"type": "integer"},
                     "think": {"type": ["boolean", "null"]},
-                    "system_template": {"type": "string"},
-                    "user_template": {"type": "string"},
-                    "retry_template": {"type": "string"},
-                    "schema": {"type": "object"},
+                    "system_template": {"type": ["string", "null"]},
+                    "user_template": {"type": ["string", "null"]},
+                    "retry_template": {"type": ["string", "null"]},
+                    "schema": {"type": ["object", "null"]},
+                    "unload_others": {"type": "boolean"},
+                    "priority": {"type": "number"},
                     "evidence_keys": {"type": "array", "items": {"type": "string"}},
                 },
             },
@@ -157,19 +159,28 @@ class Stage:
 
     @property
     def system_template(self) -> str:
-        return self.raw.get("system_template", "")
+        v = self.raw.get("system_template")
+        return "" if v is None else v
 
     @property
     def user_template(self) -> str:
-        return self.raw.get("user_template", "{{text}}")
+        v = self.raw.get("user_template")
+        return "{text}" if v is None else v
 
     @property
     def retry_template(self) -> str:
-        return self.raw.get("retry_template", DEFAULT_RETRY_TEMPLATE if self.kind == "chat" else "")
+        v = self.raw.get("retry_template")
+        if v is None:
+            return DEFAULT_RETRY_TEMPLATE if self.kind == "chat" else ""
+        return v
 
     @property
     def codebook_version(self) -> str:
-        return str(self.raw.get("codebook_version", ""))
+        v = self.raw.get("codebook_version")
+        return "" if v is None else str(v)
+
+    def unload_others(self, default: bool = True) -> bool:
+        return bool(self.raw.get("unload_others", default))
 
     @property
     def version_range(self) -> str:
@@ -252,19 +263,31 @@ def compute_pin_hash(prompt_hash: str, model_digest: str, stage: str) -> str:
     return sha256_hex(prompt_hash + bare_digest(model_digest) + stage)
 
 
-_PLACEHOLDER = re.compile(r"\{\{\s*(\w+)\s*\}\}")
+def compute_pin(stage: str, stage_raw: dict[str, Any]) -> dict[str, Any]:
+    """The pin object for ``POST /v1/admin/pin`` (the single source of truth
+    for hashing; pipeline/make_jobs.py imports this)."""
+    return Stage(stage, stage_raw).pin_object()
+
+
+# ``{{name}}`` or ``{name}`` (identifier only, so JSON like {"a": 1} is untouched).
+_PLACEHOLDER = re.compile(r"\{\{\s*(\w+)\s*\}\}|\{(\w+)\}")
 
 
 def render_template(template: str, values: dict[str, Any]) -> str:
-    """``{{name}}`` substitution (no format-string brace escaping needed for
-    JSON examples in the codebook). ``{{passage}}`` aliases ``text``."""
+    """Placeholder substitution without str.format (so literal braces in
+    templates need no escaping). ``passage`` aliases ``text``; lists are
+    joined with '; '; missing keys render empty."""
 
     def sub(m: re.Match[str]) -> str:
-        key = m.group(1)
+        key = m.group(1) or m.group(2)
         if key == "passage":
             key = "text"
         v = values.get(key, "")
-        return "" if v is None else str(v)
+        if v is None:
+            return ""
+        if isinstance(v, (list, tuple)):
+            return "; ".join(str(x) for x in v)
+        return str(v)
 
     return _PLACEHOLDER.sub(sub, template)
 
@@ -363,11 +386,13 @@ def validate_registry(raw: dict[str, Any]) -> None:
     for name, st in raw["stages"].items():
         kind = st.get("kind") or st.get("api") or "chat"
         if kind == "chat":
-            missing = [k for k in ("codebook_version", "num_ctx", "num_predict", "system_template",
-                                   "user_template", "schema") if k not in st]
+            missing = [k for k in ("num_ctx", "num_predict", "system_template", "user_template", "schema")
+                       if st.get(k) is None]
             if missing:
                 raise RegistryError(f"stage {name}: chat stage missing {missing}")
-        if "schema" in st:
+            if int(st["num_predict"]) < 1:
+                raise RegistryError(f"stage {name}: chat stage needs num_predict >= 1")
+        if st.get("schema") is not None:
             try:
                 jsonschema.Draft202012Validator.check_schema(st["schema"])
             except jsonschema.SchemaError as e:

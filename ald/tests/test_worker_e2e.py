@@ -538,3 +538,13 @@ def test_shared_model_not_unloaded_between_stages(env):
     env.coord.add_job("job-c", "cloze", env.registry.stages["cloze"].pin_hash(), make_passages("w2", 1))
     env.make_worker().run()
     assert LABEL_MODEL not in env.ollama.unloads
+
+
+def test_coordinator_unknown_stage_dropped(env):
+    env.coord.unknown_stages = {"alt_label", "workcheck"}
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 1))
+    w = env.make_worker()
+    w.run()
+    assert env.coord.state["job-1"] == "done"
+    assert env.coord.leases[-1]["stages"] == ["label", "cloze"]
+    assert w.excluded["workcheck"] == "coordinator does not know this stage"

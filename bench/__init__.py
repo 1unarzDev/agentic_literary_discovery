@@ -1,0 +1,1 @@
+"""Resampled literary discovery benchmark."""

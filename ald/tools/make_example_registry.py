@@ -102,8 +102,8 @@ LABEL_SYSTEM = CODEBOOK + "\n\n" + FEW_SHOT_LABEL
 ADJ_SYSTEM = (CODEBOOK + "\n\nTASK (ADJUDICATE): you are the senior annotator. Label the passage from scratch "
               "with the full schema and add a rationale (at most 80 words) that cites the passage.\n\n" + FEW_SHOT_LABEL)
 
-USER = ("CONTEXT BEFORE (orientation only):\n{{ctx_before}}\n\nCONTEXT AFTER (orientation only):\n{{ctx_after}}\n\n"
-        "PASSAGE (label this):\n{{text}}")
+USER = ("CONTEXT BEFORE (orientation only):\n{ctx_before}\n\nCONTEXT AFTER (orientation only):\n{ctx_after}\n\n"
+        "PASSAGE (label this):\n{text}")
 
 RETRY = ("Your previous reply was not valid for the required schema ({error}). Reply again with ONLY one JSON "
          "object that matches the schema.")
@@ -135,8 +135,8 @@ CLOZE_SYSTEM = ("NAME CLOZE. The passage comes from a published novel. One chara
                 "replaced by [MASK]. Reply with the single most likely name, as a JSON object {\"name\": \"...\"}. "
                 "Reply with one name even if you are unsure.")
 
-USER_WORK = "OPENING OF THE TEXT:\n{{text}}"
-USER_CLOZE = "PASSAGE:\n{{text}}"
+USER_WORK = "OPENING OF THE TEXT:\n{text}"
+USER_CLOZE = "PASSAGE:\n{text}"
 
 
 def stage(model_ref, size, vram, kv, num_ctx, num_predict, system, schema, codebook_version, user=USER,
@@ -199,7 +199,7 @@ reg = {
             "ollama_version_range": ">=0.12.0,<1.0.0",
             "codebook_version": "embed-0.1",
             "num_ctx": 2048,
-            "user_template": "{{text}}",
+            "user_template": "{text}",
             "evidence_field": None,
         },
     },

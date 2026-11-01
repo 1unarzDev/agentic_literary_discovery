@@ -494,7 +494,18 @@ class Worker:
                     self.log(f"[lease] network error: {e}")
                     break
                 except CoordinatorError as e:
-                    self.log(f"[lease] {e}")
+                    unknown = self._unknown_stages(e)
+                    if unknown:
+                        # Coordinator does not (yet) serve these stages: lease the rest.
+                        for u in unknown:
+                            self.excluded[u] = "coordinator does not know this stage"
+                        self.stages = [x for x in self.stages if x not in unknown]
+                        self.log(f"[lease] coordinator rejected stage(s) {', '.join(unknown)}; "
+                                 f"leasing {', '.join(self.stages) or 'nothing'}")
+                        if self.stages:
+                            continue
+                    else:
+                        self.log(f"[lease] {e}")
                     break
                 now = self.clock.time()
                 for j in jobs:
@@ -519,6 +530,14 @@ class Worker:
                 self._release(refused)
             self._queue.extend(accepted)
             return accepted
+
+    @staticmethod
+    def _unknown_stages(e: CoordinatorError) -> list[str]:
+        msg = str(e)
+        if e.status != 400 or "unknown stage" not in msg:
+            return []
+        tail = msg.split(":", 2)[-1]
+        return [x.strip() for x in tail.split(",") if x.strip()]
 
     def _prefetch_async(self) -> None:
         if self._prefetching or self._queue or self.stop.is_set():
@@ -669,7 +688,8 @@ class Worker:
         inflight: dict[Future, dict[str, Any]] = {}
         bv = self.backend_version()
         # Between jobs: only this stage's model may stay resident on the GPU.
-        self.unload_non_pinned(keep={st.model_ref})
+        if st.unload_others(self.registry.unload_others):
+            self.unload_non_pinned(keep={st.model_ref})
         residency_checked = False
         residency_tries = 0
 
@@ -850,7 +870,10 @@ class Worker:
     # (~8x slower), so keep only the model being run on the GPU.
     # ------------------------------------------------------------------
     def unload_non_pinned(self, keep: set[str] | None = None) -> list[str]:
-        if self.hw.accel == "cpu" or (self._registry is not None and not self._registry.unload_others):
+        if self.hw.accel == "cpu" or self._registry is None:
+            return []
+        reg = self._registry
+        if not (reg.unload_others and all(reg.stages[s].unload_others(True) for s in self.stages if s in reg.stages)):
             return []
         if keep is None:
             keep = {self.registry.stages[s].model_ref for s in self.stages}

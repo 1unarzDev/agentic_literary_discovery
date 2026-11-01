@@ -102,9 +102,27 @@ def test_example_registry_file_validates():
 
 
 def test_static_system_prompt_has_no_passage_placeholders(registry_raw):
+    import re
     for st in Registry.from_dict(registry_raw).stages.values():
-        assert "{{" not in st.system_template  # static prefix -> KV cache reuse
-        assert st.user_template.rstrip().endswith("{{text}}")  # passage LAST
+        # static prefix -> KV cache reuse (literal JSON braces in few-shot examples are fine)
+        assert not re.search(r"\{\{?\s*(text|passage|ctx_before|ctx_after)\s*\}?\}", st.system_template)
+        assert st.user_template.rstrip().endswith("{text}")  # passage LAST
+
+
+def test_production_registry_validates_if_present():
+    root = Path(__file__).resolve().parents[2]
+    p = root / "registry" / "models.v1.json"
+    if not p.exists():
+        pytest.skip("no production registry yet")
+    from ald.registry import compute_pin
+    reg = Registry.load(p)
+    for name, st in reg.stages.items():
+        assert compute_pin(name, reg.raw["stages"][name])["pin_hash"] == st.pin_hash()
+
+
+def test_single_and_double_brace_placeholders():
+    vals = {"text": "T", "subjects": ["a", "b"], "ctx_before": None}
+    assert render_template("{subjects}|{{text}}|{ctx_before}|{\"json\": 1}", vals) == 'a; b|T||{"json": 1}'
 
 
 def test_invalid_registry_rejected(registry_raw):
@@ -187,7 +205,7 @@ def test_embed_stage_minimal_and_hash_includes_kind():
     st = Stage("embed", raw)
     chat_like = Stage("embed", dict(raw, kind="chat"))
     assert st.prompt_hash() != chat_like.prompt_hash()
-    assert st.evidence_keys == [] and st.user_template == "{{text}}"
+    assert st.evidence_keys == [] and st.user_template == "{text}"
 
 
 def test_evidence_field_null_disables_verification():

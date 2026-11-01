@@ -8,7 +8,7 @@ export interface Env {
   MAX_LEASE_JOBS?: string;
 }
 
-export const STAGES = ["screen", "label", "adjudicate", "cloze", "embed"] as const;
+export const STAGES = ["screen", "workcheck", "label", "alt_label", "adjudicate", "cloze", "embed"] as const;
 export type Stage = (typeof STAGES)[number];
 export const SPLITS = ["discovery", "confirmation"] as const;
 

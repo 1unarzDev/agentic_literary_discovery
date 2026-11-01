@@ -9,7 +9,7 @@ describe("ping, client releases, installers, bwtest", () => {
   it("ping reports versions, wheel url and registry version", async () => {
     const before = await callJson("GET", "/v1/ping");
     expect(before.status).toBe(200);
-    expect(Object.keys(before.body).sort()).toEqual(["latest_client_version", "min_client_version", "ok", "registry_version", "wheel_url"]);
+    expect(Object.keys(before.body).sort()).toEqual(["latest_client_version", "min_client_version", "ok", "queue", "registry_version", "wheel_url"]);
     expect(before.body.ok).toBe(true);
 
     // Release requires the wheel to exist first.
