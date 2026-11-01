@@ -53,6 +53,30 @@ def test_h1_oracle_recovers_truth_direction(oracle_wd):
     mat, inn = e.components[0], e.components[1]
     assert mat.estimate < 0 and inn.estimate > 0 and e.p < 0.01
     assert e.infl.shape[1] == 3
+    assert e.extra["classification"] == "inward" and e.extra["two_sided"]
+    d = models.h1(oracle_wd, two_sided=False)            # v0.3 directional IU test still available
+    assert d.p == max(c.p_dir for c in d.tested)
+    ml = models.h1_mid_late(oracle_wd)
+    assert ml.extra["window"] == (models.MID, models.LATE)
+
+
+def test_classify_and_wald():
+    C = models.Component
+    assert models.classify_h1(C("m", -0.1, 0.02, 0), C("i", 0.08, 0.02, 0), 0.001) == "inward"
+    assert models.classify_h1(C("m", 0.08, 0.02, 0), C("i", -0.01, 0.02, 0), 0.001) == "outward"
+    assert models.classify_h1(C("m", 0.08, 0.02, 0), C("i", 0.05, 0.02, 0), 0.001) == "mixed"
+    assert models.classify_h1(C("m", -0.1, 0.02, 0), C("i", 0.01, 0.02, 0), 0.001) == "mixed"
+    assert models.classify_h1(C("m", 0.08, 0.02, 0), C("i", -0.01, 0.02, 0), 0.2) == "none"
+    W, p = models.wald(np.array([0.0196 * 2, 0.0]), np.diag([0.0196 ** 2, 1.0]))
+    assert abs(W - 4) < 1e-9 and abs(p - np.exp(-2)) < 1e-9          # chi2_2 sf(4) = e^-2
+
+
+def test_attach_genre_and_reference(corpus):
+    g = corpus.works[["work_id"]].assign(genre=np.where(np.arange(len(corpus.works)) % 2, "juvenile", "adventure"))
+    lab = models.attach_genre(corpus.labels, g)
+    assert set(lab.genre) == {"juvenile", "adventure"}
+    ref = models.reference_covariates(corpus.works, g, n=500)
+    assert len(ref) == 500 and set(ref.genre) <= {"juvenile", "adventure"}
 
 
 def test_h2_and_h3_run(dsl_wd, corpus):
@@ -60,8 +84,10 @@ def test_h2_and_h3_run(dsl_wd, corpus):
         e = f(dsl_wd)
         assert all(np.isfinite(c.estimate) for c in e.components)
     tab, effs = models.confirmatory(dsl_wd, keyword_series(corpus), n_boot=200)
-    assert set(tab.test) == {"H1", "H2a", "H2b", "H2c", "H3"}
-    assert (tab.p_adj >= tab.p_test - 1e-12).all()
+    assert set(tab.test) == {"H1", "H2a", "H2b", "H2c", "H3", "H1-ML"}
+    assert (tab[tab.test == "H1-ML"].role == "descriptive").all()
+    t2 = tab[tab.role != "descriptive"]
+    assert (t2.p_adj >= t2.p_test - 1e-12).all()
 
 
 def test_h3_tracking_vs_divergent(oracle_wd, corpus):

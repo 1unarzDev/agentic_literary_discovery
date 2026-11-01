@@ -109,11 +109,22 @@ class SimConfig:
     dom_slope: dict = field(default_factory=lambda: {
         "DISTANCE_TRAVEL": -0.5, "DARKNESS_VISIBILITY": -0.4, "ILLNESS_BODY_DEATH": -0.2,
         "SOCIAL_RANK_CONVENTION": 0.1, "INNER_STATE": 0.6, "NATURE_WEATHER": -0.3})
+    # optional step change in the domain logits at step_year (pilot-like "1880s step" scenario)
+    dom_step: dict = field(default_factory=dict)
+    step_year: int = 1883
     cause_base: tuple = (0.3, 0.0, 0.2, 0.0, -0.5)
     cause_slope: tuple = (-0.6, -0.2, 0.5, 0.0, 0.3)
     night_base: tuple = (0.6, 0.3, 0.0, -0.5, -0.6)
     night_slope: tuple = (-0.4, -0.2, 0.3, 0.0, 0.5)
     seed: int = 1
+
+    @staticmethod
+    def pilot_step(step: float = 0.65, **kw) -> "SimConfig":
+        """Pilot-like truth (docs/pilot_analysis_1.md): no smooth drift; NATURE / DISTANCE / DARKNESS
+        logits step up in the 1880s (material share +~8 pp M -> L), internal flat. Calibrated by
+        tests/test_simulate.py::test_pilot_step_calibration."""
+        return SimConfig(effect=0.0, dom_step={"NATURE_WEATHER": step, "DISTANCE_TRAVEL": step,
+                                               "DARKNESS_VISIBILITY": step}, **kw)
 
     def with_(self, **kw) -> "SimConfig":
         return replace(self, **kw)
@@ -227,6 +238,9 @@ def _truth(cfg: SimConfig, rng: np.random.Generator, wk: pd.DataFrame, w_of_p: n
     has = np.where(u < p_obs, 1, np.where(u < p_obs + 0.03 * (1 - p_obs), 2, 0))  # 1 yes, 0 no, 2 insufficient
     gdom = np.array([_vec(GENRE_DOM[g], DOMAINS) for g in GENRES])[gi] * ge
     eta = _vec(cfg.dom_base, DOMAINS) + cfg.effect * np.outer(t, _vec(cfg.dom_slope, DOMAINS)) + gdom + re[:, 1:11]
+    if cfg.dom_step:
+        yr = 1860 + 60 * t
+        eta = eta + np.outer(yr >= cfg.step_year, _vec(cfg.dom_step, DOMAINS))
     if boost is not None:
         eta = eta + boost
     p = _softmax(eta)

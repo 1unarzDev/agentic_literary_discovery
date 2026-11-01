@@ -86,3 +86,14 @@ def test_keyword_series(corpus):
     kw = keyword_series(corpus)
     assert set(kw.group) == {"comm", "travel", "dark"}
     assert kw.groupby("group").kw_rate.apply(lambda s: s.iloc[-1] > s.iloc[0]).all()
+
+
+def test_pilot_step_calibration():
+    """Pilot-like truth: material share +~8 pp M -> L (step in the 1880s), internal flat."""
+    c = simulate(SimConfig.pilot_step(n_works=24000, passages_per_work=4, seed=3), audit=False)
+    wd = dsl.prepare(c.labels, method="oracle", truth=c.truth, split=None, targets=("locus",))
+    era = np.where(wd.cov.year < 1850, "E", np.where(wd.cov.year < 1885, "M", "L"))
+    r = dsl.ratio_shares(wd, "locus", [1, 3], [1, 2, 3], era)
+    d_mat, se = r.contrast("M", "L", 1)
+    d_int, _ = r.contrast("M", "L", 3)
+    assert 0.05 < d_mat < 0.11 and abs(d_int) < 0.03

@@ -61,21 +61,36 @@ class BatteryResult:
                              for c in self.checks])
 
 
-def _ests(e: Effect) -> np.ndarray:
-    return np.array([c.estimate for c in e.tested])
+def _ref(primary: Effect) -> tuple[list[int], np.ndarray]:
+    """Components a re-estimate must reproduce, and their reference signs.
+    Directional tests: the tested components with their declared signs.
+    Two-sided H1 (prereg v0.4): the tested components whose 95% CI excludes 0 in the primary fit,
+    with their OBSERVED signs (e.g. 'outward' -> material up; 'inward' -> both); if none excludes 0,
+    all tested components with observed signs (the battery is then moot: the verdict is null)."""
+    idx = primary.tested_idx
+    if primary.extra.get("two_sided"):
+        sig = [i for i in idx if not (primary.components[i].ci()[0] <= 0 <= primary.components[i].ci()[1])]
+        idx = sig or idx
+        return idx, np.sign([primary.components[i].estimate for i in idx])
+    return idx, np.array([primary.components[i].expected_sign for i in idx])
+
+
+def _ests(e: Effect, idx: list[int] | None = None) -> np.ndarray:
+    idx = e.tested_idx if idx is None else idx
+    return np.array([e.components[i].estimate for i in idx])
 
 
 def _signs(e: Effect) -> np.ndarray:
-    return np.array([c.expected_sign for c in e.tested])
+    return _ref(e)[1]
 
 
 def holds(primary: Effect, variant: Effect | np.ndarray | None, frac: float = 0.5, ref: Effect | None = None) -> bool:
-    """Every directional component keeps the declared sign and >= frac of the reference magnitude."""
+    """Every reference component keeps its reference sign and >= frac of the reference magnitude."""
     if variant is None:
         return False
-    v = _ests(variant) if isinstance(variant, Effect) else np.asarray(variant, float)
-    r = _ests(ref or primary)
-    s = _signs(primary)
+    idx, s = _ref(primary)
+    v = _ests(variant, idx) if isinstance(variant, Effect) else np.asarray(variant, float)
+    r = _ests(ref or primary, idx)
     if np.any(~np.isfinite(v)):
         return False
     return bool(np.all(np.sign(v) == s) and np.all(np.abs(v) >= frac * np.abs(r)))
@@ -91,10 +106,9 @@ def _safe(fn: HypFn, wd: WorkData) -> Effect | None:
 # ------------------------------------------------------------------ individual checks
 
 def leave_one_author_out(fn: HypFn, wd: WorkData, primary: Effect, n_groups: int = 20, seed: int = 0) -> Check:
-    est = _ests(primary)
-    s = _signs(primary)
+    idx, s = _ref(primary)
+    est = _ests(primary, idx)
     if primary.infl is not None:
-        idx = [i for i, c in enumerate(primary.components) if c.expected_sign != 0]
         loo = est[None, :] - primary.infl[:, idx]
         G = len(loo)
         jk_se = np.sqrt((G - 1) / G * ((loo - loo.mean(0)) ** 2).sum(0))
@@ -137,7 +151,7 @@ def subset_check(name: str, fn: HypFn, wd: WorkData, primary: Effect, col: str,
     m = mask_fn(wd.cov[col])
     e = _safe(fn, wd.subset(m))
     return Check(name, holds(primary, e), {"n_works": int(m.sum()),
-                                           "estimate": float(_ests(e)[0]) if e else float("nan")})
+                                           "estimate": float(_ests(e, _ref(primary)[0])[0]) if e else float("nan")})
 
 
 def label_variant_check(name: str, fn: HypFn, primary: Effect, variants: list[tuple[WorkData, WorkData]] | None) -> Check:
@@ -148,7 +162,7 @@ def label_variant_check(name: str, fn: HypFn, primary: Effect, variants: list[tu
     for var_wd, prim_wd in variants:
         ev, ep = _safe(fn, var_wd), _safe(fn, prim_wd)
         oks.append(ev is not None and ep is not None and holds(primary, ev, ref=ep))
-        ests.append(float(_ests(ev)[0]) if ev else float("nan"))
+        ests.append(float(_ests(ev, _ref(primary)[0])[0]) if ev else float("nan"))
     return Check(name, all(oks), {"n_variants": len(variants), "first_estimate": ests[0]})
 
 
@@ -173,11 +187,12 @@ def permute_years(cov: pd.DataFrame, rng: np.random.Generator, mode: str = "auth
 def date_permutation(fn: HypFn, wd: WorkData, primary: Effect, n_perm: int = 200, seed: int = 0,
                      mode: str = "author_profile") -> Check:
     rng = np.random.default_rng(seed)
-    est, s = _ests(primary), _signs(primary)
+    idx, s = _ref(primary)
+    est = _ests(primary, idx)
     null = []
     for _ in range(n_perm):
         e = _safe(fn, wd.with_years(permute_years(wd.cov, rng, mode)))
-        null.append(_ests(e) if e else np.full(len(est), np.nan))
+        null.append(_ests(e, idx) if e else np.full(len(est), np.nan))
     null = np.array(null)
     p = (1 + np.nansum(s * null >= s * est, axis=0)) / (1 + np.isfinite(null).sum(0))
     return Check("date_permutation", bool(np.all(p < 0.05)),
@@ -190,9 +205,10 @@ def replication(fn: HypFn, primary: Effect, rep: WorkData | None, rep_fn: HypFn 
     if rep is None:
         return Check("replication", False, {"note": "not run: no replication sample"})
     e = _safe(rep_fn or fn, rep)
-    ok = e is not None and bool(np.all(np.sign(_ests(e)) == _signs(primary)))
-    return Check("replication", ok, {"estimate": float(_ests(e)[0]) if e else float("nan"),
-                                     "se": float(e.tested[0].se) if e else float("nan")})
+    idx, s = _ref(primary)
+    ok = e is not None and bool(np.all(np.sign(_ests(e, idx)) == s))
+    return Check("replication", ok, {"estimate": float(_ests(e, idx)[0]) if e else float("nan"),
+                                     "se": float(e.components[idx[0]].se) if e else float("nan")})
 
 
 # ------------------------------------------------------------------ battery + verdict
@@ -233,6 +249,9 @@ def run_battery(name: str, fn: HypFn, wd: WorkData, holm_reject: bool, primary: 
         if c.name in not_applicable:
             c.passed = None
     v, n_pass, n_app, need = verdict(holm_reject, checks)
+    cls = primary.extra.get("classification")
+    if cls and v != "null":
+        v = f"{v}: {cls}"          # e.g. "supported: outward" (two-sided H1, prereg v0.4)
     return BatteryResult(name, checks, holm_reject, v, n_pass, n_app, need)
 
 
@@ -250,13 +269,26 @@ def run_all(labels_path: str, human_path: str, frame_path: str | None, keywords_
             alt_path: str | None = None, seg_paths: tuple = (), rep_labels: str | None = None,
             rep_human: str | None = None, rep_frame: str | None = None, split: str = "confirmation",
             n_perm: int = 200, out_dir: str = "analysis/stats/out/confirmatory",
-            expert: str = "teacher") -> pd.DataFrame:
+            expert: str = "teacher", genre_path: str | None = None, works_path: str | None = None) -> pd.DataFrame:
     import functools
     from pathlib import Path
 
     from analysis.stats import models
     from analysis.stats.dsl import prepare
     labels, human = pd.read_parquet(labels_path), pd.read_parquet(human_path)
+    # registered genre variable (prereg v0.4): pipeline/genre.py -> data/work/genre.parquet
+    genre = pd.read_parquet(genre_path) if genre_path else None
+    if genre is not None:
+        labels = models.attach_genre(labels, genre)
+    # registered standard: pooled covariate mix of the primary set of BOTH halves (metadata only)
+    ref_cov = None
+    if works_path:
+        w = pd.read_parquet(works_path)
+        if "in_primary_cap" in w:
+            w = w[w.in_primary_cap & w.date_confidence.isin(["high", "medium"])]
+        if "origin" not in w and "origin_locc" in w:
+            w = w.assign(origin=w.origin_locc)
+        ref_cov = models.reference_covariates(w, genre)
     frame = pd.read_parquet(frame_path) if frame_path else None
     kw = pd.read_csv(keywords_path)
     # registered annotator rules (prereg §5.1): expert rows never enter DSL; kappa exclusion
@@ -271,7 +303,7 @@ def run_all(labels_path: str, human_path: str, frame_path: str | None, keywords_
         ann.overlap_agreement(human, labels, expert=expert).to_csv(out / "overlap_agreement.csv", index=False)
     wd = prepare(labels, human, frame, split=split, exclude_annotators={expert} | excl)
     design = models.Design.from_data(wd)
-    tab, effs = models.confirmatory(wd, kw, design=design)
+    tab, effs = models.confirmatory(wd, kw, design=design, ref_cov=ref_cov)
     holm_rej = tab.groupby("test").reject.first().to_dict()
     alt = [_naive_pair(pd.read_parquet(alt_path), labels, split)] if alt_path else None
     seg = [_naive_pair(pd.read_parquet(p), labels, split) for p in seg_paths] or None
@@ -280,8 +312,10 @@ def run_all(labels_path: str, human_path: str, frame_path: str | None, keywords_
         rl = pd.read_parquet(rep_labels)
         rep = (prepare(rl, pd.read_parquet(rep_human), pd.read_parquet(rep_frame) if rep_frame else None, split=None)
                if rep_human else prepare(rl, method="naive", split=None))
-    fns = {"H1": functools.partial(models.h1, design=design), "H2a": functools.partial(models.h2a, design=design),
-           "H2b": functools.partial(models.h2b, design=design), "H2c": functools.partial(models.h2c, design=design),
+    fns = {"H1": functools.partial(models.h1, design=design, ref_cov=ref_cov),
+           "H2a": functools.partial(models.h2a, design=design, ref_cov=ref_cov),
+           "H2b": functools.partial(models.h2b, design=design, ref_cov=ref_cov),
+           "H2c": functools.partial(models.h2c, design=design, ref_cov=ref_cov),
            "H3": functools.partial(models.h3, keywords=kw, n_boot=500)}
     tabs = []
     for k, fn in fns.items():
@@ -301,7 +335,11 @@ if __name__ == "__main__":
     ap.add_argument("--frame"); ap.add_argument("--alt"); ap.add_argument("--seg", action="append", default=[])
     ap.add_argument("--rep-labels"); ap.add_argument("--rep-human"); ap.add_argument("--rep-frame")
     ap.add_argument("--split", default="confirmation"); ap.add_argument("--n-perm", type=int, default=200)
+    ap.add_argument("--genre", default="data/work/genre.parquet", help="registered genre variable")
+    ap.add_argument("--works", default="data/work/works.parquet", help="metadata for the pooled standard")
     a = ap.parse_args()
+    import os
     bt = run_all(a.labels, a.human, a.frame, a.keywords, a.alt, tuple(a.seg), a.rep_labels, a.rep_human,
-                 a.rep_frame, a.split, a.n_perm)
+                 a.rep_frame, a.split, a.n_perm, genre_path=a.genre if os.path.exists(a.genre) else None,
+                 works_path=a.works if os.path.exists(a.works) else None)
     print(bt.groupby("hypothesis")[["verdict", "n_pass", "need"]].first())

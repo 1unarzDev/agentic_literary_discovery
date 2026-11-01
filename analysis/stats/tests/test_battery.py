@@ -60,7 +60,8 @@ def test_run_battery_end_to_end(corpus, oracle_wd):
     assert list(t.check) == battery.CHECKS
     assert t.set_index("check").result["segmentation"] == "fail"     # not run -> fail
     assert t.set_index("check").result["leave_one_author_out"] == "pass"
-    assert res.verdict in {"supported", "unstable"}
+    assert res.verdict.split(":")[0] in {"supported", "unstable"}
+    assert res.verdict.endswith("inward")          # simulated truth is the Kahler pattern
     # H3-style effect without influence matrix -> grouped jackknife path
     e = models.Effect("x", [models.Component("c", -0.1, 0.01, -1)], None)
     chk = battery.leave_one_author_out(lambda w: e, oracle_wd, e, n_groups=4)
@@ -79,5 +80,5 @@ def test_cli_run_all_on_simulated_files(tmp_path):
                          alt_path=str(tmp_path / "alt.parquet"), rep_labels=str(tmp_path / "labels.parquet"),
                          n_perm=5, out_dir=str(tmp_path / "out"))
     assert set(bt.hypothesis) == {"H1", "H2a", "H2b", "H2c", "H3"}
-    assert set(bt.verdict) <= {"supported", "unstable", "null"}
+    assert all(v.split(":")[0] in {"supported", "unstable", "null"} for v in bt.verdict)
     assert (tmp_path / "out" / "confirmatory.csv").exists()

@@ -157,8 +157,15 @@ def final_point(args) -> list[dict]:
     DSL with annotator-mean soft labels; H1, H2a, H2b, H2c(darkness), H3."""
     W, noise, strata, ann_err, era_diff, seed = args[:6]
     kw_noise = args[6] if len(args) > 6 else 0.05
+    truth_kind = args[7] if len(args) > 7 else "inward"
     rng = np.random.default_rng(seed + 11)
-    c = simulate(SimConfig(n_works=2 * W, noise=NOISE[noise], seed=seed), audit=False)
+    if truth_kind == "pilot":       # docs/pilot_analysis_1.md: material +8 pp step in the 1880s, internal flat
+        cfg = SimConfig.pilot_step(n_works=2 * W, noise=NOISE[noise], seed=seed)
+    elif truth_kind == "null":      # no within-genre drift at all (genre-mix drift kept)
+        cfg = SimConfig(n_works=2 * W, noise=NOISE[noise], seed=seed, effect=0.0)
+    else:                           # default simulated Kahler pattern (material -13, internal +8 pp)
+        cfg = SimConfig(n_works=2 * W, noise=NOISE[noise], seed=seed)
+    c = simulate(cfg, audit=False)
     lab = c.labels[(c.labels.split == "confirmation") & (c.labels.stratum == "random")].reset_index(drop=True)
     tru = c.truth.set_index("passage_id").loc[lab.passage_id].reset_index()
     sel = lab.assign(era=np.array(ERAS3, dtype=object)[np.searchsorted([1850, 1885], lab.decade.values, side="right")],
@@ -201,6 +208,7 @@ def final_point(args) -> list[dict]:
     rep = ann.expert_agreement(human)
     excl = ann.exclusions(rep)
     base = {"works_per_split": W, "noise": noise, "strata": strata, "ann_err": str(ann_err), "era_diff": era_diff,
+            "truth_kind": truth_kind,
             "seed": seed, "n_unique_labelled": len(ids), "n_excluded": len(excl),
             "kappa_locus_mean": rep.kappa_locus.mean(), "kappa_locus_min": rep.kappa_locus.min()}
     wd = dsl.prepare(lab, human, frame, g="calib", split="confirmation", exclude_annotators={"teacher"} | excl,
@@ -212,14 +220,19 @@ def final_point(args) -> list[dict]:
     design = models.Design.from_data(wo)
     models.LINK["default"] = "logit"
     out = []
-    for name, f in (("H1", models.h1), ("H2a", models.h2a), ("H2b", models.h2b), ("H2c", models.h2c)):
+    for name, f in (("H1", models.h1), ("H1-ML", models.h1_mid_late), ("H2a", models.h2a), ("H2b", models.h2b),
+                    ("H2c", models.h2c)):
         e1, e0 = f(wd, design), f(wo, design)
+        fb = bool(name != "H2b" and e1.extra.get("link", "logit") != "logit")
         for c1, c0 in zip(e1.components, e0.components):
-            if c1.expected_sign == 0:
+            if not (c1.in_test or c1.expected_sign != 0):
                 continue
             out.append({**base, "test": name, "component": c1.label, "est": c1.estimate, "se": c1.se,
-                        "truth_rep": c0.estimate, "p": c1.p_two,
-                        "fallback": bool(name != "H2b" and e1.extra.get("link", "logit") != "logit")})
+                        "truth_rep": c0.estimate, "p": c1.p_two, "fallback": fb, "cls": None})
+        if e1.extra.get("two_sided"):   # the registered joint test + classification
+            out.append({**base, "test": name, "component": "joint Wald (2 df)", "est": e1.extra["wald"], "se": np.nan,
+                        "truth_rep": np.nan, "p": e1.p, "fallback": fb, "cls": e1.extra["classification"],
+                        "truth_cls": e0.extra["classification"]})
     # expert-nested sensitivity (two-phase DSL: annotator mean on the audit, expert on the 30-item
     # probability subsample, pi_h|audit = 10 / n_audit_in_era) - raw g, identity link, H1 material
     T = dsl.TARGETS["locus"]
@@ -255,13 +268,22 @@ def final_point(args) -> list[dict]:
 
 
 def summarise_final(raw: pd.DataFrame) -> pd.DataFrame:
-    k = ["noise", "strata", "ann_err", "era_diff", "test", "component"]
+    raw = raw.copy()
+    if "truth_kind" not in raw:
+        raw["truth_kind"] = "inward"
+    raw["truth_kind"] = raw.truth_kind.fillna("inward")
+    if "cls" not in raw:
+        raw["cls"] = None
+    for c_ in ("inward", "outward", "mixed"):
+        raw[f"cls_{c_}"] = (raw.cls == c_).astype(float)
+    k = ["truth_kind", "noise", "strata", "ann_err", "era_diff", "test", "component"]
     s = raw.groupby(k).agg(reps=("se", "size"), n_lab=("n_unique_labelled", "median"),
                            kappa=("kappa_locus_mean", "mean"), excluded=("n_excluded", "mean"),
                            truth=("truth_rep", "mean"), mean_est=("est", "mean"), emp_sd=("est", "std"),
                            se=("se", lambda x: float(np.sqrt(np.mean(np.asarray(x) ** 2)))),
                            reject05=("p", lambda x: float(np.mean(np.asarray(x) < 0.05))),
-                           fallback=("fallback", "mean")).reset_index()
+                           fallback=("fallback", "mean"), cls_inward=("cls_inward", "mean"),
+                           cls_outward=("cls_outward", "mean"), cls_mixed=("cls_mixed", "mean")).reset_index()
     s["attenuation"] = s.mean_est / s.truth
     for a, z in Z.items():
         s[f"mde_pp_a{str(a)[2:]}"] = 100 * z * s.se
@@ -275,10 +297,19 @@ def run_final(reps: int = 10, procs: int = 8, extra: bool = False) -> pd.DataFra
             (7750, "good", "dgroup", (0, 0, 0, 0), 0.0),             # ablation: expert-quality annotators
             (7750, "good", "dgroup", FINAL["ann_error"], 0.10)]      # risk: annotators worse on early prose
     tag = ""
-    if extra:   # trained annotators (kappa ~0.78) and an H3 size check with noise-free keyword series
+    if extra == "v04":   # prereg v0.4: two-sided H1 under the registered annotation design, three truths
+        A0 = FINAL["ann_error"]
+        scen = [(7750, "good", "dgroup", A0, 0.0, 0.05, "inward"), (7750, "good", "dgroup", A0, 0.0, 0.05, "pilot"),
+                (7750, "good", "dgroup", A0, 0.0, 0.05, "null"),
+                (7750, "good", "dgroup", (0.15, 0.15, 0.18, 0.18), 0.0, 0.05, "pilot"),
+                (7750, "base", "dgroup", A0, 0.0, 0.05, "pilot")]
+        jobs = [sc[:5] + (500 + r,) + sc[5:] for sc in scen for r in range(reps)]
+        tag = "_v04"
+    elif extra:   # trained annotators (kappa ~0.78) and an H3 size check with noise-free keyword series
         scen = [(7750, "good", "dgroup", (0.15, 0.15, 0.18, 0.18), 0.0), (7750, "good", "dgroup", FINAL["ann_error"], 0.0)]
         tag = "_extra"
-    jobs = [sc + (500 + r,) + ((0.0,) if extra else ()) for sc in scen for r in range(reps)]
+    if extra != "v04":
+        jobs = [sc + (500 + r,) + ((0.0,) if extra else ()) for sc in scen for r in range(reps)]
     with mp.get_context("fork").Pool(procs) as pool:
         raw = pd.DataFrame([r for rows in pool.imap_unordered(final_point, jobs) for r in rows])
     OUT.mkdir(exist_ok=True)
@@ -333,7 +364,8 @@ if __name__ == "__main__":
     ap.add_argument("--curve", action="store_true", help="audit-size curve at the base point (use --reps 12)")
     ap.add_argument("--final", action="store_true", help="registered final design (prereg v0.3), use --reps 10")
     ap.add_argument("--extra", action="store_true", help="with --final: trained-annotator + H3-size scenarios")
+    ap.add_argument("--v04", action="store_true", help="with --final: two-sided H1 scenarios (prereg v0.4)")
     a = ap.parse_args()
-    s = run_final(a.reps, a.procs, a.extra) if a.final else main(a.reps, a.procs, a.quick, a.curve)
+    s = run_final(a.reps, a.procs, "v04" if a.v04 else a.extra) if a.final else main(a.reps, a.procs, a.quick, a.curve)
     pd.set_option("display.width", 220)
     print(s.round(4).to_string())

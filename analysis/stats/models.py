@@ -1,7 +1,8 @@
 """Pre-registered confirmatory models (docs/prereg.md), all on DSL work-level tables (dsl.WorkData).
 
-Family (prereg v0.3): H1 = single PRIMARY test; H2a, H2b, H2c, H3 = secondary (Holm over the
-four secondary tests, each reported with its registered MDE).
+Family (prereg v0.4): H1 = single PRIMARY test, TWO-SIDED 2-df Wald test of (d_material,
+d_internal) = 0, classified inward / outward / mixed; H2a, H2b, H2c, H3 = secondary (Holm over the
+four, each reported with its registered MDE); H1-ML (mid vs late) descriptive.
 H1  locus shares among obstacles (material / social / internal), multinomial logit on DSL soft
     outcomes ~ ns(year, df=4) + genre + origin + log length; standardised era contrast
     1800-1849 vs 1885-1929 (G0 eras; g-computation over the pooled covariate mix = "within genre");
@@ -184,6 +185,7 @@ class Component:
     estimate: float
     se: float
     expected_sign: int          # +1 / -1 / 0 (no prediction)
+    in_test: bool | None = None # part of the hypothesis test (default: expected_sign != 0)
 
     @property
     def p_two(self) -> float:
@@ -210,11 +212,19 @@ class Effect:
 
     @property
     def tested(self) -> list[Component]:
-        return [c for c in self.components if c.expected_sign != 0]
+        return [c for c in self.components if (c.in_test if c.in_test is not None else c.expected_sign != 0)]
+
+    @property
+    def tested_idx(self) -> list[int]:
+        return [i for i, c in enumerate(self.components)
+                if (c.in_test if c.in_test is not None else c.expected_sign != 0)]
 
     @property
     def p(self) -> float:
-        """intersection-union p: every directional component must be significant."""
+        """Registered test p: a joint (Wald) p if the effect carries one (two-sided H1), else the
+        intersection-union p (every directional component significant in its declared direction)."""
+        if self.extra.get("p_test") is not None:
+            return float(self.extra["p_test"])
         return max(c.p_dir for c in self.tested)
 
     def summary(self) -> pd.DataFrame:
@@ -247,7 +257,9 @@ def _contrast_components(tf: TargetFit, ref: pd.DataFrame, specs: list[tuple], e
         comps.append(Component(label, sl_ - se_, se, sign))
         grads.append(g)
         shares[label] = (se_, sl_)
-    infl = tf.fit.cluster_influence() @ np.column_stack(grads)
+    G = np.column_stack(grads)
+    infl = tf.fit.cluster_influence() @ G
+    shares["_cov"] = G.T @ tf.fit.cov @ G          # joint covariance of the contrasts (for Wald tests)
     return comps, infl, shares
 
 
@@ -260,13 +272,76 @@ def _ref(wd: WorkData, ref_cov: pd.DataFrame | None, max_ref: int = 3000) -> pd.
     return c.sample(n=max_ref, random_state=0) if len(c) > max_ref else c
 
 
-def h1(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE) -> Effect:
+def classify_h1(d_mat: Component, d_int: Component, p_wald: float, alpha: float = 0.05) -> str:
+    """Pre-registered sign rules (prereg v0.4 §1), applied only when the joint test rejects:
+    inward  = material falls AND internal rises, both 95% CIs excluding 0 (the Kahler pattern);
+    outward = material rises with its 95% CI excluding 0 AND internal does not rise (estimate <= 0);
+    mixed   = any other significant pattern;  none = joint test not significant."""
+    if not p_wald < alpha:
+        return "none"
+    mlo, mhi = d_mat.ci()
+    ilo, ihi = d_int.ci()
+    if mhi < 0 and ilo > 0:
+        return "inward"
+    if mlo > 0 and d_int.estimate <= 0:
+        return "outward"
+    return "mixed"
+
+
+def wald(est: np.ndarray, cov: np.ndarray) -> tuple[float, float]:
+    """Joint Wald chi-square test of est = 0; returns (W, p)."""
+    est = np.asarray(est, float)
+    W = float(est @ np.linalg.pinv(cov) @ est)
+    return W, float(stats.chi2.sf(W, len(est)))
+
+
+def h1(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE,
+       two_sided: bool = True, name: str = "H1 locus shift") -> Effect:
+    """Registered H1 (prereg v0.4): two-sided 2-df Wald test of (d_material, d_internal) = 0, L - E,
+    genre-standardised; result classified inward / outward / mixed (classify_h1).
+    two_sided=False reproduces the v0.3 directional intersection-union test (material down AND
+    internal up)."""
     design = design or Design.from_data(wd)
     tf = fit_target(wd, "locus", design)
-    specs = [("material share", [1], [1, 2, 3], -1), ("internal share", [3], [1, 2, 3], +1),
+    sm, si = (0, 0) if two_sided else (-1, +1)
+    specs = [("material share", [1], [1, 2, 3], sm), ("internal share", [3], [1, 2, 3], si),
              ("social share", [2], [1, 2, 3], 0)]
     comps, infl, shares = _contrast_components(tf, _ref(wd, ref_cov), specs, early, late, wd.cov)
-    return Effect("H1 inward turn", comps, infl, {"era_shares": shares, "converged": tf.fit.converged, "link": tf.fit.link, "fit": tf})
+    extra = {"era_shares": shares, "converged": tf.fit.converged, "link": tf.fit.link, "fit": tf,
+             "window": (early, late)}
+    if two_sided:
+        comps[0].in_test = comps[1].in_test = True
+        W, p = wald([comps[0].estimate, comps[1].estimate], shares["_cov"][:2, :2])
+        extra.update({"two_sided": True, "wald": W, "p_test": p, "classification": classify_h1(comps[0], comps[1], p)})
+    return Effect(name, comps, infl, extra)
+
+
+def h1_mid_late(wd: WorkData, design: Design | None = None, ref_cov=None) -> Effect:
+    """Descriptive (prereg v0.4): the same two-sided locus contrast for M (1850-84) vs L (1885-1929),
+    where most of the data lie and the pilot's 1880s step sits. Reported with CI and Wald p; not part
+    of any multiplicity family."""
+    return h1(wd, design, ref_cov, early=MID, late=LATE, name="H1-ML mid vs late (descriptive)")
+
+
+def reference_covariates(works: pd.DataFrame, genre: pd.DataFrame | None = None, n: int = 3000,
+                         seed: int = 0) -> pd.DataFrame:
+    """Registered standard population for g-computation: a fixed-seed sample of the primary-set works
+    of BOTH halves (metadata only, nothing sealed), with the registered genre variable
+    (data/work/genre.parquet, pipeline/genre.py). Needs work_id, origin, n_words (+ genre or `genre`)."""
+    w = works.copy()
+    if genre is not None:
+        w = w.drop(columns=["genre"], errors="ignore").merge(genre[["work_id", "genre"]], on="work_id", how="left")
+    w = w[w.genre.notna()]
+    return w.sample(n=min(n, len(w)), random_state=seed).reset_index(drop=True)
+
+
+def attach_genre(labels: pd.DataFrame, genre: pd.DataFrame) -> pd.DataFrame:
+    """Replace labels.genre by the registered 8-class genre (pipeline/genre.py)."""
+    out = labels.drop(columns=["genre"], errors="ignore").merge(genre[["work_id", "genre"]], on="work_id", how="left")
+    missing = out.genre.isna().mean()
+    if missing > 0.01:
+        raise ValueError(f"{missing:.1%} of passages have no registered genre")
+    return out
 
 
 def h2a(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE) -> Effect:
@@ -417,18 +492,23 @@ def holm(p: list[float] | np.ndarray) -> np.ndarray:
 
 
 def confirmatory(wd: WorkData, keywords: pd.DataFrame, alpha: float = 0.05, design: Design | None = None,
-                 n_boot: int = 2000) -> tuple[pd.DataFrame, dict[str, Effect]]:
+                 n_boot: int = 2000, ref_cov: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict[str, Effect]]:
     design = design or Design.from_data(wd)
-    effs = {"H1": h1(wd, design), "H2a": h2a(wd, design), "H2b": h2b(wd, design), "H2c": h2c(wd, design),
+    effs = {"H1": h1(wd, design, ref_cov), "H2a": h2a(wd, design, ref_cov), "H2b": h2b(wd, design, ref_cov),
+            "H2c": h2c(wd, design, ref_cov),
             "H3": h3(wd, keywords, n_boot=n_boot)}
-    # H1 primary at alpha; Holm across the four secondary tests
+    # H1 primary at alpha (two-sided Wald); Holm across the four secondary tests; H1-ML descriptive
     adj = np.r_[effs["H1"].p, holm([effs[k].p for k in ("H2a", "H2b", "H2c", "H3")])]
+    effs["H1-ML"] = h1_mid_late(wd, design, ref_cov)
+    adj = np.r_[adj, np.nan]
+    role = {"H1": "primary", "H1-ML": "descriptive"}
     rows = []
     for (k, e), pa in zip(effs.items(), adj):
         for c in e.components:
-            rows.append({"test": k, "role": "primary" if k == "H1" else "secondary", "component": c.label, "estimate": c.estimate, "se": c.se,
-                         "lo": c.ci()[0], "hi": c.ci()[1], "expected_sign": c.expected_sign,
-                         "p_test": e.p, "p_adj": pa, "reject": pa < alpha})
+            rows.append({"test": k, "role": role.get(k, "secondary"), "component": c.label, "estimate": c.estimate,
+                         "se": c.se, "lo": c.ci()[0], "hi": c.ci()[1], "expected_sign": c.expected_sign,
+                         "p_test": e.p, "p_adj": pa, "reject": bool(pa < alpha) if np.isfinite(pa) else None,
+                         "classification": e.extra.get("classification")})
     return pd.DataFrame(rows), effs
 
 
