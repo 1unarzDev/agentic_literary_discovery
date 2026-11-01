@@ -275,6 +275,8 @@ class Worker:
                 if s not in allowed:
                     excluded[s] = f"not allowed for tier {tier}"
             allowed = [s for s in allowed if s in self.requested]
+        if self.manage_ollama:  # we set OLLAMA_NUM_PARALLEL to the tier hint (ollama_env)
+            self.fit.server_slots = reg.num_parallel_hint(tier) or None
         fit_ok, why = self.fit.filter_stages(reg.stages[s] for s in allowed)
         excluded.update(why)
         try:

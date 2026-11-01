@@ -226,6 +226,9 @@ class HardwareFit:
     accel: str = "cpu"
     headroom_gb: float = 0.5
     unfit: set[str] = field(default_factory=set)
+    # Ollama allocates KV cache for OLLAMA_NUM_PARALLEL slots; requests beyond that queue in the server and
+    # cost no VRAM. Known when ald configured the server (manage_ollama), else None (= every request a slot).
+    server_slots: int | None = None
 
     @property
     def capacity_gb(self) -> float:
@@ -240,7 +243,8 @@ class HardwareFit:
     def fits(self, stage: Stage, concurrency: int = 1) -> bool:
         if stage.name in self.unfit:
             return False
-        return self.need_gb(stage, concurrency) + self.headroom_gb <= self.capacity_gb + 1e-9
+        c = min(concurrency, self.server_slots) if self.server_slots else concurrency
+        return self.need_gb(stage, c) + self.headroom_gb <= self.capacity_gb + 1e-9
 
     def max_concurrency(self, stage: Stage, cap: int) -> int:
         best = 0
@@ -287,13 +291,19 @@ class ConcurrencyTuner:
     """
 
     def __init__(self, start: int = 1, max_c: int = 8, *, window: int = 8, gain: float = 1.05,
-                 thermal_factor: float = 2.0, hold_windows: int = 10, clock: Clock | None = None):
+                 thermal_factor: float = 2.0, hold_windows: int = 10, settle_windows: int = 1,
+                 clock: Clock | None = None):
         self.max_c = max(1, max_c)
         self.current = max(1, min(start, self.max_c))
         self.window = window
         self.gain = gain
         self.thermal_factor = thermal_factor
         self.hold_windows = hold_windows
+        # After every change the first window is a transient (requests started at the old level are still
+        # finishing), so it is discarded. Measured on an RTX 3060: without this the tuner stopped at c=3
+        # although c>=4 was ~35% faster.
+        self.settle_windows = settle_windows
+        self._settle = 0
         self.clock = clock or Clock()
         self.baseline_lat: dict[int, float] = {}
         self.tput: dict[int, float] = {}
@@ -322,7 +332,14 @@ class ConcurrencyTuner:
         if self._n >= self.window:
             self._evaluate(now)
 
+    def _changed(self) -> None:
+        self._settle = self.settle_windows
+
     def _evaluate(self, now: float) -> None:
+        if self._settle > 0:
+            self._settle -= 1
+            self._reset_window()
+            return
         c = self.current
         dt = max(now - (self._t0 or now), 1e-6)
         tput = self._tokens / dt if self._tokens else self._n / dt
@@ -343,17 +360,20 @@ class ConcurrencyTuner:
             best_c = max(self.tput, key=lambda k: self.tput[k])
             if best_c != c:
                 self.events.append(f"plateau at c={c}; back to c={best_c}")
+                self._changed()
             self.current = best_c
             self._hold = self.hold_windows
             return
         if c < self.max_c:
             self.current = c + 1
+            self._changed()
             self.events.append(f"increase to c={self.current}")
 
     def _decrease(self, why: str) -> None:
         self.current = max(1, self.current // 2)
         self._hold = self.hold_windows
         self._reset_window()
+        self._changed()
         self.events.append(f"decrease to c={self.current}: {why}")
 
     def on_error(self, oom: bool = False) -> None:

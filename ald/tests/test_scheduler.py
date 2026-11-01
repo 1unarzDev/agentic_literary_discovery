@@ -129,7 +129,7 @@ def feed(tuner, clock, n, latency, tokens, dt):
 
 def test_tuner_increases_while_throughput_grows():
     clock = FakeClock()
-    t = ConcurrencyTuner(start=1, max_c=4, window=4, clock=clock)
+    t = ConcurrencyTuner(start=1, max_c=4, window=4, clock=clock, settle_windows=0)
     # Throughput grows with c: completions arrive faster at higher c.
     for c_expected in (1, 2, 3):
         assert t.current == c_expected
@@ -141,7 +141,7 @@ def test_tuner_increases_while_throughput_grows():
 
 def test_tuner_plateau_reverts_to_best():
     clock = FakeClock()
-    t = ConcurrencyTuner(start=1, max_c=8, window=4, clock=clock, hold_windows=2)
+    t = ConcurrencyTuner(start=1, max_c=8, window=4, clock=clock, hold_windows=2, settle_windows=0)
     feed(t, clock, 4, 1.0, 50, 1.0)    # c=1: 50 tok/s
     assert t.current == 2
     feed(t, clock, 4, 1.0, 50, 0.5)    # c=2: 100 tok/s
@@ -153,7 +153,7 @@ def test_tuner_plateau_reverts_to_best():
 
 def test_tuner_thermal_backoff():
     clock = FakeClock()
-    t = ConcurrencyTuner(start=4, max_c=4, window=4, clock=clock, hold_windows=0)
+    t = ConcurrencyTuner(start=4, max_c=4, window=4, clock=clock, hold_windows=0, settle_windows=0)
     feed(t, clock, 4, 1.0, 50, 0.25)   # baseline at c=4
     assert t.current == 4
     feed(t, clock, 4, 2.5, 50, 0.6)    # latency > 2x baseline
@@ -172,6 +172,31 @@ def test_tuner_oom_halves_and_caps():
     t2 = ConcurrencyTuner(start=6, max_c=8, clock=FakeClock())
     t2.on_error(oom=False)
     assert t2.current == 3 and t2.max_c == 8
+
+
+def test_tuner_discards_transient_window_after_change():
+    """RTX 3060 / NUM_PARALLEL=4: the first window at c=4 still contains c=3 completions and looked slower,
+    so the tuner stopped at 3. The settle window is ignored; the steady state at c=4 wins."""
+    clock = FakeClock()
+    t = ConcurrencyTuner(start=3, max_c=8, window=4, clock=clock, hold_windows=2)
+    feed(t, clock, 4, 1.0, 50, 1 / 3)      # c=3 steady: 150 tok/s (no change happened yet: evaluated)
+    assert t.current == 4
+    feed(t, clock, 4, 1.0, 50, 1 / 2.5)    # transient at c=4: looks like 125 tok/s -> discarded
+    assert t.current == 4 and 4 not in t.tput
+    feed(t, clock, 4, 1.0, 50, 1 / 4.5)    # steady c=4: 225 tok/s
+    assert t.current == 5
+
+
+def test_fit_counts_only_server_slots():
+    from ald.registry import Stage
+    st = Stage("label", {"model_ref": "m", "model_digest": "d", "ollama_version_range": ">=0",
+                         "vram_gb_required": 10.0, "kv_gb_per_slot": 0.35})
+    f = HardwareFit(usable_vram_gb=12.0, ram_gb=16, accel="cuda")
+    assert f.max_concurrency(st, 8) == 5          # every request counted as a KV slot
+    f.server_slots = 4
+    assert f.max_concurrency(st, 8) == 8          # beyond 4 they queue in Ollama: no extra VRAM
+    f.server_slots = 8
+    assert f.max_concurrency(st, 8) == 5
 
 
 # --- timing ------------------------------------------------------------------------
