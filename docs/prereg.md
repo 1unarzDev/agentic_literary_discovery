@@ -1,4 +1,4 @@
-# Pre-registration: What Stands in the Way (confirmatory analysis), DRAFT v0.3
+# Pre-registration: What Stands in the Way (confirmatory analysis), DRAFT v0.4
 
 **OSF registration hash:** `OSF-HASH-PLACEHOLDER` (fill in on registration; `ald sync` / `POST /v1/admin/unseal` refuse to unseal Confirmation results until this line holds the real hash)
 
@@ -25,7 +25,7 @@
 Every hypothesis is tested on the **Confirmation half** (authors hashed 50/50, stratified by decade × origin × genre).
 
 **Family.**
-- **H1 is the single primary confirmatory test**, tested at α = 0.05.
+- **H1 is the single primary confirmatory test**: two-sided, tested at α = 0.05 (v0.4, see below).
 - **H2a, H2b, H2c and H3 are secondary confirmatory tests**, Holm-corrected among themselves (§5.3). Each is reported with its registered MDE (§7.4), so a null is read against what the design could detect.
 
 Eras, revised at G0 because PG is thin before 1840:
@@ -40,11 +40,20 @@ The study window is 1800–1929.
 
 | ID | Hypothesis | Direction | Estimand (Confirmation half) |
 |---|---|---|---|
-| **H1** inward turn (primary) | Among plot obstacles, the material/external share falls **and** the internal/psychological share rises from E to L, holding the genre × origin × length mix fixed | Δ_material < 0 **and** Δ_internal > 0 | Standardised era shares of locus among obstacles; Δ = L − E for material and for internal |
+| **H1** locus shift (primary; two-sided since v0.4) | The locus mix of plot obstacles (material / social / internal) shifts between E and L, holding the registered genre × origin × length mix fixed. Kahler's inward turn (material falls, internal rises) is the named thesis tested. | two-sided; the result is classified (below) | Standardised era shares of locus among obstacles; (Δ_material, Δ_internal) = L − E. 2-df Wald test of (Δ_material, Δ_internal) = 0 |
 | **H2a** communication | Among communication failures, intentional withholding rises relative to infrastructure + accidental loss | Δ > 0 | Standardised share withholding / (withholding + infrastructure + accidental_loss), L − E |
 | **H2b** mobility | DISTANCE_TRAVEL obstacles become less prevalent after railway diffusion | Δ < 0 | Standardised prevalence per passage, 1850–1884 minus 1800–1849 (G0 window) |
 | **H2c** darkness | DARKNESS_VISIBILITY prevalence falls | Δ < 0 | Standardised prevalence per passage, L − E. The night-function part (danger + concealment share) is **exploratory**: humans do not label `night_function`, so it cannot be DSL-corrected (R4). |
 | **H3** mention ≠ function | Decade keyword rates for technology terms do **not** track the corresponding obstacle-function rates | excess divergence > 0 | D = mean over 3 pairs of (1 − r) between z-scored decade series; excess = D − E_H0[D] |
+
+**H1 classification** (pre-declared, applied only when the 2-df Wald test gives p < 0.05; `models.classify_h1`):
+- **inward (Kahler pattern):** Δ_material < 0 **and** Δ_internal > 0, with both 95% CIs excluding 0;
+- **outward / externalisation:** Δ_material > 0 with its 95% CI excluding 0, **and** Δ_internal ≤ 0 (point estimate);
+- **mixed:** any other significant pattern, e.g. material falls with internal flat, or both rise.
+
+The paper reports the class together with both component estimates and CIs. "Inward" confirms Kahler, "outward" contradicts him, and "mixed" is reported as such.
+
+**H1-ML, mid vs late (descriptive, v0.4).** The same estimand and 2-df Wald test for M (1850–1884) vs L (1885–1929), where most of the data lie and where the Discovery pilot shows a step in the 1880s. It is reported with CIs, Wald p and class. It is **not** part of any multiplicity family and carries no verdict.
 
 H3 pairs (keyword group → function rate per passage):
 
@@ -60,7 +69,8 @@ Not confirmatory, and reported descriptively only:
 - the H2b "barrier → setting" function shift (the schema has no travel-function field);
 - H2c's "earlier in urban settings" (there is no setting-location field);
 - the social share in H1;
-- night's function shares (exploratory, uncorrected model labels).
+- night's function shares (exploratory, uncorrected model labels);
+- **the genre-split interaction** ("literary fiction turned inward, popular fiction turned outward"): era × genre-group locus shares and interaction contrasts, **exploratory only**. The pilot found no support: era × popular OR 0.86–0.88, CIs spanning 0.3–2.5. An interaction contrast would need about twice H1's MDE.
 
 ## 2. Design
 
@@ -163,7 +173,7 @@ There is no optional stopping on hypothesis outcomes.
 
 - **Covariates (work level):**
   - year (natural cubic spline, df = 4, with **fixed knots at 1800, 1850, 1885, 1905, 1929**: the boundaries, the era cut points and the late-era median). Quantile knots fall at about 1891/1906/1917 in this late-heavy corpus, which leaves 1800–1890 as one cubic piece.
-  - genre (≤ 8 LCSH-mapped classes; reference = the most common);
+  - genre: **the registered 8-class variable from `pipeline/genre.py` → `data/work/genre.parquet`** (metadata only: LCSH, bookshelves, year), frozen at the registration commit. Classes: juvenile, domestic_realist, historical, adventure, sensation_mystery, collection, romance, other. Reference level: juvenile, the most common. It is attached with `models.attach_genre` and replaces any other genre field. Standardisation over genre is **necessary, not optional**: the juvenile share differs between the halves in the mid era (Discovery 25.4% vs Confirmation 37.0%, `docs/pilot_analysis_1.md` §1);
   - origin (UK reference; US; unknown);
   - log(n_words), centred.
 - **Battery variables:**
@@ -172,6 +182,17 @@ There is no optional stopping on hypothesis outcomes.
   - alternate-family labels on a 10% work subsample **plus every audit item**
   - 250- and 500-word segmentation labels
   - ELTeC-eng and Chicago labels
+
+### 4.1 Planned codebook v1.0 content (pending the QA A/B, `docs/qa/label_pass_2.md`)
+The changes below go into codebook v0.9 (variant `v09a`). Whatever passes QA's A/B gates is frozen as **v1.0 before the relabel and before registration**. Anything that fails is dropped and logged here. Both the model prompt and the human annotation guide use v1.0.
+
+| Change | Text in brief | Why (QA pass 2 / pilot) | Affects |
+|---|---|---|---|
+| **E1, three-part obstacle test** | Answer *yes* only if (a) WHO wants WHAT, (b) WHAT in the passage itself stands in the way (not in the context), and (c) it matters for what happens next. Plus an extended "not obstacles" list: mild discomfort, description or essay, banter, label taken from context. | Yes-precision is about 0.77; most false yeses are late popular fiction. | has_obstacle and every prevalence: H1 denominators, H2b, H2c |
+| **E3, narrower SOCIAL_RANK_CONVENTION** | Only a social *rule* that would stop anyone in the character's position. A specific person's opposition is INTERPERSONAL; money is MONEY_PROPERTY_LAW; pride is INNER_STATE. | 12 of 19 RANK codings were wrong; RANK is inflated about 2×. | H1 domain mix (social share) |
+| **E4, locus = proximate source** | Locus is the source of the resistance that, if removed, lets the character proceed. The default domain→locus mapping is a starting point. **`locus_reason` (≤ 10 words) is required whenever the locus differs from the default.** | The model followed the default mapping in 93–100% of cases, and `locus_reason` was filled in 0 / 1,361 rows. | H1 construct |
+
+The category sets (locus and domain) are **not** changed, and ILLNESS keeps its material default. The domain-mapped locus is reported as a sensitivity (§5.8). DSL targets the human construct under v1.0, so codebook changes alter what the model must predict, not what is estimated. Humans label without the default-mapping hint (annotation UI b280007).
 
 ## 5. Analysis plan
 
@@ -212,11 +233,11 @@ For each target and passage i, with Ŷᵢ the model one-hot, Yᵢ the human labe
 - **H1, H2a.** Multinomial logit of the work-level DSL soft outcomes on ns(year, df = 4) + genre + origin + log length. Fitting solves the estimating equations Σ w xᵢ(Ỹᵢ − pᵢ(β)) = 0. Work weights are as in §3.3.
 - **H2b and H2c.** Binary logit with the same covariates. For H2b, the time term is the indicator year ≥ 1850, fitted on 1800–1884 works.
 - **Link fallback (pre-registered).** If the logit fails to converge, the same model is fitted with the identity link and that fit is reported (`fit_target`). DSL pseudo-outcome totals can be negative in sparse cells, and then the MLE does not exist. The fallback is flagged in output; see §7.2 for how often it happens.
-- **Estimand: g-computation.** For each era, average the fitted category probabilities over the pooled reference covariate table (a fixed-seed 3,000-work subsample of the primary set) × **the era's empirical work-year distribution**. Uniform years would give the near-empty 1800s as much weight as the 1840s, which inflated the SE by about 1.7× in simulation. Then take the ratio of the relevant categories. The contrast is L − E (H2b: M-window − E).
+- **Estimand: g-computation.** For each era, average the fitted category probabilities over the **registered standard population** × **the era's empirical work-year distribution**. The standard population is a fixed-seed (seed 0) 3,000-work sample from the primary set of **both halves**: metadata only (registered genre, origin, log length), with nothing sealed. It is built by `models.reference_covariates(works, genre)`. Pooling both halves gives Discovery and Confirmation estimates the same standard, and the pooled genre mix is the standard. Uniform years would give the near-empty 1800s as much weight as the 1840s, which inflated the SE by about 1.7× in simulation. Then take the ratio of the relevant categories. The contrast is L − E (H2b: M-window − E).
 - **SEs.** Delta method with the author-clustered (CR1) sandwich.
 - **Tests.**
-  - Two-sided z-tests; a claim requires the pre-declared sign.
-  - H1 has two parts (material falls, internal rises) and uses the intersection-union p = max of the parts.
+  - **H1 (v0.4):** a two-sided 2-df Wald test of (Δ_material, Δ_internal) = 0. It uses the joint delta-method covariance of the two contrasts, from the same fit and the CR1 author sandwich (`models.h1`, `models.wald`), followed by the classification in §1. The v0.3 directional intersection-union test stays available as `h1(two_sided=False)` and is reported as a sensitivity.
+  - **Secondary tests:** two-sided z-tests; a claim requires the pre-declared sign.
 - **H3.**
   - Decade series: DSL ratio estimates per decade. Decades with fewer than 30 works are dropped.
   - D: the mean over pairs of 1 − Pearson r of z-scored series.
@@ -225,7 +246,7 @@ For each target and passage i, with Ŷᵢ the model one-hot, Yᵢ the human labe
   - CI for D: a circular moving-block bootstrap over decades (block = 3), with sampling error added.
 
 ### 5.3 Multiplicity
-- **Primary.** H1 is tested at α = 0.05: two-sided, declared sign, intersection-union over its two parts.
+- **Primary.** H1 is tested at α = 0.05: the two-sided 2-df Wald test, then the classification.
 - **Secondary.** Holm–Bonferroni across H2a, H2b, H2c and H3 at family-wise α = 0.05. They are reported whatever the H1 result.
 - Effect sizes with 95% CIs are the headline numbers. Every secondary result is printed with its registered MDE (§7.4).
 - At most 2 open-discovery promotions (plan §4.6) form a separate family, corrected with BH at q = 0.05.
@@ -266,10 +287,11 @@ Battery notes:
   - ELTeC begins in 1841, so its early era is 1841–1849 plus a slope check over 1841–1929.
   - Chicago starts in 1880, so it cannot replicate H1 or H2b–c. It is used only for H2a and H3 trends over 1880–1923, and is otherwise reported as not run.
 - **H3.** The permutation check does not apply to H3. A check that cannot run because data are missing counts as **failed**.
+- **Two-sided H1: which components must hold (v0.4).** The battery re-checks the components that define the observed class: those whose 95% CI excludes 0 in the primary fit, each against its **observed** sign (`battery._ref`). For example, "outward" re-checks the material rise, and "inward" re-checks both. The permutation p is one-sided in the observed direction of each such component.
 
 ### 5.7 Verdict rule
 - **Supported:**
-  - for H1: p < 0.05;
+  - for H1: Wald p < 0.05, and the verdict carries the class, e.g. "supported: outward";
   - for a secondary test: Holm-significant among the secondary tests;
   - **and** passes at least ⌈7/9 × number of applicable checks⌉;
   - **and** has the same sign in replication.
@@ -285,7 +307,12 @@ The verdict is computed mechanically by `battery.verdict`.
 - historical-setting novels;
 - the 1800s–1830s by decade;
 - UK vs US contrasts;
-- the naive (uncorrected) estimates, shown only to illustrate measurement bias.
+- the naive (uncorrected) estimates, shown only to illustrate measurement bias;
+- (v0.4, from the pilot) locus shares **by decade**, including the 1880s step;
+- the residual "general fiction" bucket of domestic_realist, reported separately;
+- the domain-mapped locus (default mapping) as a construct sensitivity;
+- the genre-split interaction (§1);
+- the "romance revival" reading of the 1880s step, as at most one open-discovery promotion (§5.3).
 
 ## 6. Inference criteria and validation gates
 - α = 0.05 family-wise (Holm).
@@ -414,6 +441,35 @@ Further findings:
 - **Recommended before the probability sample starts:** a training round on the Discovery teaching items with feedback, and a **certification pre-test: κ ≥ 0.60 on 20 Discovery items vs the student's adjudicated key**. Only certified peers then label audit items. The registered exclusion floor (κ < 0.40 on the expert items) stays as written.
 - **H2a, H2b, H2c** have MDEs of 35+ / 5 / 5 pp against plausible effects of about 1–2 pp in prevalence, so they are expected nulls at this design. They are registered as secondary, so that their estimates and CIs are reported honestly and not read as evidence of absence.
 
+### 7.5 Power of the two-sided H1 (v0.4; `power.py --final --v04`, 20 replicates per scenario)
+
+The design is §7.4's registered annotation design: about 1,760 Confirmation items, 4 annotators, 30 expert items, the exclusion rule, and "good" LLM noise unless stated. Three truths are simulated:
+- **inward:** the v0.3 simulated Kahler pattern;
+- **pilot-like:** no smooth drift, and the NATURE / DISTANCE / DARKNESS logits step up in 1883. In the expert construct this gives material +11.0 pp E → L and +7.0 pp M → L, with internal −1.7 / −1.2 pp (`SimConfig.pilot_step`);
+- **null:** no within-genre drift, with genre-mix drift kept.
+
+"Power" is P(Wald p < 0.05). With 20 replicates, the Monte Carlo SE of a proportion is about ±0.10.
+
+| Truth | Annotators (κ vs expert) | Material Δ: truth / mean estimate | Material MDE (pp) | Internal MDE (pp) | **H1 power (2-df Wald)** | Classified inward / outward / mixed | H1-ML power | H1-ML material: truth / estimate |
+|---|---|---|---|---|---|---|---|---|
+| inward | ≈ 0.6 (registered) | −12.7 / −8.4 | 17.6 | 9.7 | **0.55** (v0.3 IU test: 0.35) | 0.20 / 0.00 / 0.35 | 0.30 | −7.1 / −5.9 |
+| **pilot-like** | ≈ 0.6 (registered) | +11.0 / +6.5 | 17.2 | 10.8 | **0.15** | 0.00 / 0.15 / 0.00 | 0.20 | +7.0 / +4.2 |
+| pilot-like | ≈ 0.74 (trained) | +11.0 / +6.8 | 15.1 | 8.9 | **0.25** | 0.00 / 0.15 / 0.10 | 0.20 | +7.0 / +4.8 |
+| pilot-like | ≈ 0.6, "base" LLM noise | +11.0 / +7.8 | 17.9 | 11.5 | 0.20 | 0.00 / 0.10 / 0.10 | 0.05 | +7.0 / +3.2 |
+| null | ≈ 0.6 | +0.5 / +0.2 | 17.3 | 10.9 | **0.05 (size)** | 0.00 / 0.00 / 0.05 | 0.00 | 0 / −1.1 |
+
+**Reading:**
+- **Size.** The two-sided Wald test holds its size under the null with genre-mix confounding (0.05). It never assigned the wrong direction (no "inward" calls under the pilot truth, no "outward" calls under the inward truth).
+- **Inward truth.** The two-sided test is *more* powerful than the v0.3 intersection-union test (0.55 vs 0.35), because either component can carry it. When it rejects, the class is often "mixed" (the internal CI includes 0).
+- **Pilot-like truth.** It is **under-powered: about 15–25%**. Annotator noise attenuates the effect from +11 to about +6.5 pp (human construct), against an MDE of about 17 pp. H1-ML has the smaller SE (5.0 vs 6.1 pp), but the pilot step is only +7 pp (≈ +4.2 after attenuation), so its power is about 0.20.
+- **What the registered design can detect.** E-vs-L material shifts of about **17 pp in the human construct (≈ 26 pp in expert units at κ ≈ 0.6; ≈ 18 pp at κ ≈ 0.75)**, and internal shifts of about 10 pp. The paper reports these MDEs next to the H1 result. A null H1 is reported as "no locus shift detected (MDE = 17 pp material / 10 pp internal, human construct)".
+- **Raising power.** The levers, in order of value:
+  1. annotator training and certification (§7.4: κ 0.6 → 0.75);
+  2. the v1.0 construct fixes (§4.1), which reduce model error and so the variance of the DSL correction;
+  3. more expert-quality labels.
+
+  The design is otherwise unchanged.
+
 ## 8. Deviations policy
 - **Before registration.** Any change in this draft is logged in the change log below.
 - **After registration:**
@@ -434,6 +490,13 @@ Further findings:
      - Exclusion rule κ < 0.40.
      - π is recomputed after exclusions.
   10. **H3 calibration.** The H3 p-value is simulation-calibrated (×10).
+  11. **H1 made two-sided (v0.4; pre-freeze deviation, decided after viewing Discovery labels).**
+      - **Justification:** the Discovery pilot (`docs/pilot_analysis_1.md`; raw Tier-2 labels, 1,361 passages, no human correction). It shows a material-share rise from M to L of +7–8 pp, within genre, as a step in the 1880s. Internal is flat. The pilot has no information about E.
+      - Under the v0.3 directional test this pattern would be recorded as "null (opposite sign)". The two-sided test does **not** bet on the pilot's direction: the estimand is unchanged, and any significant shift is classified by pre-declared rules.
+      - The pilot used Discovery data only. Confirmation labels remain sealed.
+  12. **Registered genre variable (v0.4).** `pipeline/genre.py` 8 classes, plus a pooled two-half standard population.
+  13. **H1-ML (v0.4).** The mid-vs-late contrast is added as a descriptive estimate.
+  14. **Codebook (v0.4).** v1.0 is planned to contain the three-part obstacle test, a narrower SOCIAL_RANK_CONVENTION, and locus = proximate source with a required `locus_reason` (§4.1). These are pending the QA A/B; whatever passes is frozen in v1.0 before the relabel and before registration.
 - **Unforeseen problems.** If an analysis cannot be run as registered (e.g., an era with no audited obstacles), the nearest pre-specified fallback is used: the identity link, then the raw DSL ratio contrast without covariates. The fallback is reported as such.
 
 ## 9. Change log
@@ -446,3 +509,10 @@ Further findings:
   - Enrichment strata excluded from the audit frame.
   - H3 calibration.
   - Final-design MDEs (§7.4).
+- v0.4 (2026-11-01): pre-freeze deviation from the Discovery pilot:
+  - H1 is two-sided: 2-df Wald test plus inward / outward / mixed classification.
+  - H1-ML (mid vs late) added as descriptive.
+  - Registered genre variable (`pipeline/genre.py`) and a pooled two-half standard.
+  - Genre-split interaction is exploratory only.
+  - Planned codebook v1.0 content (§4.1).
+  - Power for the two-sided H1 (§7.5): size 0.05; power 0.55 for the inward truth and 0.15–0.25 for the pilot-like truth.
