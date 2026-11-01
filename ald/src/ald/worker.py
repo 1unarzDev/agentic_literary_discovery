@@ -1126,8 +1126,13 @@ class Worker:
                     if self.gpu_lock.enabled and not self.gpu_lock.held:
                         self.activity = "waiting_gpu_lock"
                         self._save_state()
-                        if not self.gpu_lock.acquire(self.stop):
-                            break
+                        def _abort_wait() -> bool:  # keep updating while another program holds the GPU
+                            self.check_for_update()
+                            return self.auto_update and self._update_pending()
+                        if not self.gpu_lock.acquire(self.stop, abort=_abort_wait):
+                            if self.stop.is_set():
+                                break
+                            continue  # an update is pending: the next loop iteration applies it
                     got = self.lease_jobs()
                     hj = self._queue.popleft() if got and self._queue else None
                 if hj is None:

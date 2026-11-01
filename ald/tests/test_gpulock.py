@@ -197,3 +197,17 @@ def test_prefetched_job_handed_back_when_lock_taken(env, tmp_path, monkeypatch):
     monkeypatch.setattr(w.gpu_lock, "try_acquire", lambda: False)
     assert w.run_job(hj) == "gpu_busy"
     assert env.coord.state == {"job-a": "queued"}
+
+
+@posix
+def test_update_applied_while_waiting_for_lock(env, tmp_path):
+    path = tmp_path / "gpu.lock"
+    p = _holder(path, 30)
+    assert p.stdout.readline().strip() == "locked"
+    env.coord.ping_resp.update({"latest_client_version": "99.0.0", "wheel_url": "http://coord.test/dist/x.whl"})
+    w = env.make_worker(gpu_lock=str(path), auto_update=True)
+    w.gpu_lock.poll_s = 0.01
+    w.run()  # reexec is recorded (not performed) by the fixture, then the idle worker exits
+    p.kill()
+    p.wait()
+    assert env.reexec_calls, env.logs[-5:]
