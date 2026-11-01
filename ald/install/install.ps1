@@ -26,6 +26,14 @@ function Install-Ald {
     $env:PYTHONUTF8 = "1"
     $env:PYTHONIOENCODING = "utf-8"
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    # Model downloads take a while, and an upgrade stops the running worker (which normally keeps the PC
+    # awake): keep the system from sleeping until this script ends (ES_CONTINUOUS | ES_SYSTEM_REQUIRED).
+    try {
+        if (-not ("Ald.AldPowerNative" -as [type])) {
+            Add-Type -Namespace Ald -Name AldPowerNative -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint esFlags);' -ErrorAction Stop
+        }
+        [Ald.AldPowerNative]::SetThreadExecutionState([uint32]"0x80000001") | Out-Null
+    } catch { }
 
     function Say($m)  { Write-Host "==> $m" -ForegroundColor Cyan }
     function Warn($m) { Write-Host "!!  $m" -ForegroundColor Yellow }
@@ -130,4 +138,6 @@ try {
 } catch {
     Write-Host "xx  $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "xx  ald installation did not finish; fix the problem above and re-run the same command." -ForegroundColor Red
+} finally {
+    try { [Ald.AldPowerNative]::SetThreadExecutionState([uint32]"0x80000000") | Out-Null } catch { }
 }

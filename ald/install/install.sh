@@ -55,6 +55,14 @@ if [ "$OS" = "Darwin" ]; then
   export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 NONINTERACTIVE=1
 fi
 
+# Keep the machine awake while installing (model downloads take a while; an upgrade stops the worker).
+if [ "$OS" = "Darwin" ]; then
+  caffeinate -i -m -w $$ </dev/null >/dev/null 2>&1 &
+elif command -v systemd-inhibit >/dev/null 2>&1; then
+  systemd-inhibit --what=sleep:idle --who=ald-install --why="installing ald" --mode=block \
+    tail --pid=$$ -f /dev/null </dev/null >/dev/null 2>&1 &
+fi
+
 # 1. uv -----------------------------------------------------------------------
 if ! command -v uv >/dev/null 2>&1; then
   say "Installing uv (official Astral installer, user-local, no sudo)"
