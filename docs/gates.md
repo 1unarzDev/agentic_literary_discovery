@@ -25,3 +25,9 @@ Build results:
 - The study window is 1800–1929, since PG coverage extends through the 1920s. Sensitivity checks truncate at 1925.
 - **H2b is affected.** The railway hinge (1830s–50s) sits partly inside the thin early era. H2b becomes **1800–1849 vs 1850–1884** for DISTANCE_TRAVEL prevalence, and it is flagged as the lowest-powered confirmatory test.
 - Phase 2: a HathiTrust/HTRC request for public-domain fiction from 1800–1849, to strengthen the early era.
+
+## Date issues flagged by QA pass 2 (for the date-gold rule, 2026-11-01)
+- *Tippoo Sultaun* is catalogued 1880; it was first published 1840, which moves it into the early era.
+- Henry James, *The Point of View*, is catalogued 1886; it was published 1882, which moves it into the mid era.
+- *Zenobia* is off by about a decade but stays in the same era.
+- Wilkie Collins, *"I Say No"*, is catalogued 1860; it was published 1884 (title-page scan).
