@@ -159,7 +159,11 @@ fi
 say "Configuring Ollama, pulling and verifying the pinned models for this machine's tier"
 run ald setup --yes || warn "setup reported problems (see above)"
 say "Benchmarking (~1-2 min)"
-run ald doctor --bench || warn "benchmark failed; work will auto-tune from scratch"
+if [ -n "$GPU_LOCK" ]; then
+  run ald doctor --bench --gpu-lock "$GPU_LOCK" || warn "benchmark failed; work will auto-tune from scratch"
+else
+  run ald doctor --bench || warn "benchmark failed; work will auto-tune from scratch"
+fi
 
 # 5. background service + work -------------------------------------------------
 EXTRA=""

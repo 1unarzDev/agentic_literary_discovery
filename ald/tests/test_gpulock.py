@@ -147,3 +147,17 @@ def test_no_gpu_lock_means_no_unloads(env):
     w.run()
     assert env.coord.state == {"job-a": "done"}
     assert env.registry.stages["label"].model_ref not in env.ollama.unloads
+
+
+@posix
+def test_try_acquire_never_waits(tmp_path):
+    path = tmp_path / "gpu.lock"
+    p = _holder(path, 30)
+    assert p.stdout.readline().strip() == "locked"
+    lk = GpuLock(path)
+    t0 = time.time()
+    assert lk.try_acquire() is False and time.time() - t0 < 1
+    p.kill()
+    p.wait()
+    assert lk.try_acquire() is True and lk.held
+    lk.release()

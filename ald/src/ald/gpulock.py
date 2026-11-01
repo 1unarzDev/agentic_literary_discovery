@@ -79,6 +79,20 @@ class GpuLock:
                     os.close(fd)
                     return False
 
+    def try_acquire(self) -> bool:
+        """Take the lock only if it is free right now."""
+        if not self.enabled or self.held:
+            return True
+        assert self.path is not None
+        fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o666)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(fd)
+            return False
+        self._fd = fd
+        return True
+
     def release(self) -> None:
         if self._fd is None:
             return

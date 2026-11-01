@@ -148,6 +148,9 @@ def doctor(
     levels: Optional[str] = typer.Option(None, "--levels", help="Concurrency levels to benchmark, e.g. 1,2,4,6,8."),
     bench_stages: Optional[str] = typer.Option(None, "--stages", help="Benchmark only these stages (default: the "
                                                "tier's main stages)."),
+    gpu_lock: Optional[str] = typer.Option(None, "--gpu-lock", envvar="ALD_GPU_LOCK",
+                                           help="Benchmark only if this flock(2) lock is free (never waits); "
+                                                "unload the models afterwards."),
 ) -> None:
     """Detect hardware, pick a tier, test bandwidth and (optionally) benchmark."""
     cfg = Config.load()
@@ -192,8 +195,14 @@ def doctor(
 
     if bench:
         from .bench import eta_for_share, run_bench
+        from .gpulock import GpuLock
+        lock = GpuLock(gpu_lock, log=lambda m: None)
         if report["ollama_version"] is None:
             err.print("[red]Ollama is not running; `ald setup` first.[/red]")
+        elif not lock.try_acquire():
+            err.print(f"[yellow]GPU lock {gpu_lock} is held by another program: benchmark skipped "
+                      f"(ald work auto-tunes instead).[/yellow]")
+            report["bench_skipped"] = f"gpu lock {gpu_lock} busy"
         else:
             from .bench import LEVELS, default_bench_stages
             lv = tuple(int(x) for x in levels.split(",")) if levels else LEVELS
@@ -204,6 +213,13 @@ def doctor(
                 if "passages_per_hour" in r:
                     r["eta"] = eta_for_share(status or report.get("ping"), s, r["passages_per_hour"])
             report["bench"] = res
+            if lock.enabled:
+                for st_name in res:
+                    try:
+                        backend.unload(reg.stages[st_name].model_ref)
+                    except BackendError:
+                        pass
+                lock.release()
             if save:
                 cfg.bench = {**(cfg.bench or {}),
                              **{s: {k: r[k] for k in ("best_concurrency", "passages_per_hour", "tok_s")}
