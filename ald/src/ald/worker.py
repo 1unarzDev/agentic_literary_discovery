@@ -1255,6 +1255,8 @@ class Worker:
                         self.log(f"[ram] only {self._ram_avail_gb:.1f} GB of system RAM available "
                                  f"(< {self.cfg.min_free_ram_gb:g} GB): not leasing; freeing ours")
                     self.activity = "low_memory"
+                    self.check_for_update()  # idle: updating is fine (never while paused)
+                    self.maybe_apply_update()
                     self._unload_stage_models("low system RAM")
                     self._release_gpu_lock()
                     self._save_state()

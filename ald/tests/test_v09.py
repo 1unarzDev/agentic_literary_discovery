@@ -233,3 +233,12 @@ def test_update_applied_outside_active_hours(env):
     w = env.make_worker(auto_update=True, active_hours=f"{a}-{b}")
     w.run()
     assert env.reexec_calls
+
+
+def test_update_applied_while_low_on_ram(env):
+    from ald.scheduler import GB
+    env.ram_avail = 4 * GB
+    env.coord.ping_resp.update({"latest_client_version": "99.0.0", "wheel_url": "http://coord.test/dist/x.whl"})
+    w = env.make_worker(auto_update=True)
+    w.run()
+    assert env.reexec_calls
