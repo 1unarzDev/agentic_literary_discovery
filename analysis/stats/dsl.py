@@ -106,6 +106,18 @@ def resolve_human(human: pd.DataFrame, prefer: Iterable[str] = ("adjudicated", "
     return h.sort_values(["passage_id", "_o"]).drop_duplicates("passage_id").drop(columns="_o").reset_index(drop=True)
 
 
+def human_soft(human: pd.DataFrame, target: "Target", exclude: Iterable[str] = ()) -> tuple[np.ndarray, np.ndarray]:
+    """Registered human label: per passage, the MEAN of the one-hot labels of every retained
+    non-expert annotator (overlap pairs average to 0.5/0.5 on disagreement). Returns (ids, Y)."""
+    h = human[~human.annotator.isin(set(exclude))]
+    codes = target.fn(h)
+    oh = onehot(codes, target.K)
+    pid, inv = np.unique(h.passage_id.values, return_inverse=True)
+    S = np.zeros((len(pid), target.K))
+    np.add.at(S, inv, oh)
+    return pid, S / np.bincount(inv)[:, None]
+
+
 # ------------------------------------------------------------------ design
 
 def _era(decade: np.ndarray) -> np.ndarray:
@@ -113,7 +125,8 @@ def _era(decade: np.ndarray) -> np.ndarray:
 
 
 def audit_design(labels: pd.DataFrame, human: pd.DataFrame, frame: pd.DataFrame | None = None,
-                 teaching_authors: set | None = None, tol: float = 0.01) -> np.ndarray:
+                 teaching_authors: set | None = None, tol: float = 0.01,
+                 labelled_ids: set | None = None) -> np.ndarray:
     """First-order audit inclusion probability for each row of `labels` (0 = not in the audit pool).
 
     Preferred: `frame` = audit_frame.parquet written by select_annotation.draw_audit at selection time.
@@ -122,7 +135,15 @@ def audit_design(labels: pd.DataFrame, human: pd.DataFrame, frame: pd.DataFrame 
     so N_cell is checked against human.weight * n_cell and a ValueError is raised on mismatch.
     """
     if frame is not None and len(frame):
-        pi = labels[["passage_id"]].merge(frame[["passage_id", "pi_audit"]], on="passage_id", how="left").pi_audit
+        fr = frame[["passage_id", "audit_cell", "pi_audit"]] if "audit_cell" in frame else frame
+        if labelled_ids is not None and "audit_cell" in fr:
+            # registered rule: pi_cell = (# pool passages in the cell with a retained human label) /
+            # N_cell. Valid when label loss (annotator exclusion, skips) is random within the cell,
+            # which random assignment of items to annotators guarantees for exclusions.
+            N = fr.groupby("audit_cell").size()
+            n = fr[fr.passage_id.isin(labelled_ids)].groupby("audit_cell").size().reindex(N.index, fill_value=0)
+            fr = fr.assign(pi_audit=fr.audit_cell.map(n / N).values)
+        pi = labels[["passage_id"]].merge(fr[["passage_id", "pi_audit"]], on="passage_id", how="left").pi_audit
         return pi.fillna(0.0).values
     from analysis.stats.simulate import group_vec
     teach = teaching_authors or set()
@@ -182,7 +203,8 @@ def calibration_g(yhat_code: np.ndarray, Y: np.ndarray, w: np.ndarray, strata: n
 def pseudo_outcomes(Yhat_code: np.ndarray, Y_code: np.ndarray, labelled: np.ndarray, pi: np.ndarray, K: int,
                     method: str = "raw", strata: np.ndarray | None = None, folds: np.ndarray | None = None,
                     ) -> np.ndarray:
-    """DSL pseudo-outcomes (n x K). Y_code is used only where labelled; pi > 0 required there.
+    """DSL pseudo-outcomes (n x K). Y_code (codes, or an n x K soft-label matrix) is used only where
+    labelled; pi > 0 required there.
 
     method: "raw"     g = one-hot LLM label (DSL with the LLM as predictor; equals weighted PPI)
             "calib"   g = cross-fitted P(Y | LLM label) pooled
@@ -199,7 +221,10 @@ def pseudo_outcomes(Yhat_code: np.ndarray, Y_code: np.ndarray, labelled: np.ndar
         raise ValueError("labelled passages with pi_audit == 0")
     lab = labelled & (pi > 0)
     Y = np.zeros_like(Yh)
-    Y[lab] = onehot(Y_code[lab], K)
+    if np.ndim(Y_code) == 2:                 # soft human labels (annotator mean), rows sum to 1
+        Y[lab] = Y_code[lab]
+    else:
+        Y[lab] = onehot(Y_code[lab], K)
     if method == "raw":
         G = Yh
     elif method in ("calib", "calib_s"):
@@ -255,11 +280,18 @@ def prepare(labels: pd.DataFrame, human: pd.DataFrame | None = None, frame: pd.D
             targets: Iterable[str] = ("locus", "comm_cause", "distance", "darkness", "comm_infra", "night"),
             method: str = "dsl", g: str = "calib", truth: pd.DataFrame | None = None,
             split: str | None = "confirmation", strata: Iterable[str] = ("random",),
-            teaching_authors: set | None = None, n_folds: int = 5, seed: int = 0) -> WorkData:
+            teaching_authors: set | None = None, n_folds: int = 5, seed: int = 0,
+            human_mode: str = "mean", exclude_annotators: Iterable[str] = (),
+            recompute_pi: bool = True) -> WorkData:
     """Build the work-level DSL table used by every model.
 
     method: "dsl" (default), "naive" (LLM labels as truth), "oracle" (truth table, simulation only).
     g:      DSL predictor: "raw" | "calib" | "calib_s" (era-stratified calibration).
+    human_mode: "mean" (registered: mean one-hot over retained annotators, soft) | "resolve" (one
+            row per passage: adjudicated > teacher > first).
+    exclude_annotators: expert-reference coder(s) (e.g. "teacher") and annotators excluded by the
+            registered kappa rule (annotators.exclusions); their rows never enter DSL.
+    recompute_pi: pi_cell = retained-labelled / N_cell from the frame (see audit_design).
     Passages with pi_audit = 0 (outside the audit pool: teaching authors, enrichment strata unless
     the frame covers them) are dropped for DSL - DSL needs positivity - and counted in info.
     """
@@ -273,11 +305,14 @@ def prepare(labels: pd.DataFrame, human: pd.DataFrame | None = None, frame: pd.D
     if method == "dsl":
         if human is None:
             raise ValueError("DSL needs human labels")
-        pi = audit_design(lab, human, frame, teaching_authors)
+        excl = set(exclude_annotators)
+        hum = human[~human.annotator.isin(excl)]
+        ids = set(hum.passage_id) if (recompute_pi and frame is not None) else None
+        pi = audit_design(lab, hum, frame, teaching_authors, labelled_ids=ids)
         keep = pi > 0
         info["n_dropped_pi0"] = int((~keep).sum())
         lab, pi = lab[keep].reset_index(drop=True), pi[keep]
-        h = resolve_human(human)
+        h = resolve_human(hum)
         h = h[h.passage_id.isin(lab.passage_id)]
         pos = pd.Series(np.arange(len(lab)), index=lab.passage_id)
         hidx = pos.loc[h.passage_id].values
@@ -304,8 +339,13 @@ def prepare(labels: pd.DataFrame, human: pd.DataFrame | None = None, frame: pd.D
                 Yt = onehot(yhat, T.K)       # no human labels for this target: model labels, flagged
                 info[f"{tname}_uncorrected"] = True
             else:
-                ycode = np.zeros(len(lab), int)
-                ycode[hidx] = T.fn(h)
+                if human_mode == "mean":
+                    sid, S = human_soft(hum[hum.passage_id.isin(lab.passage_id)], T)
+                    ycode = np.zeros((len(lab), T.K))
+                    ycode[pos.loc[sid].values] = S
+                else:
+                    ycode = np.zeros(len(lab), int)
+                    ycode[hidx] = T.fn(h)
                 Yt = pseudo_outcomes(yhat, ycode, labelled, pi, T.K, method=g, strata=era_s, folds=folds)
         Ys[tname] = Yt
     return aggregate_to_works(lab, Ys, method if method != "dsl" else f"dsl_{g}", info)
@@ -334,13 +374,15 @@ def pseudo_outcomes_two_phase(Yhat2: np.ndarray, Y3: np.ndarray, Yh: np.ndarray,
     """Nested two-phase DSL (recommended design): Tier-2 labels on all passages, a strong Tier-3
     model on a probability subsample (R3, pi3), humans on a probability subsample of that (Rh, pih3 =
     P(human | in phase 3)). Ytilde = Yhat2 + R3/pi3 (Y3 - Yhat2) + R3 Rh/(pi3 pih3) (Y - Y3);
-    E[Ytilde] = Y. Codes are integer categories (Y3 / Yh read only where R3 / Rh)."""
+    E[Ytilde] = Y. Y3 / Yh: integer codes or soft n x K matrices (read only where R3 / Rh). Also the
+    registered expert-nested sensitivity analysis: phase 3 = non-expert mean, phase h = expert on a
+    probability subsample of the audit."""
     A = onehot(Yhat2, K)
     B = np.zeros_like(A)
     C = np.zeros_like(A)
-    B[R3] = onehot(Y3[R3], K)
     m = R3 & Rh
-    C[m] = onehot(Yh[m], K)
+    B[R3] = Y3[R3] if np.ndim(Y3) == 2 else onehot(Y3[R3], K)
+    C[m] = Yh[m] if np.ndim(Yh) == 2 else onehot(Yh[m], K)
     out = A.copy()
     out[R3] += (B[R3] - A[R3]) / pi3[R3, None]
     out[m] += (C[m] - B[m]) / (pi3[m] * pih3[m])[:, None]

@@ -61,7 +61,7 @@ def test_h2_and_h3_run(dsl_wd, corpus):
         assert all(np.isfinite(c.estimate) for c in e.components)
     tab, effs = models.confirmatory(dsl_wd, keyword_series(corpus), n_boot=200)
     assert set(tab.test) == {"H1", "H2a", "H2b", "H2c", "H3"}
-    assert (tab.p_holm >= tab.p_test - 1e-12).all()
+    assert (tab.p_adj >= tab.p_test - 1e-12).all()
 
 
 def test_h3_tracking_vs_divergent(oracle_wd, corpus):

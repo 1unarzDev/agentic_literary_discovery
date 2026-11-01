@@ -506,3 +506,28 @@ if __name__ == "__main__":
     c = simulate(SimConfig(n_works=a.works, seed=a.seed, enrichment=a.enrichment))
     write(c, Path(a.out))
     print(f"labels={len(c.labels)} works={len(c.works)} audit_rows={len(c.human)} -> {a.out}")
+
+
+def annotate_noisy(truth_rows: pd.DataFrame, error: float, rng: np.random.Generator,
+                   dom_marginal: np.ndarray | None = None) -> pd.DataFrame:
+    """A non-expert annotator's labels (human schema: has_obstacle, single main domain, locus,
+    failure_cause only for COMMUNICATION) from expert/true labels, with per-item error rate `error`:
+    obstacle status flipped w.p. error/2; main domain replaced by a draw from the domain marginal
+    w.p. error; failure cause randomised w.p. error; locus re-derived by the codebook mapping
+    (non-experts do not apply overrides). error ~0.25-0.35 gives locus kappa ~0.6-0.7 vs expert."""
+    n = len(truth_rows)
+    p = np.ones(9) / 9 if dom_marginal is None else np.asarray(dom_marginal, float)[:9] / np.sum(dom_marginal[:9])
+    has = (truth_rows.has_obstacle.values == "yes")
+    flip = rng.random(n) < error / 2
+    has_n = has ^ flip
+    d_true = np.array([D[list(x)[0]] if len(list(x)) else -1 for x in truth_rows.domains.values])
+    d_rand = rng.choice(9, n, p=p)
+    swap = rng.random(n) < error
+    d = np.where(has_n, np.where((d_true >= 0) & ~swap, d_true, d_rand), -1)
+    c_true = np.array([CAUSES.index(x) if x in CAUSES else -1 for x in truth_rows.failure_cause.values])
+    c_rand = rng.integers(0, 4, n)
+    is_comm = d == D["COMMUNICATION_INFORMATION"]
+    c = np.where(is_comm, np.where((c_true >= 0) & (rng.random(n) >= error), c_true, c_rand), -1)
+    loc = np.where(has_n, _locus(d, c), -1)
+    f = _fields_to_frame({"has": has_n.astype(int), "d1": d, "d2": np.full(n, -1), "cause": c, "locus": loc})
+    return pd.DataFrame({"passage_id": truth_rows.passage_id.values, **f})

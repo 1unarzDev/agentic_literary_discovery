@@ -41,21 +41,41 @@ def group(r) -> str:
             "internal_psychological": "internal"}.get(r.locus, "other")
 
 
+# H2 audit strata (prereg R3): predicted primary domain, merged to 8 groups that also nest the
+# locus groups (material = DIST/DARK/ILLNESS/NATURE split three ways; social; internal)
+DOMAIN_GROUP = {"COMMUNICATION_INFORMATION": "comm", "DISTANCE_TRAVEL": "distance", "DARKNESS_VISIBILITY": "darkness",
+                "ILLNESS_BODY_DEATH": "material_other", "NATURE_WEATHER": "material_other",
+                "MONEY_PROPERTY_LAW": "social", "SOCIAL_RANK_CONVENTION": "social", "INTERPERSONAL_CONFLICT": "social",
+                "INNER_STATE": "internal", "OTHER": "other"}
+
+
+def domain_group(r) -> str:
+    """Audit stratum by predicted primary (first-listed) domain; 'no_obstacle' if no obstacle."""
+    if r.has_obstacle != "yes":
+        return "no_obstacle"
+    d = list(r.domains) if r.domains is not None else []
+    return DOMAIN_GROUP.get(d[0], "other") if d else "other"
+
+
 def item_id(pid: str) -> str:
     # opaque id: never reveals pg number to annotators
     return "it_" + hashlib.sha256(f"{SEED}:{pid}".encode()).hexdigest()[:12]
 
 
 def draw_audit(lab: pd.DataFrame, teaching_authors: set, rng: np.random.Generator,
-               n_target: int = 200) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Probability sample for DSL/PPI. `lab` needs era, group, split, stratum, author_key, passage_id.
+               n_target: int = 200, group_col: str = "group") -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Probability sample for DSL/PPI. `lab` needs era, <group_col>, split, stratum, author_key, passage_id.
+
+    group_col: "group" (locus groups, the original design) or e.g. "dgroup" = domain_group() strata
+    (the registered final design: Confirmation only, era x predicted-domain group, n_target ~1800).
+    Restrict `lab` to the Confirmation split before calling to draw a Confirmation-only audit.
 
     Returns (audit, frame). `frame` lists EVERY pool passage with its audit cell and first-order
     inclusion probability pi_audit = n_cell / N_cell (0 for passages outside the pool); DSL needs
     pi for unaudited passages too, so the frame must be persisted (analysis/stats/README.md).
     """
     pool = lab[~lab.author_key.isin(teaching_authors) & (lab.stratum == "random")]
-    cells = pool.groupby(["era", "group", "split"])
+    cells = pool.groupby(["era", group_col, "split"])
     n_cells = cells.ngroups
     per = max(2, int(np.ceil(n_target / n_cells)))
     rows, frame = [], []

@@ -1,5 +1,7 @@
 """Pre-registered confirmatory models (docs/prereg.md), all on DSL work-level tables (dsl.WorkData).
 
+Family (prereg v0.3): H1 = single PRIMARY test; H2a, H2b, H2c, H3 = secondary (Holm over the
+four secondary tests, each reported with its registered MDE).
 H1  locus shares among obstacles (material / social / internal), multinomial logit on DSL soft
     outcomes ~ ns(year, df=4) + genre + origin + log length; standardised era contrast
     1800-1849 vs 1885-1929 (G0 eras; g-computation over the pooled covariate mix = "within genre");
@@ -8,7 +10,7 @@ H2a share intentional_withholding / (withholding + infrastructure + accidental_l
     communication failures; rises early -> late.
 H2b DISTANCE_TRAVEL prevalence 1800-1849 vs 1850-1884 (G0), logit ~ post1850 + genre + origin +
     log length; falls.
-H2c DARKNESS_VISIBILITY prevalence falls AND night_function share (danger + concealment) falls.
+H2c DARKNESS_VISIBILITY prevalence falls (night-function share: exploratory, include_night=True).
 H3  divergence between z-scored decade keyword rates and function rates (1 - r, averaged over the
     three technology pairs); parametric null of affine tracking + measurement error; block-bootstrap CI.
 Holm across the five p-values. Unit = work; SEs cluster-robust by author (works nest in authors).
@@ -297,19 +299,24 @@ def h2b(wd: WorkData, design: Design | None = None, ref_cov=None, cut: int = HIN
                                                   "raw": per.table})
 
 
-def h2c(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE) -> Effect:
+def h2c(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE,
+        include_night: bool = False) -> Effect:
+    """Registered (secondary) H2c: DARKNESS_VISIBILITY prevalence falls E -> L. The night-function
+    share (danger + concealment) is exploratory only (humans do not label night_function, so it
+    cannot be DSL-corrected); include_night=True adds it as an extra directional component."""
     design = design or Design.from_data(wd)
     ref = _ref(wd, ref_cov)
     tf1 = fit_target(wd, "darkness", design)
-    c1, i1, s1 = _contrast_components(tf1, ref, [("DARKNESS prevalence", [1], None, -1)], early, late, wd.cov)
-    tf2 = fit_target(wd, "night", design)
-    c2, i2, s2 = _contrast_components(tf2, ref, [("night danger+concealment share", [1], [1, 2], -1)], early, late,
-                                      wd.cov)
-    # influence matrices share the author cluster ordering only if factorised identically: they are
-    # (same wd.cov[cluster] order), so stack
-    return Effect("H2c darkness", c1 + c2, np.column_stack([i1, i2]),
-                  {"era_shares": {**s1, **s2}, "night_dsl_corrected": "night_uncorrected" not in wd.info,
-                   "converged": tf1.fit.converged and tf2.fit.converged})
+    comps, infl, shares = _contrast_components(tf1, ref, [("DARKNESS prevalence", [1], None, -1)], early, late, wd.cov)
+    conv = tf1.fit.converged
+    if include_night and "night" in wd.Y:
+        tf2 = fit_target(wd, "night", design)
+        c2, i2, s2 = _contrast_components(tf2, ref, [("night danger+concealment share", [1], [1, 2], -1)],
+                                          early, late, wd.cov)
+        comps, infl, shares = comps + c2, np.column_stack([infl, i2]), {**shares, **s2}
+        conv = conv and tf2.fit.converged
+    return Effect("H2c darkness", comps, infl,
+                  {"era_shares": shares, "night_dsl_corrected": "night_uncorrected" not in wd.info, "converged": conv})
 
 
 # ------------------------------------------------------------------ H3
@@ -408,14 +415,14 @@ def confirmatory(wd: WorkData, keywords: pd.DataFrame, alpha: float = 0.05, desi
     design = design or Design.from_data(wd)
     effs = {"H1": h1(wd, design), "H2a": h2a(wd, design), "H2b": h2b(wd, design), "H2c": h2c(wd, design),
             "H3": h3(wd, keywords, n_boot=n_boot)}
-    ps = [e.p for e in effs.values()]
-    adj = holm(ps)
+    # H1 primary at alpha; Holm across the four secondary tests
+    adj = np.r_[effs["H1"].p, holm([effs[k].p for k in ("H2a", "H2b", "H2c", "H3")])]
     rows = []
     for (k, e), pa in zip(effs.items(), adj):
         for c in e.components:
-            rows.append({"test": k, "component": c.label, "estimate": c.estimate, "se": c.se,
+            rows.append({"test": k, "role": "primary" if k == "H1" else "secondary", "component": c.label, "estimate": c.estimate, "se": c.se,
                          "lo": c.ci()[0], "hi": c.ci()[1], "expected_sign": c.expected_sign,
-                         "p_test": e.p, "p_holm": pa, "reject": pa < alpha})
+                         "p_test": e.p, "p_adj": pa, "reject": pa < alpha})
     return pd.DataFrame(rows), effs
 
 
