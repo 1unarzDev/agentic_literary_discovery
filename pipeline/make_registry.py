@@ -59,7 +59,7 @@ STAGES = {
                       vram_gb_required=4.5, model_size_gb=3.3, kv_gb_per_slot=0.15, priority=10),
     "label": dict(model_ref="gemma4:12b-it-q4_K_M", schema=LABEL_SCHEMA, system_template=LABEL_SYSTEM,
                   user_template=LABEL_USER, num_ctx=8192, num_predict=400, evidence_field="evidence_quote",
-                  vram_gb_required=10.5, model_size_gb=8.0, kv_gb_per_slot=0.5, priority=20),
+                  vram_gb_required=10.0, model_size_gb=8.0, kv_gb_per_slot=0.35, priority=20),  # measured: RTX 3060, docs/perf_report.md
     "cloze": dict(model_ref="gemma4:12b-it-q4_K_M", schema=CLOZE_SCHEMA, system_template=CLOZE_SYSTEM,
                   user_template=CLOZE_USER, num_ctx=2048, num_predict=16, evidence_field=None,
                   vram_gb_required=10.0, model_size_gb=8.0, kv_gb_per_slot=0.12, priority=30),
@@ -77,7 +77,7 @@ TIERS = {
     "cpu": {"min_vram_gb": 0, "stages": ["embed"], "num_parallel_hint": 2},
     "t6": {"min_vram_gb": 5.5, "stages": ["workcheck", "baseline_small", "embed"], "num_parallel_hint": 2},
     "t8": {"min_vram_gb": 7.5, "stages": ["workcheck", "baseline_small", "embed"], "num_parallel_hint": 4},
-    "t12": {"min_vram_gb": 11.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 2},
+    "t12": {"min_vram_gb": 11.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 4},
     "t16": {"min_vram_gb": 15.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 6},
     "t24": {"min_vram_gb": 23.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 8},
 }
