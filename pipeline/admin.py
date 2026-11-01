@@ -323,11 +323,13 @@ def cmd_close_wave(a: argparse.Namespace) -> None:
     print(f"closed {len(r['closed'])} job(s) in wave {a.wave}: {', '.join(r['closed']) or '-'}")
 
 
-def wrangler(*args: str) -> str:
-    p = subprocess.run(["npx", "wrangler", *args], cwd=COORD_DIR, capture_output=True, text=True)
-    if p.returncode != 0:
-        raise SystemExit(f"wrangler {' '.join(args[:3])} failed: {p.stderr[-800:]}")
-    return p.stdout
+def wrangler(*args: str, attempts: int = 3) -> str:
+    for i in range(attempts):  # the D1/R2 API occasionally fails transiently
+        p = subprocess.run(["npx", "wrangler", *args], cwd=COORD_DIR, capture_output=True, text=True)
+        if p.returncode == 0:
+            return p.stdout
+        time.sleep(3 * (i + 1))
+    raise SystemExit(f"wrangler {' '.join(args[:3])} failed: {(p.stderr + p.stdout)[-800:]}")
 
 
 def d1(sql: str) -> list[dict]:
