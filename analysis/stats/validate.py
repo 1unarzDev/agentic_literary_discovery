@@ -119,7 +119,7 @@ def figure(summ: pd.DataFrame, raw: pd.DataFrame, truth: pd.DataFrame, path: Pat
     col = {"naive": "#eb6834", "dsl_calib": "#2a78d6", "truth": "#52514e"}
     plt.rcParams.update({"font.size": 9, "axes.edgecolor": ink2, "axes.labelcolor": ink, "xtick.color": ink2,
                          "ytick.color": ink2, "axes.spines.top": False, "axes.spines.right": False})
-    fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3.6), gridspec_kw={"width_ratios": [1.1, 1]})
+    fig, (a, b) = plt.subplots(1, 2, figsize=(9, 4.2), gridspec_kw={"width_ratios": [1.1, 1]})
     an = int(sorted(raw.audit_n.unique())[-1])
     eras = list(H1_ERAS)
     for k, est in enumerate(["naive", "dsl_calib"]):
@@ -140,7 +140,7 @@ def figure(summ: pd.DataFrame, raw: pd.DataFrame, truth: pd.DataFrame, path: Pat
     a.grid(axis="y", color=grid, lw=0.6)
     a.text(2.42, tv[2], "truth", color=ink2, va="center", fontsize=8)
     a.legend(handles=[plt.Line2D([], [], color=col["naive"], lw=5, label="naive model labels"),
-                      plt.Line2D([], [], color=col["dsl_calib"], lw=5, label=f"DSL (n_audit={an})")],
+                      plt.Line2D([], [], color=col["dsl_calib"], lw=5, label=f"DSL ({int(raw[(raw.audit_n == an) & (raw.estimator == 'dsl_calib')].n_labelled.median())} human labels)")],
              frameon=False, loc="upper right", fontsize=8)
     # B: coverage by audit size for the key quantities
     qs = ["material share [early]", "material share [late]", "material raw contrast late-early",
@@ -149,13 +149,19 @@ def figure(summ: pd.DataFrame, raw: pd.DataFrame, truth: pd.DataFrame, path: Pat
     s = summ[summ.quantity.isin(qs)]
     ans = sorted(s.audit_n.unique())
     w = 0.8 / (len(ans) + 1)
-    for j, (est, nm) in enumerate([("naive", "naive")] + [("dsl_calib", f"DSL n_audit={x}") for x in ans]):
+    nl = summ[summ.estimator == "dsl_calib"].groupby("audit_n").n_lab.median()
+    for j, (est, nm) in enumerate([("naive", "naive model labels")] +
+                                  [("dsl_calib", f"DSL, {int(nl.get(x, x))} human labels") for x in ans]):
         sub = s[s.estimator == est] if est == "naive" else s[(s.estimator == est) & (s.audit_n == ans[j - 1])]
         if est == "naive":
             sub = sub[sub.audit_n == ans[-1]]
         vals = [sub.set_index("quantity").coverage.get(q, np.nan) for q in qs]
         shade = col["naive"] if est == "naive" else ["#9ec5f0", "#5e9fe6", "#2a78d6", "#1a4f91"][min(j - 1, 3)]
-        b.bar(np.arange(len(qs)) + (j - len(ans) / 2) * w, vals, width=w * 0.9, color=shade, label=nm)
+        xs = np.arange(len(qs)) + (j - len(ans) / 2) * w
+        b.bar(xs, vals, width=w * 0.9, color=shade, label=nm)
+        if est == "naive":
+            for x, v in zip(xs, vals):
+                b.text(x, max(v, 0) + 0.02, f"{v:.2f}", ha="center", va="bottom", fontsize=7, color=ink2)
     b.axhline(0.95, color=ink2, lw=1, ls=(0, (3, 2)))
     b.text(len(qs) - 0.45, 0.955, "0.95", color=ink2, fontsize=8, va="bottom", ha="right")
     b.set_xticks(range(len(qs)), labels, rotation=15, ha="right")
@@ -163,7 +169,7 @@ def figure(summ: pd.DataFrame, raw: pd.DataFrame, truth: pd.DataFrame, path: Pat
     b.set_ylabel("95% CI coverage")
     b.set_title("B. Coverage under era-varying label noise", loc="left", color=ink, fontsize=9.5)
     b.grid(axis="y", color=grid, lw=0.6)
-    b.legend(frameon=False, fontsize=7.5, loc="lower left")
+    b.legend(frameon=False, fontsize=7.5, loc="upper center", bbox_to_anchor=(0.5, -0.32), ncol=2)
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=200, facecolor="white")
@@ -189,7 +195,12 @@ if __name__ == "__main__":
     ap.add_argument("--reps", type=int, default=300)
     ap.add_argument("--audit", default="200,1000,4000")
     ap.add_argument("--procs", type=int, default=8)
+    ap.add_argument("--figure-only", action="store_true", help="redraw from out/*.csv")
     a = ap.parse_args()
+    if a.figure_only:
+        raw, truth = pd.read_csv(OUT / "coverage_raw.csv"), pd.read_csv(OUT / "coverage_truth.csv")
+        figure(pd.read_csv(OUT / "coverage.csv"), raw, truth, FIGS / "dsl_coverage.png")
+        raise SystemExit
     s = main(a.reps, tuple(int(x) for x in a.audit.split(",")), a.procs)
     pd.set_option("display.width", 220)
     print(s[s.quantity.str.contains("material|H1|prevalence")].round(3).to_string())

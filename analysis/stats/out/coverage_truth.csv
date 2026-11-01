@@ -15,7 +15,7 @@ darkness share [early],0.05574324324324324
 darkness share [late],0.027516474264527305
 darkness share [mid],0.03746687380060312
 darkness raw contrast late-early,-0.028226768978715937
-H1 material share contrast [identity],-0.1396438184734114
-H1 internal share contrast [identity],0.0842025238557904
-H1 material share contrast [logit],-0.14274584698819587
-H1 internal share contrast [logit],0.08590435309898731
+H1 material share contrast [identity],-0.12783753283036853
+H1 internal share contrast [identity],0.08103295885227134
+H1 material share contrast [logit],-0.1304852267789871
+H1 internal share contrast [logit],0.08227989421449967
