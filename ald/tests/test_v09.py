@@ -168,8 +168,10 @@ def test_foreign_vram_lowers_capacity_and_num_parallel(env):
     hint = reg.num_parallel_hint(tier)
     st = max((reg.stages[s] for s in reg.allowed_stages(tier)), key=lambda x: x.vram_gb_required + (hint or 1) * x.kv_gb_per_slot)
     assert w.effective_parallel(reg, tier) == hint  # nothing foreign: the tier hint
-    env.gpu_used = 4.7  # e.g. a resident llama-server; our Ollama has nothing loaded
+    env.gpu_used = 0.9  # desktop baseline: not foreign
     env.ollama.loaded.clear()
+    assert w.measure_foreign_vram() == 0.0 and w.effective_parallel(reg, tier) == hint
+    env.gpu_used = 6.2  # a resident llama-server (4.7 GB) + desktop
     assert w.measure_foreign_vram() == 4.7 and w.fit.capacity_gb == pytest.approx(w.hw.usable_vram_gb - 4.7)
     np_eff = w.effective_parallel(reg, tier)
     assert 1 <= np_eff <= hint
@@ -179,7 +181,7 @@ def test_foreign_vram_lowers_capacity_and_num_parallel(env):
 def test_our_own_resident_model_is_not_foreign(env):
     w = env.make_worker()
     env.ollama.loaded["m"] = int(6.0 * 1024 ** 3)
-    env.gpu_used = 6.8  # 6.0 GB our model + its CUDA context
+    env.gpu_used = 8.3  # 6.0 GB our model + its CUDA context + desktop
     assert w.measure_foreign_vram() < 0.5
 
 
@@ -220,3 +222,14 @@ def test_ram_reserve_configurable(env):
     assert w.ram_low() is False
     w.cfg.min_free_ram_gb = 0
     assert w.ram_low() is False
+
+
+def test_update_applied_outside_active_hours(env):
+    import datetime as dt
+    now = dt.datetime.fromtimestamp(env.clock.time())
+    a = (now + dt.timedelta(hours=2)).strftime("%H:%M")
+    b = (now + dt.timedelta(hours=3)).strftime("%H:%M")
+    env.coord.ping_resp.update({"latest_client_version": "99.0.0", "wheel_url": "http://coord.test/dist/x.whl"})
+    w = env.make_worker(auto_update=True, active_hours=f"{a}-{b}")
+    w.run()
+    assert env.reexec_calls

@@ -53,6 +53,7 @@ HEARTBEAT_S = 60.0
 REGISTRY_POLL_S = 300.0
 PING_POLL_S = 300.0
 FLUSH_POLL_S = 30.0
+DESKTOP_VRAM_BASELINE_GB = 1.5  # VRAM other programs may hold without lowering ald's plan
 IDLE_HEARTBEAT_S = 300.0  # self-report while holding nothing (fleet view); cheap on D1 writes
 STATE_SAVE_S = 15.0
 MAX_PASSAGE_ERRORS = 2
@@ -1081,7 +1082,10 @@ class Worker:
             ours = 0.0
         # The CUDA context / compute buffers of a loaded model are not in size_vram: allow ~0.6 GB of them.
         slack = 0.6 if ours > 0 else 0.0
-        foreign = max(0.0, round(used - ours - slack, 2))
+        # Up to ~1.5 GB is the normal desktop / display baseline. The registry's VRAM figures and tier
+        # thresholds were calibrated on cards that carry it (COLLIN: 0.9 GB), so only memory beyond it
+        # counts. Counting all of it cut NUM_PARALLEL to 1 on a 3060 (-30%).
+        foreign = max(0.0, round(used - ours - slack - DESKTOP_VRAM_BASELINE_GB, 2))
         if abs(foreign - self.fit.foreign_gb) >= 0.5:
             self.log(f"[gpu] {foreign:.1f} GB of VRAM held by other programs; planning with "
                      f"{max(0.0, self.hw.usable_vram_gb - foreign):.1f} GB")
@@ -1253,6 +1257,8 @@ class Worker:
                         break
                     continue
                 if not in_active_hours(self.active_hours, self.clock.time()):
+                    self.check_for_update()  # idle anyway: a good time to update (never while paused)
+                    self.maybe_apply_update()
                     if self.activity != "outside_hours":
                         self.log(f"[window] outside active hours {self.active_hours}; pausing")
                     self.activity = "outside_hours"
