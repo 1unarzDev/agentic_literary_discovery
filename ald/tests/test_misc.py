@@ -296,3 +296,18 @@ def test_config_set_cli(cli_home):
     assert r.exit_code == 0 and Config.load().stages == ["label", "workcheck"]
     assert CliRunner().invoke(app, ["config", "set", "active_hours", "25:00-01:00"]).exit_code == 2
     assert CliRunner().invoke(app, ["config", "set", "nope", "1"]).exit_code == 2
+
+
+def test_windows_install_keeps_admin_created_task(monkeypatch):
+    monkeypatch.setattr(service, "_windows_user", lambda: "PC\\vol")
+    calls = []
+
+    def run(c):
+        calls.append(c)
+        if c[:2] == ["schtasks", "/Create"]:
+            return P(1, "", "ERROR: Access is denied.")
+        return P(0, "", "")
+
+    msgs = service.install(run=run, platform="win32")
+    assert any("kept it" in m for m in msgs) and not any(m.startswith("FAILED") for m in msgs)
+    assert ["schtasks", "/Run", "/TN", "ald-worker"] in calls

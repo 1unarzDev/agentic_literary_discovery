@@ -153,6 +153,15 @@ def _install_windows(run: Runner, extra: list[str] | None, msgs: list[str]) -> N
         msgs.append(f"schtasks /Create ({'S4U' if s4u else 'interactive'}) -> {r.returncode} "
                     f"{(r.stderr or r.stdout).strip()}")
     if mode is None:
+        denied = all("denied" in m.lower() for m in msgs if m.startswith("schtasks /Create"))
+        if denied and run(["schtasks", "/Query", "/TN", TASK]).returncode == 0:
+            # Created earlier from an Administrator shell: a normal shell may not replace it, and need not.
+            msgs.clear()
+            msgs.append(f"Scheduled Task '{TASK}' already exists (installed from an Administrator shell); kept it. "
+                        f"Re-run from an Administrator PowerShell to change it.")
+            r = run(["schtasks", "/Run", "/TN", TASK])
+            msgs.append(f"schtasks /Run -> {r.returncode}")
+            return
         msgs.append("FAILED: could not create the Scheduled Task; run `ald work` manually")
         return
     if mode == "s4u":
