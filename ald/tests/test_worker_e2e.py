@@ -222,7 +222,25 @@ def test_heartbeat_extends_and_reports(env):
     resp = w.heartbeat_once()
     assert resp["extended"] == ["job-h"]
     hb = env.coord.heartbeats[-1]
-    assert hb["job_ids"] == ["job-h"] and set(hb["stats"]) == {"tok_s", "passages_done"}
+    assert hb["job_ids"] == ["job-h"] and {"tok_s", "passages_done", "state", "keep_awake", "client_version"} <= set(hb["stats"])
+    assert w.last_contact is not None
+    # Holding nothing: still self-reports, but at most every IDLE_HEARTBEAT_S.
+    w._queue.clear()
+    n = len(env.coord.heartbeats)
+    w.heartbeat_once()
+    assert env.coord.heartbeats[-1]["job_ids"] == [] and len(env.coord.heartbeats) == n + 1
+    w.heartbeat_once()
+    assert len(env.coord.heartbeats) == n + 1
+
+
+def test_active_hours():
+    import datetime as dt
+    from ald.scheduler import in_active_hours
+    at = lambda h, m: dt.datetime(2026, 11, 1, h, m).timestamp()  # noqa: E731
+    assert in_active_hours(None, at(3, 0)) and in_active_hours("bad", at(3, 0))
+    assert in_active_hours("22:00-07:00", at(23, 0)) and in_active_hours("22:00-07:00", at(6, 59))
+    assert not in_active_hours("22:00-07:00", at(7, 0)) and not in_active_hours("22:00-07:00", at(12, 0))
+    assert in_active_hours("09:00-17:00", at(9, 0)) and not in_active_hours("09:00-17:00", at(17, 0))
 
 
 def test_registry_hot_reload_new_pin(env, registry_raw):

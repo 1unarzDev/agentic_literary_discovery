@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import os
 import random
 import threading
 import time
@@ -44,6 +45,7 @@ from .scheduler import (
     RunWindow, StorageManager, lease_size, should_prefetch,
 )
 from .gpulock import GpuLock
+from .scheduler import in_active_hours
 from .updater import Updater, decide
 
 LEASE_TTL_S = 600.0
@@ -51,6 +53,8 @@ HEARTBEAT_S = 60.0
 REGISTRY_POLL_S = 300.0
 PING_POLL_S = 300.0
 FLUSH_POLL_S = 30.0
+IDLE_HEARTBEAT_S = 300.0  # self-report while holding nothing (fleet view); cheap on D1 writes
+STATE_SAVE_S = 15.0
 MAX_PASSAGE_ERRORS = 2
 OOM_DEMOTE_AFTER = 2  # OOMs at concurrency 1 before the stage is demoted
 
@@ -124,6 +128,7 @@ class Worker:
         gpu_lock: str | None = None,
         service_mode: bool = False,
         manage_ollama: bool = False,
+        active_hours: str | None = None,
     ):
         self.cfg = cfg
         self.client = client
@@ -184,6 +189,13 @@ class Worker:
         self.service_mode = service_mode
         self.updater.service_mode = service_mode
         self.manage_ollama = manage_ollama
+        self.active_hours = active_hours
+        self.activity = "starting"
+        self.keep_awake: Any = None  # KeepAwake (set by `ald work`)
+        self.last_contact: float | None = None
+        self.gpu_fraction: dict[str, float] = {}
+        self._last_idle_hb = -1e18
+        self._last_state_save = -1e18
         self._last_ollama_ensure = -1e18
 
     # ------------------------------------------------------------------
@@ -498,6 +510,7 @@ class Worker:
                 try:
                     jobs = self.client.lease(self.tier, self.stages, n)
                     self._offline = False
+                    self.last_contact = self.clock.time()
                 except UpgradeRequired as e:
                     self._update_required = True
                     if isinstance(e.body, dict) and e.body.get("min_client_version"):
@@ -574,15 +587,39 @@ class Worker:
     # ------------------------------------------------------------------
     # Heartbeat (background)
     # ------------------------------------------------------------------
+    def report(self) -> dict[str, Any]:
+        """Self-report for the fleet view (heartbeat stats) and `ald status`."""
+        from .keepawake import battery_info
+        cur = self._current
+        stage = cur.stage if cur else None
+        rate = self.rates.rate(stage) if stage else None
+        bat = battery_info()
+        return {
+            "tok_s": round(self._recent_tok_s(), 2), "passages_done": self.passages_done,
+            "state": self.activity, "stage": stage, "job_id": cur.job_id if cur else None,
+            "progress": round(cur.progress, 3) if cur else None,
+            "concurrency": self.tuners[stage].current if stage in self.tuners else None,
+            "passages_per_hour": round(rate * 3600) if rate else None,
+            "keep_awake": bool(self.keep_awake.alive()) if self.keep_awake is not None else False,
+            "battery_percent": bat.get("percent"), "power_plugged": bat.get("plugged"),
+            "gpu_fraction": self.gpu_fraction.get(stage) if stage else None,
+            "gpu": self.hw.gpu_summary[:120], "client_version": CLIENT_VERSION, "service": self.service_mode,
+            "gpu_lock": bool(self.gpu_lock.enabled),
+        }
+
     def heartbeat_once(self) -> dict[str, Any] | None:
         held = self._held()
-        if not held:
+        now_m = self.clock.monotonic()
+        if not held and now_m - self._last_idle_hb < IDLE_HEARTBEAT_S:
             return None
+        if not held:
+            self._last_idle_hb = now_m
         ids = [j.job_id for j in held]
-        stats = {"tok_s": round(self._recent_tok_s(), 2), "passages_done": self.passages_done}
+        stats = self.report()
         try:
             resp = self.client.heartbeat(ids, stats)
             self._offline = False
+            self.last_contact = self.clock.time()
         except httpx.TransportError as e:
             self._offline = True
             self.log(f"[heartbeat] network error ({e}); working offline while leases are valid")
@@ -629,6 +666,9 @@ class Worker:
                 if now - self._last_heartbeat >= HEARTBEAT_S:
                     self._last_heartbeat = now
                     self.heartbeat_once()
+                if now - self._last_state_save >= STATE_SAVE_S:
+                    self._last_state_save = now
+                    self._save_state()
                 if now - self._last_flush >= FLUSH_POLL_S:
                     self._last_flush = now
                     if self.outbox.entries():
@@ -663,11 +703,13 @@ class Worker:
         hj.started = True
         try:
             # --gpu-lock: the lock covers this shard's inference (heartbeats keep the lease alive meanwhile).
+            self.activity = "waiting_gpu_lock" if self.gpu_lock.enabled else "working"
             if not self.gpu_lock.acquire(self.stop):
                 self.store.remove_job(hj.job_id)
                 self._release([hj.job_id])
                 return "stopped"
             self._gpu_models_loaded = True
+            self.activity = "working"
             return self._run_job(hj)
         finally:
             self._current = None
@@ -973,6 +1015,7 @@ class Worker:
             return "ok"
         if frac is None:
             return "unknown"  # not (yet) resident; check again on the next passage
+        self.gpu_fraction[stage] = round(frac, 3)
         if frac >= 0.99:
             self._residency_retry.pop(stage, None)
             return "ok"
@@ -996,6 +1039,8 @@ class Worker:
                                "remaining_s": j.remaining_s} for j in self._held()],
                 "passages_done": self.passages_done, "client_version": CLIENT_VERSION,
                 "registry_version": self._registry.version if self._registry else None,
+                "pid": os.getpid(), "last_contact": self.last_contact, "report": self.report(),
+                "active_hours": self.active_hours, "service": self.service_mode,
             })
         except OSError:
             pass
@@ -1026,9 +1071,19 @@ class Worker:
                     break
                 if self._registry_changed:
                     self.resolve_stages()
+                if not in_active_hours(self.active_hours, self.clock.time()):
+                    if self.activity != "outside_hours":
+                        self.log(f"[window] outside active hours {self.active_hours}; pausing")
+                    self.activity = "outside_hours"
+                    self._idle_gpu_unload()
+                    self._save_state()
+                    if self.exit_when_idle or self.clock.sleep(60.0, self.stop):
+                        break
+                    continue
                 self.check_for_update()
                 paused_for_update = self.maybe_apply_update()
                 if not self.stages:
+                    self.activity = "no_stages"
                     self.log("[work] no runnable stages: " + "; ".join(f"{k}: {v}" for k, v in self.excluded.items()))
                     if any("Ollama unavailable" in v for v in self.excluded.values()):
                         self.ensure_ollama(min_interval_s=120.0)
@@ -1049,6 +1104,7 @@ class Worker:
                     hj = self._queue.popleft() if got and self._queue else None
                 if hj is None:
                     idle += 1
+                    self.activity = "idle"
                     self._idle_gpu_unload()
                     if self.exit_when_idle and idle >= self.idle_polls_before_exit:
                         break
@@ -1097,5 +1153,6 @@ class Worker:
         except Exception:  # noqa: BLE001
             pass
         self.gpu_lock.release()
+        self.activity = "stopped"
         self._save_state()
         self.shutdown_done.set()

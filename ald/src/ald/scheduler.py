@@ -483,3 +483,20 @@ def fmt_duration(s: float | None) -> str:
     h, rem = divmod(s, 3600)
     m, _ = divmod(rem, 60)
     return f"{h}h{m:02d}m" if h else f"{m}m"
+
+
+def in_active_hours(spec: str | None, now: float) -> bool:
+    """``spec`` = "HH:MM-HH:MM" local time (may wrap midnight, e.g. "22:00-07:00"); None/"" = always."""
+    if not spec:
+        return True
+    try:
+        a, b = (x.strip() for x in spec.split("-", 1))
+        ah, am = (int(x) for x in a.split(":"))
+        bh, bm = (int(x) for x in b.split(":"))
+    except ValueError:
+        return True  # a malformed window never stops work
+    t = _dt.datetime.fromtimestamp(now)
+    cur, start, end = t.hour * 60 + t.minute, ah * 60 + am, bh * 60 + bm
+    if start == end:
+        return True
+    return start <= cur < end if start < end else (cur >= start or cur < end)

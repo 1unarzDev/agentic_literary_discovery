@@ -105,7 +105,7 @@ def test_systemd_unit_and_install(tmp_path, monkeypatch):
     calls = []
     msgs = service.install(run=lambda c: (calls.append(c), P(0, "", ""))[1], platform="linux")
     unit = (tmp_path / "systemd" / "user" / "ald-worker.service").read_text()
-    assert "ExecStart=" in unit and " work --keep-awake" in unit and "Restart=on-failure" in unit
+    assert "ExecStart=" in unit and " work --service" in unit and "Restart=always" in unit
     assert "KillSignal=SIGTERM" in unit
     assert ["systemctl", "--user", "enable", "--now", "ald-worker.service"] in calls
     assert any("enable-linger" in m for m in msgs)
@@ -130,7 +130,7 @@ def test_launchd_plist():
 
 def test_windows_task_xml():
     cmd = service.windows_command(python=r"C:\Users\a b\tools\ald\Scripts\python.exe")
-    assert cmd[0].endswith("pythonw.exe") and cmd[1:] == ["-m", "ald", "work", "--keep-awake", "--service"]
+    assert cmd[0].endswith("pythonw.exe") and cmd[1:] == ["-m", "ald", "work", "--service"]
     xml = service.windows_task_xml(cmd, r"PC\a b", s4u=True, workdir=r"C:\Users\a b")
     import xml.etree.ElementTree as ET
     ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
@@ -141,7 +141,7 @@ def test_windows_task_xml():
     assert st.find("t:ExecutionTimeLimit", ns).text == "PT0S"  # no 72 h default limit
     assert st.find("t:DisallowStartIfOnBatteries", ns).text == "false"
     assert st.find("t:StopIfGoingOnBatteries", ns).text == "false"
-    assert root.find("t:Actions/t:Exec/t:Arguments", ns).text == "-m ald work --keep-awake --service"
+    assert root.find("t:Actions/t:Exec/t:Arguments", ns).text == "-m ald work --service"
     xml = service.windows_task_xml(cmd, r"PC\a", s4u=False, workdir="C:\\")
     root = ET.fromstring(xml.replace('encoding="UTF-16"', ""))
     assert root.find("t:Principals/t:Principal/t:LogonType", ns).text == "InteractiveToken"
@@ -214,3 +214,24 @@ def test_config_saved_chmod_600(cli_home):
 def test_safe_names_have_no_colons():
     from ald.config import safe_name
     assert ":" not in safe_name("wave1:shard:0001") and "/" not in safe_name("a/b\\c")
+
+
+def test_service_verify(tmp_path):
+    import time
+    p = tmp_path / "state.json"
+    assert service.verify(p)[0] is False
+    now = time.time()
+    p.write_text(json.dumps({"pid": os.getpid(), "updated": now, "last_contact": now - 5, "client_version": "x",
+                             "report": {"state": "idle", "keep_awake": True}}))
+    ok, msg = service.verify(p, now=now)
+    assert ok and "keep-awake on" in msg
+    p.write_text(json.dumps({"pid": os.getpid(), "updated": now, "last_contact": None}))
+    assert service.verify(p, now=now)[0] is False
+    p.write_text(json.dumps({"pid": 2 ** 22 + 12345, "updated": now, "last_contact": now}))
+    assert "not running" in service.verify(p, now=now)[1]
+
+
+def test_windows_xml_has_repeating_trigger():
+    xml = service.windows_task_xml(["C:\\py\\pythonw.exe", "-m", "ald"], "PC\\a", s4u=False, workdir="C:\\")
+    assert "<Interval>PT10M</Interval>" in xml and "<MultipleInstancesPolicy>IgnoreNew" in xml
+    assert "<Count>999</Count>" in xml

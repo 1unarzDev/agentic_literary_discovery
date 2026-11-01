@@ -435,48 +435,129 @@ def join(
 
 @app.command()
 def status(
-    local: bool = typer.Option(False, "--local", help="Local disk use, outbox and jobs (no network)."),
-    admin_token: Optional[str] = typer.Option(None, "--admin-token", envvar="ALD_ADMIN_TOKEN",
-                                              help="/v1/status is an admin endpoint in the contract."),
+    watch: bool = typer.Option(False, "--watch", "-w", help="Refresh every 5 s (Ctrl-C to quit)."),
     as_json: bool = typer.Option(False, "--json"),
+    local: bool = typer.Option(True, "--local", hidden=True, help="(default; kept for compatibility)"),
+    details: bool = typer.Option(False, "--details", help="Also list jobs on disk and outbox entries."),
 ) -> None:
-    """Show fleet status (/v1/status) or local state (--local)."""
+    """This machine: is the worker running, keep-awake, power, GPU, current job, throughput, disk, version."""
+    from . import ui
     cfg = Config.load()
-    if local:
-        _status_local(cfg, as_json)
+    if as_json:
+        console.print_json(ui.to_json(ui.local_summary(cfg)))
         return
-    c = _client(cfg)
-    if c is None:
-        console.print("[red]not joined; run `ald join URL INVITE`[/red]")
+    if not watch:
+        console.print(ui.render_status(ui.local_summary(cfg)))
+        if details:
+            _status_local(cfg, False)
+        return
+    import time
+    from rich.live import Live
+    with Live(ui.render_status(ui.local_summary(cfg)), console=console, refresh_per_second=1) as live:
+        try:
+            while True:
+                time.sleep(5)
+                live.update(ui.render_status(ui.local_summary(Config.load())))
+        except KeyboardInterrupt:
+            pass
+
+
+@app.command()
+def fleet(
+    watch: bool = typer.Option(False, "--watch", "-w", help="Refresh every 30 s (Ctrl-C to quit)."),
+    as_json: bool = typer.Option(False, "--json"),
+    token: Optional[str] = typer.Option(None, "--token", help="Viewer or admin token (default: ALD_VIEWER_TOKEN, "
+                                        "ALD_ADMIN_TOKEN, ~/.config/ald-viewer.json, ~/.config/ald-admin.json)."),
+    url: Optional[str] = typer.Option(None, "--url", help="Coordinator URL (default: from the token file or config)."),
+) -> None:
+    """All workers: status, throughput, queue progress per stage and wave, fleet passages/h, ETA."""
+    from . import ui
+    furl, tok = ui.fleet_token(token)
+    base = (url or furl or Config.load().coordinator_url or "").rstrip("/")
+    if not base or not tok:
+        console.print("[red]need a coordinator URL and a viewer token (ask the admin for one: "
+                      "POST /v1/admin/viewer_token)[/red]")
         raise typer.Exit(1)
+
+    def get() -> dict[str, Any]:
+        r = httpx.get(f"{base}/v1/fleet", headers={"Authorization": f"Bearer {tok}"}, timeout=30)
+        if r.status_code != 200:
+            raise CoordinatorError(r.status_code, r.text[:200])
+        return r.json()
+
     try:
-        st = c.status(token=admin_token)
+        data = get()
     except (CoordinatorError, httpx.HTTPError) as e:
-        console.print(f"[red]status failed: {e}[/red]")
-        if isinstance(e, CoordinatorError) and e.status in (401, 403):
-            console.print("/v1/status may require an admin token: --admin-token or ALD_ADMIN_TOKEN")
-        _status_local(cfg, as_json)
+        console.print(f"[red]fleet: {e}[/red]")
         raise typer.Exit(1)
     if as_json:
-        console.print_json(json.dumps(st))
+        console.print_json(json.dumps(data))
         return
-    q = Table(title="Queue")
-    for col in ("stage", "queued", "leased", "done", "dead", "ETA (h)"):
-        q.add_column(col)
-    for stage, v in (st.get("queue") or {}).items():
-        q.add_row(stage, str(v.get("queued", 0)), str(v.get("leased", 0)), str(v.get("done", 0)),
-                  str(v.get("dead", 0)), str((st.get("eta_hours") or {}).get(stage, "-")))
-    console.print(q)
-    w = Table(title="Workers")
-    for col in ("name", "tier", "os", "last seen", "passages 1h", "passages 24h", "tok/s"):
-        w.add_column(col)
-    for x in st.get("workers") or []:
-        w.add_row(str(x.get("name")), str(x.get("tier")), str(x.get("os")), str(x.get("last_seen")),
-                  str(x.get("passages_1h")), str(x.get("passages_24h")), str(x.get("tok_s")))
-    console.print(w)
-    cells = st.get("cells") or []
-    if cells:
-        console.print(f"{len(cells)} cells")
+    if not watch:
+        console.print(ui.render_fleet(data))
+        return
+    import time
+    from rich.live import Live
+    with Live(ui.render_fleet(data), console=console, refresh_per_second=1) as live:
+        try:
+            while True:
+                time.sleep(30)
+                try:
+                    live.update(ui.render_fleet(get()))
+                except (CoordinatorError, httpx.HTTPError):
+                    pass
+        except KeyboardInterrupt:
+            pass
+
+
+config_app = typer.Typer(invoke_without_command=True, help="View and change ald's settings (menu, or show/set).")
+app.add_typer(config_app, name="config")
+
+
+@config_app.callback()
+def config_cmd(ctx: typer.Context) -> None:
+    """Interactive settings menu (`ald config show` / `ald config set KEY VALUE` for scripts)."""
+    if ctx.invoked_subcommand is not None:
+        return
+    from rich.prompt import Prompt
+    from . import ui
+    if not sys.stdin or not sys.stdin.isatty():
+        console.print(ui.render_config(Config.load()))
+        console.print("(not a terminal: use `ald config set KEY VALUE`)")
+        return
+    ui.config_menu(console, lambda q: Prompt.ask(q, default="", show_default=False, console=console), svc.restart)
+
+
+@config_app.command("show")
+def config_show(as_json: bool = typer.Option(False, "--json")) -> None:
+    from . import ui
+    cfg = Config.load()
+    if as_json:
+        console.print_json(json.dumps({k: getattr(cfg, k) for k, _l, _t in ui.SETTINGS}))
+    else:
+        console.print(ui.render_config(cfg))
+
+
+@config_app.command("set")
+def config_set(key: str = typer.Argument(...), value: str = typer.Argument("", help="Empty = default."),
+               restart: bool = typer.Option(False, "--restart", help="Restart the background worker.")) -> None:
+    from . import ui
+    kinds = {k: t for k, _l, t in ui.SETTINGS}
+    if key not in kinds:
+        console.print(f"[red]unknown setting {key}; one of: {', '.join(kinds)}[/red]")
+        raise typer.Exit(2)
+    cfg = Config.load()
+    try:
+        v = ui.parse_setting(kinds[key], value) if value != "" or kinds[key] != "bool" else True
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(2)
+    setattr(cfg, key, v)
+    cfg.save()
+    console.print(f"{key} = {ui.fmt_setting(v)}")
+    if restart:
+        for m in svc.restart():
+            console.print(m, markup=False)
 
 
 def _status_local(cfg: Config, as_json: bool) -> None:
@@ -643,9 +724,13 @@ def _install_windows_ctrl_handler(worker: Any) -> None:
 
 @app.command()
 def work(
-    max_concurrency: int = typer.Option(8, "--max-concurrency", help="Upper bound for auto-tuned concurrency."),
-    keep_awake: bool = typer.Option(True, "--keep-awake/--allow-sleep", help="Prevent system sleep while working (default on)."),
-    stages: Optional[str] = typer.Option(None, "--stages", help="Comma-separated subset of allowed stages."),
+    max_concurrency: Optional[int] = typer.Option(None, "--max-concurrency",
+                                                  help="Upper bound for auto-tuned concurrency (config; default 8)."),
+    keep_awake: Optional[bool] = typer.Option(None, "--keep-awake/--allow-sleep",
+                                              help="Prevent system sleep while working (config; default on)."),
+    stages: Optional[str] = typer.Option(None, "--stages", help="Comma-separated subset of allowed stages (config)."),
+    active_hours: Optional[str] = typer.Option(None, "--active-hours",
+                                               help="Only work between HH:MM-HH:MM local time, daily (config)."),
     until: Optional[str] = typer.Option(None, "--until", help="Stop leasing near HH:MM (local time)."),
     hours: Optional[float] = typer.Option(None, "--hours", help="Run for N hours."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the plan without leasing."),
@@ -661,13 +746,17 @@ def work(
     from .keepawake import KeepAwake
     from .scheduler import RunWindow
     cfg = Config.load()
+    # Command-line options override the saved settings (`ald config`), which the service relies on.
     if disk_budget_gb is not None:
         cfg.disk_budget_gb = disk_budget_gb
     window = RunWindow.from_args(until, hours)
     argv = sys.argv[1:]
-    w = _make_worker(cfg, stages=_parse_stages(stages), max_concurrency=max_concurrency, window=window,
-                     auto_update=not no_auto_update, argv=argv, auto_pull=not dry_run, gpu_lock=gpu_lock,
-                     service_mode=service_mode)
+    w = _make_worker(cfg, stages=_parse_stages(stages) or cfg.stages,
+                     max_concurrency=max_concurrency or cfg.max_concurrency or 8, window=window,
+                     auto_update=cfg.auto_update and not no_auto_update, argv=argv, auto_pull=not dry_run,
+                     gpu_lock=gpu_lock or cfg.gpu_lock, service_mode=service_mode,
+                     active_hours=active_hours or cfg.active_hours)
+    keep_awake = cfg.keep_awake if keep_awake is None else keep_awake
     if dry_run:
         try:
             w.refresh_registry(force=True)
@@ -678,7 +767,8 @@ def work(
         _print_plan(w.plan(), w)
         return
     _install_signal_handlers(w)
-    with KeepAwake(keep_awake, log=w.log):
+    with KeepAwake(keep_awake, log=w.log) as ka:
+        w.keep_awake = ka
         try:
             w.run()
         except KeyboardInterrupt:
@@ -717,9 +807,27 @@ def _print_plan(p: Any, w: Any) -> None:
 
 @service_app.command("install")
 def service_install(extra: Optional[str] = typer.Option(None, "--args", help="Extra args for `ald work`.")) -> None:
-    """Install + start a user service that runs `ald work --keep-awake`."""
-    for m in svc.install(extra=extra.split() if extra else None):
-        console.print(m)
+    """Install (or rewrite) and start the background service that runs `ald work`."""
+    msgs = svc.install(extra=extra.split() if extra else None)
+    for m in msgs:
+        console.print(m, markup=False, highlight=False)
+    if any(m.startswith("FAILED") for m in msgs) or any(" -> 127" in m for m in msgs) or \
+            any("enable --now" in m and " -> 0" not in m for m in msgs):
+        raise typer.Exit(1)
+
+
+@service_app.command("verify")
+def service_verify(wait: float = typer.Option(0.0, "--wait", help="Keep checking for up to N seconds.")) -> None:
+    """Exit 0 if the worker process is alive and has reached the coordinator."""
+    import time
+    t0 = time.time()
+    while True:
+        ok, msg = svc.verify(cfgmod.data_dir() / "state.json")
+        if ok or time.time() - t0 >= wait:
+            break
+        time.sleep(5)
+    console.print(("[green]OK[/green] " if ok else "[red]NOT OK[/red] ") + msg)
+    raise typer.Exit(0 if ok else 1)
 
 
 @service_app.command("uninstall")
@@ -731,6 +839,13 @@ def service_uninstall() -> None:
 @service_app.command("status")
 def service_status() -> None:
     console.print(svc.status(), markup=False, highlight=False)
+
+
+@service_app.command("restart")
+def service_restart() -> None:
+    """Restart the background worker (e.g. after `ald config`)."""
+    for m in svc.restart():
+        console.print(m)
 
 
 def main() -> None:

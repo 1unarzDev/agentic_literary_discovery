@@ -167,34 +167,36 @@ fi
 
 # 5. background service + work -------------------------------------------------
 EXTRA=""
-[ -n "$GPU_LOCK" ] && EXTRA="--gpu-lock $GPU_LOCK"
+if [ -n "$GPU_LOCK" ]; then
+  EXTRA="--gpu-lock $GPU_LOCK"
+  run ald config set gpu_lock "$GPU_LOCK" >/dev/null || true  # also a saved setting (`ald config`)
+fi
 SERVICE_OK=0
 if [ "$DO_SERVICE" = 1 ]; then
-  say "Installing the background service (resumes after reboot)"
+  say "Installing (or rewriting) the background service and starting it"
   if [ -n "$EXTRA" ]; then run ald service install --args "$EXTRA" || true; else run ald service install || true; fi
-  sleep 3
-  if [ "$OS" = "Darwin" ]; then
-    launchctl print "gui/$(id -u)/org.ald.worker" >/dev/null 2>&1 && SERVICE_OK=1
-  else
-    systemctl --user is-active --quiet ald-worker.service 2>/dev/null && SERVICE_OK=1
-    if [ "$SERVICE_OK" = 1 ]; then
-      # Start at boot without an open login session (no password prompt: --no-ask-password).
-      loginctl --no-ask-password enable-linger "$(id -un)" >/dev/null 2>&1 \
-        || warn "could not enable lingering: the service runs while you are logged in (sudo loginctl enable-linger $(id -un) fixes that)"
-    fi
+  if [ "$OS" != "Darwin" ] && systemctl --user is-enabled --quiet ald-worker.service 2>/dev/null; then
+    # Start at boot without an open login session. --no-ask-password: never prompts (polkit may refuse).
+    loginctl --no-ask-password enable-linger "$(id -un)" >/dev/null 2>&1 \
+      || [ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" = yes ] \
+      || warn "could not enable lingering: the service runs only while you are logged in (fix: sudo loginctl enable-linger $(id -un))"
   fi
-  [ "$SERVICE_OK" = 1 ] || warn "the background service could not be started here (no systemd user session?)"
+  say "Waiting for the worker to start and reach the coordinator (up to 3 min)"
+  run ald service verify --wait 180 && SERVICE_OK=1
 fi
 
-say "Summary"
-run ald work --dry-run || true
-run ald status --local || true
+run ald status || true
 
-if [ "$SERVICE_OK" = 1 ]; then
-  say "ald work is running as a background service. Check: 'ald status --local'; logs: 'ald service status'; stop and remove: 'ald service uninstall'."
-elif [ "$DO_WORK" = 1 ] && [ "$DO_SERVICE" = 0 ]; then
+if [ "$DO_SERVICE" = 1 ]; then
+  if [ "$SERVICE_OK" = 1 ]; then
+    printf "${B}==> SUCCESS:${N} ald is installed and working in the background.\n"
+    say "Check: 'ald status' (or 'ald status --watch'); settings: 'ald config'; stop and remove: 'ald service uninstall'."
+  else
+    printf "${R}xx  FAILED:${N} ald is installed but the background worker is not running (no systemd user session?).\n" >&2
+    say "Run it in the foreground instead: ald work   (or: nohup ald work >/dev/null 2>&1 &)"
+    exit 1
+  fi
+elif [ "$DO_WORK" = 1 ]; then
   say "Starting ald work (Ctrl-C uploads partial results and releases leases)"
-  exec ald work --keep-awake $EXTRA </dev/null
-else
-  say "Start working with: ald work   (or: nohup ald work >/dev/null 2>&1 &)"
+  exec ald work $EXTRA </dev/null
 fi

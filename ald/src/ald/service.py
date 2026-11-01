@@ -40,7 +40,7 @@ def ald_executable() -> str:
 def work_command(extra: list[str] | None = None) -> list[str]:
     exe = ald_executable()
     base = [exe] if exe != sys.executable else [exe, "-m", "ald"]
-    return base + ["work", "--keep-awake", "--service"] + (extra or [])
+    return base + ["work", "--service"] + (extra or [])  # other settings come from the config (`ald config`)
 
 
 def windows_command(extra: list[str] | None = None, python: str | None = None) -> list[str]:
@@ -49,7 +49,7 @@ def windows_command(extra: list[str] | None = None, python: str | None = None) -
     py = Path(python or sys.executable)
     pyw = py.with_name("pythonw.exe")
     exe = str(pyw if pyw.exists() or python else py)
-    return [exe, "-m", "ald", "work", "--keep-awake", "--service"] + (extra or [])
+    return [exe, "-m", "ald", "work", "--service"] + (extra or [])
 
 
 def _xml_escape(s: str) -> str:
@@ -70,6 +70,10 @@ def windows_task_xml(cmd: list[str], user: str, *, s4u: bool, workdir: str) -> s
   </RegistrationInfo>
   <Triggers>
     <LogonTrigger><Enabled>true</Enabled><UserId>{_xml_escape(user)}</UserId><Delay>PT1M</Delay></LogonTrigger>{boot}
+    <TimeTrigger>
+      <Repetition><Interval>PT10M</Interval><StopAtDurationEnd>false</StopAtDurationEnd></Repetition>
+      <StartBoundary>2026-01-01T00:00:00</StartBoundary><Enabled>true</Enabled>
+    </TimeTrigger>
   </Triggers>
   <Principals>
     <Principal id="Author">
@@ -148,7 +152,7 @@ def _install_windows(run: Runner, extra: list[str] | None, msgs: list[str]) -> N
         msgs.append(f"schtasks /Create ({'S4U' if s4u else 'interactive'}) -> {r.returncode} "
                     f"{(r.stderr or r.stdout).strip()}")
     if mode is None:
-        msgs.append("could not create the Scheduled Task; run `ald work` manually")
+        msgs.append("FAILED: could not create the Scheduled Task; run `ald work` manually")
         return
     if mode == "s4u":
         msgs.append(f"Scheduled Task '{TASK}' installed: starts at boot and at logon, keeps running after "
@@ -173,7 +177,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart={' '.join(q(a) for a in cmd)}
-Restart=on-failure
+Restart=always
 RestartSec=30
 TimeoutStopSec=90
 KillSignal=SIGTERM
@@ -198,7 +202,7 @@ def launchd_plist(cmd: list[str], log_path: Path) -> str:
 {args}
     </array>
     <key>RunAtLoad</key><true/>
-    <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+    <key>KeepAlive</key><true/>
     <key>ThrottleInterval</key><integer>30</integer>
     <key>ProcessType</key><string>Background</string>
     <key>EnvironmentVariables</key>
@@ -252,6 +256,48 @@ def install(run: Runner = _run, platform: str = sys.platform, extra: list[str] |
     else:
         msgs.append(f"unsupported platform {platform}; run `ald work` manually")
     return msgs
+
+
+def verify(state_path: Path, max_age_s: float = 90.0, contact_age_s: float = 600.0,
+           now: float | None = None) -> tuple[bool, str]:
+    """Is a worker process alive (state.json written recently by a live pid) and did it reach the coordinator?"""
+    import json
+    import time
+    now = time.time() if now is None else now
+    try:
+        st = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False, "no worker state yet"
+    pid, upd, contact = st.get("pid"), float(st.get("updated") or 0), st.get("last_contact")
+    try:
+        import psutil
+        alive = bool(pid) and psutil.pid_exists(int(pid))
+    except Exception:  # noqa: BLE001
+        alive = bool(pid)
+    if not alive:
+        return False, f"worker process {pid} is not running"
+    if now - upd > max_age_s:
+        return False, f"worker state is stale ({now - upd:.0f}s old)"
+    if not contact or now - float(contact) > contact_age_s:
+        return False, f"worker {pid} is running but has not reached the coordinator yet"
+    rep = st.get("report") or {}
+    return True, (f"worker running (pid {pid}, v{st.get('client_version')}, {rep.get('state')}, "
+                  f"keep-awake {'on' if rep.get('keep_awake') else 'off'}); last coordinator contact "
+                  f"{now - float(contact):.0f}s ago")
+
+
+def restart(run: Runner = _run, platform: str = sys.platform) -> list[str]:
+    if platform.startswith("linux"):
+        r = run(["systemctl", "--user", "restart", UNIT])
+        return [f"systemctl --user restart {UNIT} -> {r.returncode} {r.stderr.strip()}"]
+    if platform == "darwin":
+        r = run(["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{LABEL}"])
+        return [f"launchctl kickstart -k -> {r.returncode} {r.stderr.strip()}"]
+    if platform == "win32":
+        run(["schtasks", "/End", "/TN", TASK])
+        r = run(["schtasks", "/Run", "/TN", TASK])
+        return [f"schtasks /Run -> {r.returncode} {(r.stderr or r.stdout).strip()}"]
+    return ["unsupported platform"]
 
 
 def uninstall(run: Runner = _run, platform: str = sys.platform) -> list[str]:

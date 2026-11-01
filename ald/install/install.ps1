@@ -116,20 +116,28 @@ function Install-Ald {
     if ($rc -ne 0) { Warn "benchmark failed; work will auto-tune from scratch" }
 
     # 5. background task + work -----------------------------------------------------------------------
+    $ok = $true
     if (-not $NoService) {
-        Say "Installing the Scheduled Task 'ald-worker'"
+        Say "Installing (or rewriting) the Scheduled Task 'ald-worker' and starting it"
         $rc = Native "ald" @("service", "install")
-        if ($rc -ne 0) { Warn "service install failed; run 'ald work' manually" }
+        if ($rc -ne 0) { Warn "service install failed (see above)"; $ok = $false }
+        Say "Waiting for the worker to start and reach the coordinator (up to 3 min)"
+        $rc = Native "ald" @("service", "verify", "--wait", "180")
+        if ($rc -ne 0) { $ok = $false }
     }
-    Say "Summary"
-    Native "ald" @("work", "--dry-run") | Out-Null
-    Native "ald" @("status", "--local") | Out-Null
+    Native "ald" @("status") | Out-Null
     if (-not $NoService) {
-        Say "Done. ald works in the background (Scheduled Task 'ald-worker'). Check: 'ald status --local'; stop/remove: 'ald service uninstall'."
-        Say "Open a new PowerShell window to use the 'ald' command."
+        if ($ok) {
+            Write-Host "==> SUCCESS: ald is installed and working in the background (Scheduled Task 'ald-worker')." -ForegroundColor Green
+            Say "Check: 'ald status' (or 'ald status --watch'); settings: 'ald config'; stop/remove: 'ald service uninstall'."
+            Say "Open a new PowerShell window to use the 'ald' command."
+        } else {
+            Write-Host "xx  FAILED: ald is installed but the background worker is not running. Re-run this command;" -ForegroundColor Red
+            Write-Host "xx  if it fails again, send the output above to the project admin." -ForegroundColor Red
+        }
     } elseif (-not $NoWork) {
         Say "Starting ald work (Ctrl-C uploads partial results and releases leases)"
-        & ald work --keep-awake
+        & ald work
     }
 }
 
