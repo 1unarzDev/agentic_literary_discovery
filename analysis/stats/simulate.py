@@ -35,10 +35,10 @@ ORIGINS = ["UK", "US", "unknown"]
 CAUSES = ["infrastructure", "accidental_loss", "intentional_withholding", "misinterpretation", "success_resolution"]
 NIGHT = ["danger", "concealment", "intimacy", "labor", "leisure"]
 LOCI = ["material_external", "social_institutional", "internal_psychological"]
-ERAS3 = ["early_1800_1849", "mid_1850_1884", "late_1885_1920"]
+ERAS3 = ["early_1800_1849", "mid_1850_1884", "late_1885_1920"]   # select_annotation names; late = decade >= 1885
 DECADES = list(range(1800, 1930, 10))
-# PG-like: thin before 1830, thick after 1880 (relative works per decade)
-DECADE_PROFILE = [60, 90, 130, 200, 300, 400, 500, 600, 750, 900, 1000, 900, 400]
+# G0 (docs/gates.md): Confirmation-half works per decade 1800s..1920s
+DECADE_PROFILE = [10, 13, 34, 62, 83, 204, 277, 365, 473, 1036, 1612, 2006, 1166]
 
 # default locus of each primary domain (codebook table); COMMUNICATION depends on failure cause
 DOMAIN_LOCUS = {"DISTANCE_TRAVEL": 0, "DARKNESS_VISIBILITY": 0, "NATURE_WEATHER": 0, "ILLNESS_BODY_DEATH": 0,
@@ -84,8 +84,10 @@ class LLMNoise:
 
 @dataclass
 class SimConfig:
-    n_works: int = 12000                  # both splits together
-    works_per_author: float = 3.0         # mean (1 + Poisson)
+    n_works: int = 15500                  # both splits together (G0: 15,511 works)
+    works_per_author: float = 3.7         # mean of 1 + NegBin (G0 Confirmation: 3.7, median 1)
+    wpa_size: float = 0.35                # NegBin size (heavy tail: a few prolific authors)
+    wpa_max: int = 60
     passages_per_work: int = 24
     prevalence: float = 0.45              # P(has_obstacle) at 1860, reference genre
     icc_author: float = 0.05              # latent-scale ICC from author RE (each logit)
@@ -165,7 +167,8 @@ def make_works(cfg: SimConfig, rng: np.random.Generator) -> pd.DataFrame:
     prof = np.asarray(cfg.decade_profile, float)
     prof = prof / prof.sum()
     centre = rng.choice(DECADES, size=n_auth, p=prof) + rng.uniform(0, 10, n_auth)
-    nw = 1 + rng.poisson(cfg.works_per_author - 1, n_auth)
+    mu = cfg.works_per_author - 1
+    nw = 1 + np.minimum(rng.negative_binomial(cfg.wpa_size, cfg.wpa_size / (cfg.wpa_size + mu), n_auth), cfg.wpa_max - 1)
     # trim/pad to n_works exactly
     a_idx = np.repeat(np.arange(n_auth), nw)
     if len(a_idx) >= cfg.n_works:
@@ -173,7 +176,7 @@ def make_works(cfg: SimConfig, rng: np.random.Generator) -> pd.DataFrame:
     else:
         a_idx = np.sort(np.concatenate([a_idx, rng.integers(0, n_auth, cfg.n_works - len(a_idx))]))
     n = len(a_idx)
-    year = np.clip(np.round(centre[a_idx] + rng.normal(0, 6, n)), 1800, 1925).astype(int)
+    year = np.clip(np.round(centre[a_idx] + rng.normal(0, 6, n)), 1800, 1929).astype(int)
     t = (year - 1860) / 60
     gl = genre_logits(t, cfg.genre_drift)
     # authors have a home genre (drawn at their career centre); works follow it with prob 0.7
@@ -184,7 +187,7 @@ def make_works(cfg: SimConfig, rng: np.random.Generator) -> pd.DataFrame:
     ao = _draw(rng, np.c_[0.9 - p_us, p_us, np.full(n_auth, 0.1)])
     split = np.where(rng.random(n_auth) < 0.5, "discovery", "confirmation")
     n_words = np.exp(rng.normal(np.log(95_000), 0.5, n)).clip(15_000, 600_000).astype(int)
-    dc = _draw(rng, np.tile([0.6, 0.3, 0.1], (n, 1)))
+    dc = _draw(rng, np.tile([0.47, 0.27, 0.26], (n, 1)))     # G0 shares high/medium/low
     canon = rng.random(n_auth) < 0.1
     memo = np.clip(rng.beta(1.2, 8, n) + 0.4 * canon[a_idx] * rng.random(n), 0, 1)
     return pd.DataFrame({

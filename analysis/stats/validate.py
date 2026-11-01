@@ -22,7 +22,7 @@ from analysis.stats.simulate import SimConfig, simulate
 
 HERE = Path(__file__).resolve().parent
 OUT, FIGS = HERE / "out", HERE / "figs"
-H1_ERAS = {"early": (1800, 1839), "mid": (1840, 1884), "late": (1885, 1920)}
+H1_ERAS = {"early": (1800, 1849), "mid": (1850, 1884), "late": (1885, 1929)}   # G0 eras
 TARGET_SHARES = [("locus", "material", [1], [1, 2, 3]), ("locus", "internal", [3], [1, 2, 3]),
                  ("obstacle", "prevalence", [1], None), ("darkness", "darkness", [1], None)]
 ESTIMATORS = [("naive", "raw"), ("dsl", "raw"), ("dsl", "calib"), ("dsl", "calib_s")]
@@ -55,7 +55,7 @@ def estimates(wd: dsl.WorkData, design: models.Design, ref: pd.DataFrame, links=
 
 
 def truth_table(seed: int = 999, n_works: int = 150_000) -> tuple[pd.DataFrame, models.Design, pd.DataFrame]:
-    c = simulate(SimConfig(n_works=n_works, passages_per_work=4, seed=seed), audit=False)
+    c = simulate(SimConfig(n_works=n_works, passages_per_work=4, seed=seed, wpa_max=20), audit=False)
     wd = dsl.prepare(c.labels, method="oracle", truth=c.truth, split=None,
                      targets=("locus", "obstacle", "darkness"))
     design = models.Design.from_data(wd)
@@ -134,7 +134,7 @@ def figure(summ: pd.DataFrame, raw: pd.DataFrame, truth: pd.DataFrame, path: Pat
     tv = [truth.set_index("quantity").truth[f"material share [{e}]"] for e in eras]
     for i, t in enumerate(tv):
         a.plot([i - 0.4, i + 0.4], [t, t], color=col["truth"], lw=1.5, ls=(0, (3, 2)))
-    a.set_xticks(range(3), ["1800–39", "1840–84", "1885–1920"])
+    a.set_xticks(range(3), ["1800–49", "1850–84", "1885–1929"])
     a.set_ylabel("material share of obstacles")
     a.set_title(f"A. Sampling distribution over {raw.seed.nunique()} corpora", loc="left", color=ink, fontsize=9.5)
     a.grid(axis="y", color=grid, lw=0.6)
@@ -145,7 +145,7 @@ def figure(summ: pd.DataFrame, raw: pd.DataFrame, truth: pd.DataFrame, path: Pat
     # B: coverage by audit size for the key quantities
     qs = ["material share [early]", "material share [late]", "material raw contrast late-early",
           "H1 material share contrast [identity]"]
-    labels = ["material 1800–39", "material 1885–1920", "contrast (raw)", "H1 contrast (model)"]
+    labels = ["material 1800–49", "material 1885–1929", "contrast (raw)", "H1 contrast (model)"]
     s = summ[summ.quantity.isin(qs)]
     ans = sorted(s.audit_n.unique())
     w = 0.8 / (len(ans) + 1)
@@ -170,7 +170,7 @@ def figure(summ: pd.DataFrame, raw: pd.DataFrame, truth: pd.DataFrame, path: Pat
     plt.close(fig)
 
 
-def main(reps: int = 300, audits=(200, 1000, 4000), procs: int = 16) -> pd.DataFrame:
+def main(reps: int = 300, audits=(200, 1000, 4000), procs: int = 8) -> pd.DataFrame:
     truth, design, ref = truth_table()
     jobs = [(10_000 + i, a, design, ref) for a in audits for i in range(reps)]
     with mp.get_context("fork").Pool(procs) as pool:
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--reps", type=int, default=300)
     ap.add_argument("--audit", default="200,1000,4000")
-    ap.add_argument("--procs", type=int, default=16)
+    ap.add_argument("--procs", type=int, default=8)
     a = ap.parse_args()
     s = main(a.reps, tuple(int(x) for x in a.audit.split(",")), a.procs)
     pd.set_option("display.width", 220)

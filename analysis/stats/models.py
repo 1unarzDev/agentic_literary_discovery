@@ -2,11 +2,12 @@
 
 H1  locus shares among obstacles (material / social / internal), multinomial logit on DSL soft
     outcomes ~ ns(year, df=4) + genre + origin + log length; standardised era contrast
-    1800-39 vs 1885-1920 (g-computation over the pooled covariate mix = "within genre");
+    1800-1849 vs 1885-1929 (G0 eras; g-computation over the pooled covariate mix = "within genre");
     intersection-union test: material falls AND internal rises.
 H2a share intentional_withholding / (withholding + infrastructure + accidental_loss) among
     communication failures; rises early -> late.
-H2b DISTANCE_TRAVEL prevalence, logit ~ post1850 + genre + origin + log length; falls.
+H2b DISTANCE_TRAVEL prevalence 1800-1849 vs 1850-1884 (G0), logit ~ post1850 + genre + origin +
+    log length; falls.
 H2c DARKNESS_VISIBILITY prevalence falls AND night_function share (danger + concealment) falls.
 H3  divergence between z-scored decade keyword rates and function rates (1 - r, averaged over the
     three technology pairs); parametric null of affine tracking + measurement error; block-bootstrap CI.
@@ -23,9 +24,10 @@ from scipy import stats
 
 from analysis.stats.dsl import WorkData, fit_linear, fit_mnlogit, ratio_shares
 
-EARLY = (1800, 1839)
-LATE = (1885, 1920)          # task spec; plan §3/4.7 say 1885-1925 (see prereg deviations note)
-HINGE_B = 1850               # H2b railway cut
+EARLY = (1800, 1849)         # G0 decision (docs/gates.md): early era pooled 1800-1849
+MID = (1850, 1884)
+LATE = (1885, 1929)
+HINGE_B = 1850               # H2b railway cut: 1800-1849 vs 1850-1884
 H3_PAIRS = {"comm": "comm_infra", "travel": "distance", "dark": "darkness"}
 
 
@@ -249,9 +251,16 @@ def h2a(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, l
     return Effect("H2a communication", comps, infl, {"era_shares": shares, "converged": tf.fit.converged})
 
 
-def h2b(wd: WorkData, design: Design | None = None, ref_cov=None, cut: int = HINGE_B) -> Effect:
+def h2b(wd: WorkData, design: Design | None = None, ref_cov=None, cut: int = HINGE_B,
+        window: tuple = (EARLY[0], MID[1])) -> Effect:
+    """DISTANCE_TRAVEL prevalence, works in `window` only (G0: 1800-1849 vs 1850-1884), logit ~
+    post-cut + genre + origin + log length; standardised over the pooled covariate mix."""
     base = design or Design.from_data(wd)
     d = Design(base.knots, base.genres, base.origins, base.loglen_mean, "step", cut, base.extra)
+    full = wd
+    wd = wd.subset((wd.cov.year.values >= window[0]) & (wd.cov.year.values <= window[1]))
+    if ref_cov is None:
+        ref_cov = _ref(full, None)
     tf = fit_target(wd, "distance", d)
     ref = _ref(wd, ref_cov)
     s0, g0 = standardized_share(tf, ref, [cut - 1], [1], None)

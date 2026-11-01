@@ -35,8 +35,11 @@ def test_audit_is_select_annotation_probability_sample(corpus):
     lab = corpus.labels
     pool = lab[(lab.stratum == "random") & ~lab.author_key.isin(corpus.teaching_authors)]
     assert len(fr) == len(pool)
-    # equal allocation over era x group x split cells
-    assert hu.groupby("audit_cell").size().nunique() <= 2
+    # equal allocation over era x group x split cells: n_cell = min(per, N_cell)
+    n = hu.groupby("audit_cell").size()
+    N = fr.groupby("audit_cell").size()
+    per = n.max()
+    assert (n == np.minimum(per, N[n.index])).all()
     # teaching authors are Discovery and never audited
     audited = lab.set_index("passage_id").loc[hu.passage_id]
     assert not audited.author_key.isin(corpus.teaching_authors).any()
