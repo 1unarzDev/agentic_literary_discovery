@@ -853,8 +853,14 @@ def service_restart() -> None:
 def main() -> None:
     # Under pythonw.exe (the Windows Scheduled Task) there is no console: sys.stdout/stderr are None.
     for name in ("stdout", "stderr"):
-        if getattr(sys, name) is None:
+        stream = getattr(sys, name)
+        if stream is None:
             setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
+        else:
+            try:  # never crash on a character the console code page cannot show
+                stream.reconfigure(errors="replace")
+            except (AttributeError, ValueError):
+                pass
     app()
 
 

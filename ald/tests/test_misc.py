@@ -266,3 +266,13 @@ def test_refresh_definition_windows_keeps_logon_type(monkeypatch):
     assert "S4U" in msg and len(created) == 1
     assert "<LogonType>S4U</LogonType>" in created[0] and "--service --max-concurrency 2</Arguments>" in created[0]
     assert "<Interval>PT10M</Interval>" in created[0]
+
+
+def test_ui_ascii_fallback(monkeypatch):
+    import io
+    import sys
+    from ald import ui
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(io.BytesIO(), encoding="cp1252"))
+    assert set(ui.sparkline([0, 1, 5, 10])) <= set(ui.SPARK_ASCII)
+    t = ui.bar([(1, "green"), (1, "grey37")], 10).plain
+    assert t.encode("cp1252") and set(t) <= {"#", "."}

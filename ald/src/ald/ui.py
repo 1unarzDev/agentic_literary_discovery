@@ -21,6 +21,14 @@ from .config import Config, read_json
 from .scheduler import GB, StorageManager, fmt_bytes, fmt_duration
 
 SPARK = "▁▂▃▄▅▆▇█"
+SPARK_ASCII = " .:-=+*#"
+
+
+def _unicode_ok() -> bool:
+    """Legacy Windows consoles (cp1252 / cp437) cannot print block characters."""
+    import sys
+    enc = (getattr(sys.stdout, "encoding", None) or "").lower().replace("-", "")
+    return enc.startswith("utf")
 STATE_STYLE = {"working": "green", "idle": "yellow", "waiting_gpu_lock": "cyan", "outside_hours": "blue",
                "no_stages": "red", "stopped": "red", "starting": "cyan"}
 
@@ -29,17 +37,20 @@ def sparkline(vals: list[float]) -> str:
     if not vals:
         return ""
     hi = max(vals) or 1
-    return "".join(SPARK[min(len(SPARK) - 1, int(v / hi * (len(SPARK) - 1)))] if v else " " for v in vals)
+    g = SPARK if _unicode_ok() else SPARK_ASCII
+    return "".join(g[min(len(g) - 1, int(v / hi * (len(g) - 1)))] if v else " " for v in vals)
 
 
 def bar(parts: list[tuple[float, str]], width: int = 30) -> Text:
     total = sum(v for v, _ in parts) or 1
     t = Text()
     used = 0
+    uni = _unicode_ok()
+    ascii_glyph = {"green": "#", "cyan": "=", "grey37": ".", "red": "x"}
     for i, (v, style) in enumerate(parts):
         n = round(v / total * width) if i < len(parts) - 1 else width - used
         n = max(0, min(n, width - used))
-        t.append("█" * n, style=style)
+        t.append(("█" if uni else ascii_glyph.get(style, "#")) * n, style=style)
         used += n
     return t
 
