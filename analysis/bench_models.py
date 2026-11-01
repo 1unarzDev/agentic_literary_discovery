@@ -15,7 +15,7 @@ from pathlib import Path
 import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
-CODEBOOK = (ROOT / "docs/codebook.md").read_text(encoding="utf-8")
+CODEBOOK = (ROOT / "docs/codebook_v0.5.md").read_text(encoding="utf-8")  # the 2026-10-31 pilot ran on v0.5
 DOMAINS = ["DISTANCE_TRAVEL", "COMMUNICATION_INFORMATION", "DARKNESS_VISIBILITY", "ILLNESS_BODY_DEATH",
            "MONEY_PROPERTY_LAW", "SOCIAL_RANK_CONVENTION", "INTERPERSONAL_CONFLICT", "INNER_STATE",
            "NATURE_WEATHER", "OTHER", "NONE"]
