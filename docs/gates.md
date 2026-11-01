@@ -31,3 +31,4 @@ Build results:
 - Henry James, *The Point of View*, is catalogued 1886; it was published 1882, which moves it into the mid era.
 - *Zenobia* is off by about a decade but stays in the same era.
 - Wilkie Collins, *"I Say No"*, is catalogued 1860; it was published 1884 (title-page scan).
+- Found while building the showcase: *Edgar Huntly* (Brown) is catalogued 1804 but was first published 1799, which puts it outside the study window. *Monsieur Violet* (Marryat) is catalogued 1836 but was published 1843. *Confession; or, The Blind Heart* (Simms) is catalogued 1856 but was published 1841.

@@ -1,0 +1,284 @@
+<title>What Stands in the Way</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a single reading column (≈68ch) like a well-made book page; charts and passage pairs widen to a 2-column "spread". */
+:root{
+  --paper:#f3f4ef; --leaf:#fbfbf8; --ink:#1b2220; --muted:#59645f; --rule:#d5dad2;
+  --cloth:#1f5c45;           /* book-cloth green: the one accent */
+  --mark:#f1e2a8;            /* highlighter for quoted evidence */
+  --s-material:#b07400; --s-social:#2a78d6; --s-inner:#d55181;
+  --f-display:"IM Fell English", "Iowan Old Style", Georgia, serif;
+  --f-body:"Newsreader", Georgia, "Times New Roman", serif;
+  --f-ui:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#141918; --leaf:#1b2120; --ink:#e7ece8; --muted:#9ba7a1; --rule:#2c3532;
+  --cloth:#7cc6a2; --mark:#5a4d17; --s-material:#c98500; --s-social:#3987e5; --s-inner:#d55181; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#141918; --leaf:#1b2120; --ink:#e7ece8; --muted:#9ba7a1; --rule:#2c3532;
+  --cloth:#7cc6a2; --mark:#5a4d17; --s-material:#c98500; --s-social:#3987e5; --s-inner:#d55181; color-scheme:dark}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:1.0625rem;line-height:1.6}
+.wrap{max-width:68rem;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:2.5rem 4rem;display:grid;gap:4.5rem}
+.col{max-width:42rem}
+h1,h2{font-family:var(--f-display);font-weight:400;text-wrap:balance;line-height:1.1;margin:0}
+h1{font-size:clamp(2.6rem,7vw,4.6rem)}
+h2{font-size:clamp(1.7rem,4vw,2.4rem)}
+p{margin:0}
+.eyebrow{font-family:var(--f-ui);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--cloth);font-weight:600}
+.lede{font-size:1.25rem;color:var(--ink)}
+.muted{color:var(--muted)}
+.small{font-family:var(--f-ui);font-size:.82rem;color:var(--muted);line-height:1.5}
+section{display:grid;gap:1.25rem}
+.stack{display:grid;gap:1rem}
+em{font-style:italic}
+a{color:var(--cloth);text-underline-offset:3px}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--cloth);outline-offset:3px;border-radius:2px}
+
+/* hero */
+.hero{display:grid;gap:1.6rem;padding-top:1rem}
+.epigraph{border-left:3px solid var(--cloth);padding-left:1.1rem;font-size:1.2rem;font-style:italic;max-width:38rem}
+.epigraph cite{display:block;font-style:normal;font-family:var(--f-ui);font-size:.8rem;color:var(--muted);margin-top:.4rem}
+.ledger{display:flex;flex-wrap:wrap;gap:.5rem 2.2rem;font-family:var(--f-ui);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding-block:.9rem}
+.ledger div{display:grid}
+.ledger b{font-family:var(--f-display);font-weight:400;font-size:1.9rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.ledger span{font-size:.78rem;color:var(--muted);letter-spacing:.04em}
+
+/* process */
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.steps li{background:var(--leaf);padding:1rem 1rem 1.1rem;display:grid;gap:.35rem;align-content:start;min-width:0}
+.steps .n{font-family:var(--f-ui);font-size:.75rem;color:var(--cloth);font-weight:600;letter-spacing:.08em}
+.steps h3{font-family:var(--f-body);font-size:1.05rem;margin:0;font-weight:600}
+.steps p{font-family:var(--f-ui);font-size:.86rem;color:var(--muted);line-height:1.45}
+
+/* charts */
+.figure{background:var(--leaf);border:1px solid var(--rule);padding:1.2rem 1.2rem 1rem;display:grid;gap:.8rem;min-width:0}
+.figure h3{font-family:var(--f-body);font-weight:600;font-size:1.08rem;margin:0}
+.chart{position:relative;width:100%;overflow-x:auto}
+.chart svg{display:block;width:100%;height:auto;min-width:540px}
+.chart text{font-family:var(--f-ui);fill:var(--muted);font-size:12px}
+.chart .lbl{fill:var(--ink);font-size:13px}
+.chart .val{fill:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.chart .grid{stroke:var(--rule);stroke-width:1}
+.legend{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;font-family:var(--f-ui);font-size:.82rem;color:var(--ink)}
+.legend i{display:inline-block;width:.75rem;height:.75rem;border-radius:2px;margin-right:.4rem;vertical-align:-1px}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);font-family:var(--f-ui);font-size:.8rem;padding:.4rem .55rem;border-radius:4px;white-space:nowrap;transform:translate(-50%,-115%);opacity:0;transition:opacity .12s}
+.tip.on{opacity:1}
+details{font-family:var(--f-ui);font-size:.85rem}
+summary{cursor:pointer;color:var(--cloth)}
+table{border-collapse:collapse;margin-top:.6rem;font-variant-numeric:tabular-nums}
+th,td{padding:.25rem .8rem .25rem 0;text-align:left;border-bottom:1px solid var(--rule)}
+.spread{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,26rem),1fr));gap:1.5rem;align-items:start}
+.spread > *{min-width:0}
+
+/* stat */
+.stat{display:grid;grid-template-columns:auto 1fr;gap:1.4rem;align-items:center}
+.stat .big{font-family:var(--f-display);font-size:clamp(3.4rem,10vw,5.5rem);line-height:1;color:var(--cloth);font-variant-numeric:tabular-nums}
+@media (max-width:520px){.stat{grid-template-columns:1fr}}
+
+/* passage pairs */
+.pairs{display:grid;gap:2.2rem}
+.pair{display:grid;gap:.8rem}
+.pair h3{font-family:var(--f-ui);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.card{background:var(--leaf);padding:1.1rem 1.2rem 1.2rem;display:grid;gap:.7rem;align-content:start;min-width:0}
+.card .yr{font-family:var(--f-display);font-size:2rem;line-height:1;color:var(--cloth)}
+.card blockquote{margin:0;font-size:1rem;line-height:1.65}
+.card mark{background:var(--mark);color:var(--ink);padding:0 .1em;border-radius:2px}
+.card .src{font-family:var(--f-ui);font-size:.78rem;color:var(--muted)}
+.chip{font-family:var(--f-ui);font-size:.72rem;font-weight:600;letter-spacing:.03em;border:1px solid var(--rule);border-radius:999px;padding:.12rem .55rem;justify-self:start;display:inline-flex;gap:.4rem;align-items:center}
+.chip i{width:.55rem;height:.55rem;border-radius:50%;display:inline-block}
+.verdict{font-family:var(--f-ui);font-size:.82rem;font-weight:600}
+.verdict.no{color:var(--muted)}
+.verdict.yes{color:var(--cloth)}
+
+.invite{border-top:2px solid var(--cloth);padding-top:1.4rem}
+.note{font-family:var(--f-ui);font-size:.8rem;color:var(--muted);border-top:1px solid var(--rule);padding-top:1rem;line-height:1.55}
+@media (prefers-reduced-motion:reduce){.tip{transition:none}}
+</style>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">A research project in progress · English fiction, 1800–1929</div>
+    <h1>What Stands in the Way</h1>
+    <p class="lede col">Every plot needs something between a character and what they want. A storm, a rival, a rule about who may marry whom, a letter that never arrives, a fear the hero cannot master. This project reads thousands of novels to ask a simple question: <em>as the world modernized, did the things standing in the way change?</em></p>
+    <blockquote class="epigraph">“To preserve myself, I was obliged to loose my hold of my burden, and it fell into the gulf.”<cite>Charles Brockden Brown, <em>Edgar Huntly</em> (1799): a gust of wind on a log bridge defeats the narrator’s errand.</cite></blockquote>
+    <div class="ledger" aria-label="Project scale">
+      <div><b>15,511</b><span>novels in the library</span></div>
+      <div><b>607,623</b><span>passages sampled</span></div>
+      <div><b>5,053</b><span>passages read so far</span></div>
+      <div><b>130</b><span>years of fiction, 1800–1929</span></div>
+    </div>
+  </header>
+
+  <section>
+    <div class="eyebrow">How the reading works</div>
+    <h2>A machine that reads for plot, checked by people who read for a living</h2>
+    <ol class="steps">
+      <li><span class="n">STEP 1</span><h3>Build the library</h3><p>15,511 English-language novels from Project Gutenberg, de-duplicated, dated, and sorted into genres.</p></li>
+      <li><span class="n">STEP 2</span><h3>Sample the pages</h3><p>24 random passages of about 350 words from each novel, so no book or author dominates.</p></li>
+      <li><span class="n">STEP 3</span><h3>Read for the obstacle</h3><p>An AI model running on volunteers’ computers names what is in the way and must quote the exact sentence that shows it.</p></li>
+      <li><span class="n">STEP 4</span><h3>Check with human readers</h3><p>Students and an English teacher label a random sample blind, so the machine’s mistakes can be measured and corrected.</p></li>
+      <li><span class="n">STEP 5</span><h3>Test the history</h3><p>Pre-registered statistics ask whether obstacles shifted over time, and whether the answer survives every alternative explanation.</p></li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="eyebrow">First counts · 2,531 obstacles found in 3,518 passages</div>
+    <h2>What usually stands in the way? Other people.</h2>
+    <p class="col">About seven in ten passages contain a real plot obstacle. Most come from people and social rules, not from the physical world. Bars are colored by where the resistance usually comes from: the material world, society, or the character’s own mind.</p>
+    <div class="figure">
+      <h3>Kinds of obstacle, share of all obstacles</h3>
+      <div class="legend" aria-hidden="true"><span><i style="background:var(--s-material)"></i>Material world</span><span><i style="background:var(--s-social)"></i>Society and other people</span><span><i style="background:var(--s-inner)"></i>The character’s own mind</span></div>
+      <div class="chart" id="domains"></div>
+      <details><summary>Show the numbers</summary><table id="domains-table"></table></details>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">A first look at change · preliminary</div>
+    <h2>Did novels turn inward?</h2>
+    <div class="spread">
+      <div class="stack">
+        <p>Critics from Erich Kahler to Virginia Woolf describe the modern novel moving <em>inward</em>, from adventures in the world to struggles in the mind. If that is true, the obstacles in plots should shift toward the character’s own doubts and fears.</p>
+        <p>The first labeled passages do not show that. The share of inner obstacles stays near one in eight and dips slightly after 1885, while obstacles from the material world (weather, distance, darkness, illness) edge up. In earlier pilot labels this rise held <em>within</em> every genre, so it is not just the flood of adventure stories on later shelves.</p>
+        <p class="small">These are the AI’s labels before human correction, from one half of the library. Bars show 95% ranges from resampling novels. Few novels survive from before 1850, so that era is uncertain. The confirmatory test runs on the sealed second half after students and a teacher check a random sample.</p>
+      </div>
+      <div class="figure">
+        <h3>Where the resistance comes from, share of obstacles by era</h3>
+        <div class="legend" aria-hidden="true"><span><i style="background:var(--s-social)"></i>Society and other people</span><span><i style="background:var(--s-material)"></i>Material world</span><span><i style="background:var(--s-inner)"></i>Own mind</span></div>
+        <div class="chart" id="locus"></div>
+        <details><summary>Show the numbers</summary><table id="locus-table"></table></details>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">A surprise for the technology question</div>
+    <div class="stat">
+      <div class="big">1.5%</div>
+      <div class="stack">
+        <h2>Machines are almost never the obstacle</h2>
+        <p class="col">This project began with the telegraph, the railway, and the penny post. Yet only 38 of 2,531 obstacles name a technology at all. The telegram leads with 10. Even in an age of new machines, novelists kept putting people in the way.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Then and now · real passages, exact quotes</div>
+    <h2>The same kind of trouble, a century apart</h2>
+    <p class="col">The highlighted words are the evidence the AI quoted. Every quote is checked character by character against the original book.</p>
+    <div class="pairs" id="pairs"></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Reading for function, not for words</div>
+    <h2>Why counting words is not enough</h2>
+    <p class="col">A word count would score both passages below as “labor” or “letters.” Only one of them puts something in a character’s way. Telling the difference is the skill of a careful reader, and it is what the project measures.</p>
+    <div class="cards" id="contrast"></div>
+  </section>
+
+  <section class="invite col">
+    <div class="eyebrow">Where you come in</div>
+    <h2>Thirty passages, fifteen minutes</h2>
+    <p>The study’s results are only as good as its checks. An English teacher’s judgment on 30 short passages becomes the expert reference that every student annotator is measured against. The questions are the ones you would ask in class: is something in the way, what kind of thing is it, and does it come from the world, from other people, or from the character’s own mind?</p>
+    <p>The annotator guide shows the method with worked examples: <a href="https://ald-coordinator.lunarzdev.workers.dev/annotate/guide">read the guide</a>.</p>
+  </section>
+
+  <p class="note">Data: Project Gutenberg texts (US public domain), dates from the pg-dates project with an ongoing audit. Years shown are verified first-publication years where the catalog date was wrong: <em>Edgar Huntly</em> 1799, <em>Monsieur Violet</em> 1843, <em>Confession</em> 1841. Figures reflect labels collected through November 1, 2026, and will change as the reading continues.</p>
+</div>
+
+<script>
+const D = {
+  domains: [
+    ["A person opposing","INTERPERSONAL_CONFLICT",699,"social"],
+    ["Social rank and rules","SOCIAL_RANK_CONVENTION",613,"social"],
+    ["Money, property, law","MONEY_PROPERTY_LAW",310,"social"],
+    ["Distance and travel","DISTANCE_TRAVEL",260,"material"],
+    ["The character’s own mind","INNER_STATE",197,"inner"],
+    ["Illness, body, death","ILLNESS_BODY_DEATH",169,"material"],
+    ["Messages and secrets","COMMUNICATION_INFORMATION",147,"social"],
+    ["Nature and weather","NATURE_WEATHER",92,"material"],
+    ["Darkness, not seeing","DARKNESS_VISIBILITY",44,"material"]
+  ],
+  eras: ["1800–1849","1850–1884","1885–1929"],
+  eraN: [[63,70],[375,440],[1747,2021]],
+  locus: {
+    social:  [[.729,.623,.836],[.677,.634,.721],[.694,.674,.714]],
+    material:[[.143,.060,.240],[.195,.158,.232],[.209,.192,.225]],
+    inner:   [[.129,.057,.209],[.127,.098,.159],[.097,.083,.111]]
+  },
+  names:{social:"Society and other people",material:"Material world",inner:"Own mind"}
+};
+const CARDS = {
+  comm:[
+    {yr:1807,title:"The Mysterious Wanderer",author:"Sophia Reeve",pre:"…as my witnesses and proofs were indisputable, the verdict pronounced in my favour. But ",q:"the crafty villain effectually screened himself from punishment by the evidence of his two servants",post:", who positively swore their master had… purchased the plantations of a man who assumed my name.",kind:"Messages and secrets",why:"Forged deeds and lying witnesses: the truth is withheld on purpose.",loc:"social"},
+    {yr:1918,title:"A Daughter of Jehu",author:"Laura E. Richards",pre:"“It has been delayed!” Kitty looked at the envelope. “",q:"Missent to ‘Cyrene’!",post:" I should think…”",kind:"Messages and secrets",why:"A letter sent to the wrong town: now the post office is the villain.",loc:"material"}],
+  dark:[
+    {yr:1843,title:"Monsieur Violet",author:"Frederick Marryat",pre:"…should I have the same good luck in a third encounter? It was more than I could expect, ",q:"especially as the darkness would render it more difficult to take a certain aim",post:".",kind:"Darkness, not seeing",why:"Nightfall on a panther hunt: the dark itself is dangerous.",loc:"material"},
+    {yr:1912,title:"Molly McDonald",author:"Randall Parrish",pre:"…the heavy canopy of cloud settled lower in a frosty fog, which gradually obscured the landscape. ",q:"This mist became so thick that the men could scarcely see a hundred yards in any direction",post:", and Hamlin placed a pocket compass on his saddle-pommel.",kind:"Darkness, not seeing",why:"Fog hides a pursuit on the frontier; a compass answers it.",loc:"material"}],
+  nature:[
+    {yr:1799,title:"Edgar Huntly",author:"Charles Brockden Brown",pre:"As I crept with hands and feet along my imperfect bridge, a sudden gust had nearly whirled me into the frightful abyss below. ",q:"To preserve myself, I was obliged to loose my hold of my burden, and it fell into the gulf.",post:" This incident disconcerted and distressed me.",kind:"Nature and weather",why:"A gust on a log bridge costs the narrator his burden.",loc:"material"},
+    {yr:1916,title:"The Rover Boys on a Tour",author:"Edward Stratemeyer",pre:"“He tried to cross the river yonder in the storm, and the bridge broke and let the automobile down. I managed to save myself and jumped ashore, but ",q:"he was carried off by the torrent",post:".”",kind:"Nature and weather",why:"The same broken bridge, now under an automobile.",loc:"material"}],
+  inner:[
+    {yr:1841,title:"Confession",author:"William Gilmore Simms",pre:"“…but if we only had love, truth, peace. ",q:"If that damning doubt were not there!—that wild fear, that fatal, soul-petrifying suspicion!",post:"” I groaned audibly as I traversed the streets…",kind:"The character’s own mind",why:"Jealous suspicion: the obstacle is inside the narrator.",loc:"inner"},
+    {yr:1916,title:"Held to Answer",author:"Peter Clark MacFarlane",pre:"To be sure, ",q:"he was still under the spell of his fear,—and could not see himself as yet doing one thing to weaken the pressure upon his benefactor",post:". For this dastardly inactivity he suffered a flood of self-reproaches…",kind:"The character’s own mind",why:"Fear keeps a man from helping the friend who saved him.",loc:"inner"}]
+};
+const PAIRS=[["Messages that fail","comm"],["Darkness and not seeing","dark"],["Nature in the way","nature"],["The enemy within","inner"]];
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const col={material:"var(--s-material)",social:"var(--s-social)",inner:"var(--s-inner)"};
+const pct=x=>(x*100).toFixed(0)+"%";
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+function tipFor(el){const t=document.createElement("div");t.className="tip";el.appendChild(t);return t}
+function showTip(t,host,evt,html){const r=host.getBoundingClientRect();t.innerHTML=html;t.style.left=(evt.clientX-r.left+host.scrollLeft)+"px";t.style.top=(evt.clientY-r.top)+"px";t.classList.add("on")}
+
+/* Chart 1: horizontal bars */
+(function(){
+  const host=document.getElementById("domains"), total=D.domains.reduce((a,d)=>a+d[2],0);
+  const W=720,L=190,R=56,rowH=30,top=8,H=top+D.domains.length*rowH+24,max=0.30;
+  const x=v=>L+(W-L-R)*v/max;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart of obstacle kinds as a share of all obstacles">`;
+  [0,.1,.2,.3].forEach(t=>{s+=`<line class="grid" x1="${x(t)}" x2="${x(t)}" y1="${top}" y2="${H-22}"/><text x="${x(t)}" y="${H-6}" text-anchor="middle">${pct(t)}</text>`});
+  const show=new Set(["INTERPERSONAL_CONFLICT","INNER_STATE","COMMUNICATION_INFORMATION","DARKNESS_VISIBILITY"]);
+  D.domains.forEach((d,i)=>{const y=top+i*rowH, sh=d[2]/total, w=x(sh)-L;
+    s+=`<text class="lbl" x="${L-10}" y="${y+rowH/2+4}" text-anchor="end">${d[0]}</text>`;
+    s+=`<rect class="hit" data-i="${i}" x="${L}" y="${y+4}" width="${W-L-R}" height="${rowH-8}" fill="transparent"/>`;
+    s+=`<path d="M${L},${y+7} h${w-4} a4,4 0 0 1 4,4 v${rowH-22} a4,4 0 0 1 -4,4 h-${w-4} z" fill="${col[d[3]]}" pointer-events="none"/>`;
+    if(show.has(d[1])) s+=`<text class="val" x="${x(sh)+6}" y="${y+rowH/2+4}">${pct(sh)}</text>`;
+  });
+  host.innerHTML=s+"</svg>"; const t=tipFor(host);
+  host.querySelectorAll(".hit").forEach(r=>{r.addEventListener("mousemove",e=>{const d=D.domains[+r.dataset.i];showTip(t,host,e,`<b>${d[0]}</b> · ${d[2]} obstacles · ${(d[2]/total*100).toFixed(1)}%`)});r.addEventListener("mouseleave",()=>t.classList.remove("on"))});
+  document.getElementById("domains-table").innerHTML="<tr><th>Kind</th><th>Obstacles</th><th>Share</th></tr>"+D.domains.map(d=>`<tr><td>${d[0]}</td><td>${d[2]}</td><td>${(d[2]/total*100).toFixed(1)}%</td></tr>`).join("");
+})();
+
+/* Chart 2: dot + range by era */
+(function(){
+  const host=document.getElementById("locus");
+  const W=560,L=46,R=120,T=12,B=58,H=330,ymax=.9;
+  const xs=D.eras.map((_,i)=>L+(W-L-R)*(i+.5)/3), y=v=>T+(H-T-B)*(1-v/ymax);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of obstacles by source and era, with 95 percent ranges">`;
+  [0,.2,.4,.6,.8].forEach(t=>{s+=`<line class="grid" x1="${L}" x2="${W-R+10}" y1="${y(t)}" y2="${y(t)}"/><text x="${L-8}" y="${y(t)+4}" text-anchor="end">${pct(t)}</text>`});
+  D.eras.forEach((e,i)=>{s+=`<text class="lbl" x="${xs[i]}" y="${H-B+22}" text-anchor="middle">${e}</text><text x="${xs[i]}" y="${H-B+40}" text-anchor="middle">${D.eraN[i][0].toLocaleString()} novels</text>`});
+  const order=["social","material","inner"], off={social:0,material:-7,inner:7};
+  order.forEach(k=>{const v=D.locus[k];
+    s+=`<polyline points="${v.map((p,i)=>`${xs[i]+off[k]},${y(p[0])}`).join(" ")}" fill="none" stroke="${col[k]}" stroke-width="2"/>`;
+    v.forEach((p,i)=>{const cx=xs[i]+off[k];
+      s+=`<line x1="${cx}" x2="${cx}" y1="${y(p[1])}" y2="${y(p[2])}" stroke="${col[k]}" stroke-width="2" stroke-linecap="round"/>`;
+      s+=`<circle class="pt" data-k="${k}" data-i="${i}" cx="${cx}" cy="${y(p[0])}" r="5.5" fill="${col[k]}" stroke="var(--leaf)" stroke-width="2"/>`;});
+    const last=v[2]; const ly={social:y(last[0])+4,material:y(last[0])-2,inner:y(last[0])+12}[k];
+    s+=`<text class="val" x="${xs[2]+18}" y="${ly}">${pct(last[0])}</text><text x="${xs[2]+50}" y="${ly}">${{social:"society",material:"material",inner:"own mind"}[k]}</text>`;
+  });
+  host.innerHTML=s+"</svg>"; const t=tipFor(host);
+  host.querySelectorAll(".pt").forEach(c=>{c.addEventListener("mousemove",e=>{const k=c.dataset.k,i=+c.dataset.i,p=D.locus[k][i];showTip(t,host,e,`<b>${D.names[k]}</b> · ${D.eras[i]}<br>${pct(p[0])} (range ${pct(p[1])}–${pct(p[2])}) · ${D.eraN[i][1]} obstacles`)});c.addEventListener("mouseleave",()=>t.classList.remove("on"))});
+  document.getElementById("locus-table").innerHTML="<tr><th>Era</th><th>Society</th><th>Material</th><th>Own mind</th><th>Novels / obstacles</th></tr>"+D.eras.map((e,i)=>`<tr><td>${e}</td>${order.map(k=>`<td>${pct(D.locus[k][i][0])}</td>`).join("")}<td>${D.eraN[i][0]} / ${D.eraN[i][1]}</td></tr>`).join("");
+})();
+
+/* passage pairs */
+function card(c,verdict){return `<article class="card"><div class="yr">${c.yr}</div><blockquote>${esc(c.pre)}<mark>${esc(c.q)}</mark>${esc(c.post)}</blockquote>${verdict||""}<span class="chip"><i style="background:${col[c.loc]}"></i>${c.kind}</span><p class="small">${c.why}</p><p class="src"><em>${c.title}</em> · ${c.author}</p></article>`}
+document.getElementById("pairs").innerHTML=PAIRS.map(([h,k])=>`<div class="pair"><h3>${h}</h3><div class="cards">${CARDS[k].map(c=>card(c)).join("")}</div></div>`).join("");
+document.getElementById("contrast").innerHTML=
+ `<article class="card"><span class="verdict no">Not an obstacle</span><blockquote>The first thing to be done was to cut the whale’s head off. <mark>This operation, involving the greatest amount of labor in the whole of the cutting-in</mark>, was taken in hand by the first and second mates…</blockquote><p class="small">Hard work, described. Nobody’s goal is blocked; the passage explains a procedure.</p><p class="src"><em>Sea Stories</em> (1902)</p></article>`+
+ card(CARDS.comm[1],`<span class="verdict yes">An obstacle</span>`);
+</script>
