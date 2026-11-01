@@ -229,12 +229,21 @@ class HardwareFit:
     # Ollama allocates KV cache for OLLAMA_NUM_PARALLEL slots; requests beyond that queue in the server and
     # cost no VRAM. Known when ald configured the server (manage_ollama), else None (= every request a slot).
     server_slots: int | None = None
+    # VRAM held by other programs (games, another study's llama-server, the desktop), measured at runtime.
+    foreign_gb: float = 0.0
 
     @property
     def capacity_gb(self) -> float:
         if self.accel == "cpu" or self.usable_vram_gb <= 0:
             return self.ram_gb * 0.7
-        return self.usable_vram_gb
+        return max(0.0, self.usable_vram_gb - self.foreign_gb)
+
+    def slots_that_fit(self, stage: Stage, wanted: int) -> int:
+        """Largest NUM_PARALLEL <= wanted whose KV slots fit next to the other programs' VRAM (>= 1)."""
+        n = max(1, wanted)
+        while n > 1 and self.need_gb(stage, n) + self.headroom_gb > self.capacity_gb + 1e-9:
+            n -= 1
+        return n
 
     @staticmethod
     def need_gb(stage: Stage, concurrency: int) -> float:

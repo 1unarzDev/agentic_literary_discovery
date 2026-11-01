@@ -129,6 +129,7 @@ class Worker:
         service_mode: bool = False,
         manage_ollama: bool = False,
         active_hours: str | None = None,
+        gpu_used_fn: Callable[[], float | None] | None = None,
     ):
         self.cfg = cfg
         self.client = client
@@ -190,6 +191,10 @@ class Worker:
         self.updater.service_mode = service_mode
         self.manage_ollama = manage_ollama
         self.active_hours = active_hours
+        if gpu_used_fn is None:
+            from .hw import gpu_memory_used_gb
+            gpu_used_fn = gpu_memory_used_gb
+        self.gpu_used_fn = gpu_used_fn
         self.activity = "starting"
         self.last_quality: dict[str, Any] | None = None
         self.keep_awake: Any = None  # KeepAwake (set by `ald work`)
@@ -277,8 +282,9 @@ class Worker:
                 if s not in allowed:
                     excluded[s] = f"not allowed for tier {tier}"
             allowed = [s for s in allowed if s in self.requested]
-        if self.manage_ollama:  # we set OLLAMA_NUM_PARALLEL to the tier hint (ollama_env)
-            self.fit.server_slots = reg.num_parallel_hint(tier) or None
+        self.measure_foreign_vram()
+        if self.manage_ollama:  # we set OLLAMA_NUM_PARALLEL (tier hint, reduced if it does not fit)
+            self.fit.server_slots = self.effective_parallel(reg, tier, allowed)
         fit_ok, why = self.fit.filter_stages(reg.stages[s] for s in allowed)
         excluded.update(why)
         try:
@@ -1040,6 +1046,55 @@ class Worker:
         except Exception as e:  # noqa: BLE001
             self.log(f"[service] could not refresh the service definition: {e}")
 
+    def measure_foreign_vram(self) -> float:
+        """VRAM held by programs other than our Ollama = GPU memory in use - what Ollama has resident.
+        (Per-process figures are often N/A on Windows/WDDM, so this works from totals.)"""
+        if self.hw.accel != "cuda":
+            return self.fit.foreign_gb
+        used = self.gpu_used_fn()
+        if used is None:
+            return self.fit.foreign_gb
+        try:
+            ours = sum(float(m.get("size_vram") or 0) for m in self.backend.ps()) / GB
+        except BackendError:
+            ours = 0.0
+        # The CUDA context / compute buffers of a loaded model are not in size_vram: allow ~0.6 GB of them.
+        slack = 0.6 if ours > 0 else 0.0
+        foreign = max(0.0, round(used - ours - slack, 2))
+        if abs(foreign - self.fit.foreign_gb) >= 0.5:
+            self.log(f"[gpu] {foreign:.1f} GB of VRAM held by other programs; planning with "
+                     f"{max(0.0, self.hw.usable_vram_gb - foreign):.1f} GB")
+        self.fit.foreign_gb = foreign
+        return foreign
+
+    def _recheck_vram(self, every_s: float = 600.0) -> None:
+        """Between jobs: other programs may have taken or freed VRAM; re-plan NUM_PARALLEL if it changed."""
+        if not self.manage_ollama or self.hw.accel != "cuda" or self._registry is None:
+            return
+        now = self.clock.monotonic()
+        if now - getattr(self, "_last_vram_check", -1e18) < every_s:
+            return
+        self._last_vram_check = now
+        before = self.fit.server_slots
+        self.measure_foreign_vram()
+        after = self.effective_parallel(self.registry, self.tier or "", self.stages or None)
+        if after != before:
+            self.log(f"[gpu] NUM_PARALLEL {before} -> {after} for the VRAM other programs hold")
+            self.ensure_ollama()
+            self.resolve_stages()
+
+    def effective_parallel(self, reg: Registry, tier: str, stages: list[str] | None = None) -> int | None:
+        """The tier's NUM_PARALLEL hint, lowered until the largest allowed stage's KV slots fit in the VRAM
+        actually free (other programs' memory excluded)."""
+        hint = reg.num_parallel_hint(tier)
+        if not hint:
+            return None
+        cands = [reg.stages[s] for s in (stages or reg.allowed_stages(tier)) if s in reg.stages]
+        if not cands:
+            return hint
+        main = max(cands, key=lambda st: st.vram_gb_required + hint * st.kv_gb_per_slot)
+        return self.fit.slots_that_fit(main, hint)
+
     def ensure_ollama(self, min_interval_s: float = 0.0) -> None:
         """Start Ollama if it is down and keep the tier's OLLAMA_* settings applied (see ollama_env)."""
         if not self.manage_ollama:
@@ -1054,6 +1109,11 @@ class Worker:
             tier = self.tier or (reg.select_tier(self.hw.usable_vram_gb)["name"] if reg else None)
             env = (ollama_env.tier_env(reg, tier, self.hw.accel) if (reg and tier)
                    else ollama_env.wanted_env(None, self.hw.accel))
+            if reg and tier:
+                self.measure_foreign_vram()
+                np_eff = self.effective_parallel(reg, tier)
+                if np_eff:
+                    env["OLLAMA_NUM_PARALLEL"] = str(np_eff)
             ollama_env.ensure(env, url=self.cfg.ollama_url, log=self.log, service_mode=self.service_mode)
             self.backend._version = None
             self._backend_version_cache = None
@@ -1169,6 +1229,7 @@ class Worker:
                     if self.exit_when_idle or self.clock.sleep(60.0, self.stop):
                         break
                     continue
+                self._recheck_vram()
                 self.check_for_update()
                 paused_for_update = self.maybe_apply_update()
                 if not self.stages:

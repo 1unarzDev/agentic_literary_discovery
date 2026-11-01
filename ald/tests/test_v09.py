@@ -160,3 +160,26 @@ def test_tuner_starts_at_tier_parallel_hint(env, registry_raw):
     hint = w.registry.num_parallel_hint(w.tier)
     if hint:
         assert all(t.current == min(hint, t.max_c) for t in w.tuners.values())
+
+
+# --- foreign VRAM (another program keeps memory resident) ------------------------------------------------
+def test_foreign_vram_lowers_capacity_and_num_parallel(env):
+    w = env.make_worker(manage_ollama=False)
+    w.startup()
+    reg, tier = w.registry, w.tier
+    hint = reg.num_parallel_hint(tier)
+    st = max((reg.stages[s] for s in reg.allowed_stages(tier)), key=lambda x: x.vram_gb_required + (hint or 1) * x.kv_gb_per_slot)
+    assert w.effective_parallel(reg, tier) == hint  # nothing foreign: the tier hint
+    env.gpu_used = 4.7  # e.g. a resident llama-server; our Ollama has nothing loaded
+    env.ollama.loaded.clear()
+    assert w.measure_foreign_vram() == 4.7 and w.fit.capacity_gb == pytest.approx(w.hw.usable_vram_gb - 4.7)
+    np_eff = w.effective_parallel(reg, tier)
+    assert 1 <= np_eff <= hint
+    assert st.vram_gb_required + (np_eff - 1) * st.kv_gb_per_slot + w.fit.headroom_gb <= w.fit.capacity_gb or np_eff == 1
+
+
+def test_our_own_resident_model_is_not_foreign(env):
+    w = env.make_worker()
+    env.ollama.loaded["m"] = int(6.0 * 1024 ** 3)
+    env.gpu_used = 6.8  # 6.0 GB our model + its CUDA context
+    assert w.measure_foreign_vram() < 0.5

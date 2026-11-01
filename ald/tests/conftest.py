@@ -334,6 +334,7 @@ def env(tmp_path, registry_raw, hw16):
     e.run = FakeRun()
     e.reexec_calls = []
     e.logs = []
+    e.gpu_used = None  # VRAM in use (GB) as nvidia-smi would report it; None = unknown
 
     def make_worker(**kw: Any) -> Worker:
         cfg = Config(coordinator_url="http://coord.test", token=FakeCoordinator.TOKEN, tier="t16")
@@ -345,7 +346,7 @@ def env(tmp_path, registry_raw, hw16):
                           clock=clock.time, which=lambda n: "/usr/bin/uv", log=e.logs.append)
         defaults = dict(data_root=e.root, hw=hw16, clock=clock, storage=storage, updater=updater,
                         auto_update=False, background=False, exit_when_idle=True, max_concurrency=1,
-                        log=e.logs.append, rng=random.Random(0))
+                        log=e.logs.append, rng=random.Random(0), gpu_used_fn=lambda: e.gpu_used)
         defaults.update(kw)
         return Worker(cfg, client, backend, **defaults)
 

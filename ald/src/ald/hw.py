@@ -183,3 +183,22 @@ def detect(data_path: Path | None = None, run: Callable[[list[str]], str | None]
         info.disk_path = str(p)
         info.disk_free_gb = round(shutil.disk_usage(str(p)).free / GiB, 2)
     return info
+
+
+def gpu_memory_used_gb(run: Callable[[list[str]], str | None] = _run) -> float | None:
+    """VRAM in use on the largest NVIDIA GPU (all processes), or None if unknown."""
+    smi = nvidia_smi_path()
+    if not smi:
+        return None
+    out = run([smi, "--query-gpu=memory.total,memory.used", "--format=csv,noheader,nounits"])
+    if not out:
+        return None
+    best = None
+    for line in out.strip().splitlines():
+        try:
+            total, used = (float(x) for x in line.split(",")[:2])
+        except ValueError:
+            continue
+        if best is None or total > best[0]:
+            best = (total, used)
+    return round(best[1] / 1024, 2) if best else None
