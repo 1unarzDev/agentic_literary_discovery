@@ -14,13 +14,13 @@ MAX_LEASE_JOBS = "16"       # cap on max_jobs per /v1/lease call
 
 [[d1_databases]]
 binding = "DB"
-database_name = "ald"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"   # printed by `npx wrangler d1 create ald`
+database_name = "ald-coordinator"
+database_id = "bf8bdba1-3687-4633-a071-e010c3f73475"   # printed by `npx wrangler d1 create ald`
 migrations_dir = "migrations"
 
 [[r2_buckets]]
 binding = "BUCKET"
-bucket_name = "replace-with-r2-bucket-name"   # set to "ald" after `npx wrangler r2 bucket create ald`
+bucket_name = "ald-coordinator"   # set to "ald" after `npx wrangler r2 bucket create ald`
 
 [triggers]
 crons = ["*/5 * * * *"]   # reclaim expired leases

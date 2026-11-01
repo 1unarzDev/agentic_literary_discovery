@@ -1,0 +1,21 @@
+quantity,truth
+material share [early],0.483031780256867
+material share [late],0.3399854914762423
+material share [mid],0.40822754401511835
+material raw contrast late-early,-0.1430462887806247
+internal share [early],0.0748101621824318
+internal share [late],0.15756982227058397
+internal share [mid],0.11424178686966827
+internal raw contrast late-early,0.08275966008815216
+prevalence share [early],0.4424672307947569
+prevalence share [late],0.4609011394639705
+prevalence share [mid],0.4553192937424649
+prevalence raw contrast late-early,0.018433908669213572
+darkness share [early],0.0584245893479343
+darkness share [late],0.028606965174129355
+darkness share [mid],0.04049508030957103
+darkness raw contrast late-early,-0.029817624173804944
+H1 material share contrast [identity],-0.13974668777412697
+H1 internal share contrast [identity],0.08422356166151786
+H1 material share contrast [logit],-0.1422700740404907
+H1 internal share contrast [logit],0.08459833474211655

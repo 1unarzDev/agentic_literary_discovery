@@ -624,7 +624,7 @@ def _install_windows_ctrl_handler(worker: Any) -> None:
 @app.command()
 def work(
     max_concurrency: int = typer.Option(8, "--max-concurrency", help="Upper bound for auto-tuned concurrency."),
-    keep_awake: bool = typer.Option(False, "--keep-awake", help="Prevent system sleep while working."),
+    keep_awake: bool = typer.Option(True, "--keep-awake/--allow-sleep", help="Prevent system sleep while working (default on)."),
     stages: Optional[str] = typer.Option(None, "--stages", help="Comma-separated subset of allowed stages."),
     until: Optional[str] = typer.Option(None, "--until", help="Stop leasing near HH:MM (local time)."),
     hours: Optional[float] = typer.Option(None, "--hours", help="Run for N hours."),

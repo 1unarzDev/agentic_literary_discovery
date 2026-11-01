@@ -73,6 +73,7 @@ STAGES = {
 TIERS = {
     "cpu": {"min_vram_gb": 0, "stages": ["embed"], "num_parallel_hint": 2},
     "t8": {"min_vram_gb": 7.5, "stages": ["workcheck", "embed"], "num_parallel_hint": 4},
+    "t12": {"min_vram_gb": 11.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 2},
     "t16": {"min_vram_gb": 15.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 6},
     "t24": {"min_vram_gb": 23.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 8},
 }

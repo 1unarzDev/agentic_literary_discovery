@@ -29,17 +29,17 @@ class KeepAwake:
                 self._win = True
                 self.log("[keep-awake] SetThreadExecutionState(ES_SYSTEM_REQUIRED)")
             elif sys.platform == "darwin":
-                self._proc = subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())])
-                self.log("[keep-awake] caffeinate -i -w <pid>")
+                self._proc = subprocess.Popen(["caffeinate", "-i", "-m", "-s", "-w", str(os.getpid())])
+                self.log("[keep-awake] caffeinate -i -m -s -w <pid> (idle+system sleep blocked on AC; closing the lid still sleeps unless an external display is attached)")
             else:
                 inhibit = shutil.which("systemd-inhibit")
                 if inhibit:
                     holder = ["tail", f"--pid={os.getpid()}", "-f", "/dev/null"]
                     self._proc = subprocess.Popen(
-                        [inhibit, "--what=sleep:idle", "--who=ald", "--why=ald work is labeling passages",
+                        [inhibit, "--what=sleep:idle:handle-lid-switch", "--who=ald", "--why=ald work is labeling passages",
                          "--mode=block", *holder],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    self.log("[keep-awake] systemd-inhibit --what=sleep:idle")
+                    self.log("[keep-awake] systemd-inhibit --what=sleep:idle:handle-lid-switch")
                 else:
                     self.log("[keep-awake] systemd-inhibit not available; sleep is not inhibited")
         except Exception as e:  # noqa: BLE001
@@ -59,3 +59,19 @@ class KeepAwake:
                 self._proc.wait(timeout=5)
             except Exception:  # noqa: BLE001
                 pass
+
+
+def battery_ok(min_percent: int = 30) -> tuple[bool, str]:
+    """False when running on battery below ``min_percent`` (pause leasing to avoid draining laptops)."""
+    try:
+        import psutil
+        b = psutil.sensors_battery()
+    except Exception:  # noqa: BLE001
+        return True, "battery: unknown"
+    if b is None:
+        return True, "battery: none (desktop)"
+    if b.power_plugged:
+        return True, f"battery: {b.percent:.0f}% plugged in"
+    if b.percent < min_percent:
+        return False, f"battery: {b.percent:.0f}% on battery (< {min_percent}%) - pausing new leases"
+    return True, f"battery: {b.percent:.0f}% on battery"

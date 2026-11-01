@@ -1,0 +1,490 @@
+"""Pre-registered confirmatory models (docs/prereg.md), all on DSL work-level tables (dsl.WorkData).
+
+H1  locus shares among obstacles (material / social / internal), multinomial logit on DSL soft
+    outcomes ~ ns(year, df=4) + genre + origin + log length; standardised era contrast
+    1800-39 vs 1885-1920 (g-computation over the pooled covariate mix = "within genre");
+    intersection-union test: material falls AND internal rises.
+H2a share intentional_withholding / (withholding + infrastructure + accidental_loss) among
+    communication failures; rises early -> late.
+H2b DISTANCE_TRAVEL prevalence, logit ~ post1850 + genre + origin + log length; falls.
+H2c DARKNESS_VISIBILITY prevalence falls AND night_function share (danger + concealment) falls.
+H3  divergence between z-scored decade keyword rates and function rates (1 - r, averaged over the
+    three technology pairs); parametric null of affine tracking + measurement error; block-bootstrap CI.
+Holm across the five p-values. Unit = work; SEs cluster-robust by author (works nest in authors).
+Also: shift-share decomposition (within-genre vs composition) and fixed-composition trends.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+from analysis.stats.dsl import WorkData, fit_linear, fit_mnlogit, ratio_shares
+
+EARLY = (1800, 1839)
+LATE = (1885, 1920)          # task spec; plan §3/4.7 say 1885-1925 (see prereg deviations note)
+HINGE_B = 1850               # H2b railway cut
+H3_PAIRS = {"comm": "comm_infra", "travel": "distance", "dark": "darkness"}
+
+
+# ------------------------------------------------------------------ design
+
+def ns_basis(x: np.ndarray, knots: np.ndarray) -> np.ndarray:
+    """Natural cubic spline basis without intercept (ESL eq. 5.4-5.5): len(knots)-1 columns,
+    linear beyond the boundary knots. df = len(knots) - 1."""
+    k = np.asarray(knots, float)
+    lo, hi = k[0], k[-1]
+    xs = (np.asarray(x, float) - lo) / (hi - lo)
+    ks = (k - lo) / (hi - lo)
+    K = len(ks)
+
+    def d(j):
+        return (np.clip(xs - ks[j], 0, None) ** 3 - np.clip(xs - ks[K - 1], 0, None) ** 3) / (ks[K - 1] - ks[j])
+    cols = [xs] + [d(j) - d(K - 2) for j in range(K - 2)]
+    return np.column_stack(cols)
+
+
+def default_knots(years: np.ndarray, df: int = 4) -> np.ndarray:
+    qs = np.linspace(0, 1, df + 1)[1:-1]
+    return np.r_[np.min(years), np.quantile(years, qs), np.max(years)].astype(float)
+
+
+@dataclass
+class Design:
+    knots: np.ndarray
+    genres: list
+    origins: list
+    loglen_mean: float | None
+    time: str = "spline"        # "spline" | "step"
+    cut: int = HINGE_B
+    extra: tuple = ()           # extra numeric work covariates (e.g. "memorization")
+
+    @classmethod
+    def from_data(cls, wd: WorkData, df: int = 4, time: str = "spline", extra: tuple = (),
+                  knots: np.ndarray | None = None) -> "Design":
+        cov = wd.cov
+        gl = cov.genre.value_counts().index.tolist()      # reference = most common genre
+        ol = ["UK"] + sorted(set(cov.origin) - {"UK"})
+        ll = float(np.log(cov.n_words).mean()) if "n_words" in cov else None
+        return cls(default_knots(cov.year.values, df) if knots is None else np.asarray(knots, float),
+                   gl, ol, ll, time, HINGE_B, extra)
+
+    def X(self, cov: pd.DataFrame, year: np.ndarray | float | None = None) -> tuple[np.ndarray, list]:
+        n = len(cov)
+        yr = cov.year.values if year is None else np.broadcast_to(np.asarray(year, float), (n,))
+        cols, names = [np.ones(n)], ["const"]
+        if self.time == "spline":
+            B = ns_basis(yr, self.knots)
+            cols += list(B.T)
+            names += [f"ns{i}" for i in range(B.shape[1])]
+        else:
+            cols.append((yr >= self.cut).astype(float))
+            names.append(f"post{self.cut}")
+        for g in self.genres[1:]:
+            cols.append((cov.genre.values == g).astype(float))
+            names.append(f"genre[{g}]")
+        for o in self.origins[1:]:
+            cols.append((cov.origin.values == o).astype(float))
+            names.append(f"origin[{o}]")
+        if self.loglen_mean is not None and "n_words" in cov:
+            cols.append(np.log(cov.n_words.values) - self.loglen_mean)
+            names.append("log_len")
+        for e in self.extra:
+            cols.append(cov[e].values.astype(float))
+            names.append(e)
+        return np.column_stack(cols), names
+
+
+@dataclass
+class TargetFit:
+    fit: object
+    design: Design
+    keep: np.ndarray            # columns kept (non-degenerate in this data)
+    names: list
+
+    def Xk(self, cov, year=None):
+        return self.design.X(cov, year)[0][:, self.keep]
+
+
+LINK = {"default": "logit"}   # set LINK["default"] = "identity" to switch every model (see README)
+
+
+def fit_target(wd: WorkData, target: str, design: Design, cluster: str = "author_key",
+               cats: list | None = None, link: str | None = None) -> TargetFit:
+    """Fit the (multinomial) logit or identity-link DSL model for `target` (optionally collapsing to
+    the categories `cats`, others -> 0). A logit that fails to converge (DSL pseudo-outcome totals
+    can be negative in small cells, so the MLE may not exist) falls back to the identity link,
+    as pre-registered; the fallback is recorded in fit.link."""
+    X, names = design.X(wd.cov)
+    keep = np.r_[True, X[:, 1:].std(0) > 1e-12]
+    Y = wd.Y[target]
+    if cats is not None:
+        Y = np.c_[1 - Y[:, cats].sum(1), Y[:, cats]]
+    link = link or LINK["default"]
+    cols = [n for n, k in zip(names, keep) if k]
+    cl = wd.cov[cluster].values
+    if link == "logit":
+        fit = fit_mnlogit(X[:, keep], Y, clusters=cl, columns=cols)
+        if not fit.converged:
+            fit = fit_linear(X[:, keep], Y, clusters=cl, columns=cols)
+            fit.link = "identity"; fit.n_iter = -1  # -1 marks the logit->identity fallback
+    else:
+        fit = fit_linear(X[:, keep], Y, clusters=cl, columns=cols)
+    return TargetFit(fit, design, keep, fit.columns)
+
+
+def standardized_share(tf: TargetFit, ref_cov: pd.DataFrame, years: np.ndarray, num: list[int],
+                       den: list[int] | None) -> tuple[float, np.ndarray]:
+    """g-computation: average fitted category probabilities over ref works x years, then
+    share = sum_num A / sum_den A (den None -> prevalence sum_num A). Returns (share, d share / d vec(beta))."""
+    p, Km1 = tf.fit.beta.shape
+    A = np.zeros(Km1 + 1)
+    dA = np.zeros((Km1 + 1, Km1 * p))
+    M = 0
+    for y in np.atleast_1d(years):
+        X = tf.Xk(ref_cov, y)
+        a, da = tf.fit.mean_and_grad(X)
+        A += a
+        dA += da
+        M += len(X)
+    A /= M
+    dA /= M
+    Nn = A[num].sum()
+    gN = dA[num].sum(0)
+    if den is None:
+        return float(Nn), gN
+    Dd = A[den].sum()
+    gD = dA[den].sum(0)
+    return float(Nn / Dd), (gN * Dd - Nn * gD) / Dd ** 2
+
+
+# ------------------------------------------------------------------ results
+
+@dataclass
+class Component:
+    label: str
+    estimate: float
+    se: float
+    expected_sign: int          # +1 / -1 / 0 (no prediction)
+
+    @property
+    def p_two(self) -> float:
+        return float(2 * stats.norm.sf(abs(self.estimate) / self.se)) if self.se > 0 else float("nan")
+
+    @property
+    def p_dir(self) -> float:
+        """two-sided p if the sign is the pre-declared one, else 1 (claim needs the declared sign)."""
+        if self.expected_sign == 0:
+            return self.p_two
+        return self.p_two if np.sign(self.estimate) == self.expected_sign else 1.0
+
+    def ci(self, level=0.95):
+        z = stats.norm.ppf(0.5 + level / 2)
+        return self.estimate - z * self.se, self.estimate + z * self.se
+
+
+@dataclass
+class Effect:
+    name: str
+    components: list[Component]
+    infl: np.ndarray | None = None         # (n_clusters, n_components): theta_{-c} ~= theta - infl[c]
+    extra: dict = field(default_factory=dict)
+
+    @property
+    def tested(self) -> list[Component]:
+        return [c for c in self.components if c.expected_sign != 0]
+
+    @property
+    def p(self) -> float:
+        """intersection-union p: every directional component must be significant."""
+        return max(c.p_dir for c in self.tested)
+
+    def summary(self) -> pd.DataFrame:
+        return pd.DataFrame([{"test": self.name, "component": c.label, "estimate": c.estimate, "se": c.se,
+                              "lo": c.ci()[0], "hi": c.ci()[1], "expected_sign": c.expected_sign,
+                              "p_two_sided": c.p_two} for c in self.components])
+
+
+def _contrast_components(tf: TargetFit, ref: pd.DataFrame, specs: list[tuple], early, late) -> tuple[list, np.ndarray, dict]:
+    """specs: (label, num, den, expected_sign). Returns components, influence matrix, era shares."""
+    ye = np.arange(early[0], early[1] + 1)
+    yl = np.arange(late[0], late[1] + 1)
+    comps, grads, shares = [], [], {}
+    for label, num, den, sign in specs:
+        se_, ge = standardized_share(tf, ref, ye, num, den)
+        sl_, gl = standardized_share(tf, ref, yl, num, den)
+        g = gl - ge
+        se = float(np.sqrt(max(g @ tf.fit.cov @ g, 0)))
+        comps.append(Component(label, sl_ - se_, se, sign))
+        grads.append(g)
+        shares[label] = (se_, sl_)
+    infl = tf.fit.cluster_influence() @ np.column_stack(grads)
+    return comps, infl, shares
+
+
+def _ref(wd: WorkData, ref_cov: pd.DataFrame | None, max_ref: int = 3000) -> pd.DataFrame:
+    """Reference covariate distribution for standardisation (default: the analysis works; capped
+    by a fixed-seed subsample for speed)."""
+    if ref_cov is not None:
+        return ref_cov
+    c = wd.cov
+    return c.sample(n=max_ref, random_state=0) if len(c) > max_ref else c
+
+
+def h1(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE) -> Effect:
+    design = design or Design.from_data(wd)
+    tf = fit_target(wd, "locus", design)
+    specs = [("material share", [1], [1, 2, 3], -1), ("internal share", [3], [1, 2, 3], +1),
+             ("social share", [2], [1, 2, 3], 0)]
+    comps, infl, shares = _contrast_components(tf, _ref(wd, ref_cov), specs, early, late)
+    return Effect("H1 inward turn", comps, infl, {"era_shares": shares, "converged": tf.fit.converged, "link": tf.fit.link, "fit": tf})
+
+
+def h2a(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE) -> Effect:
+    design = design or Design.from_data(wd)
+    tf = fit_target(wd, "comm_cause", design)
+    comps, infl, shares = _contrast_components(tf, _ref(wd, ref_cov), [("withholding share", [1], [1, 2], +1)], early, late)
+    return Effect("H2a communication", comps, infl, {"era_shares": shares, "converged": tf.fit.converged})
+
+
+def h2b(wd: WorkData, design: Design | None = None, ref_cov=None, cut: int = HINGE_B) -> Effect:
+    base = design or Design.from_data(wd)
+    d = Design(base.knots, base.genres, base.origins, base.loglen_mean, "step", cut, base.extra)
+    tf = fit_target(wd, "distance", d)
+    ref = _ref(wd, ref_cov)
+    s0, g0 = standardized_share(tf, ref, [cut - 1], [1], None)
+    s1, g1 = standardized_share(tf, ref, [cut], [1], None)
+    g = g1 - g0
+    comp = Component(f"DISTANCE prevalence post-pre {cut}", s1 - s0, float(np.sqrt(g @ tf.fit.cov @ g)), -1)
+    infl = tf.fit.cluster_influence() @ g[:, None]
+    # secondary (not tested): per-genre raw pre/post shares
+    per = ratio_shares(wd, "distance", [1], None, by=np.where(wd.cov.year.values >= cut, "post", "pre"))
+    return Effect("H2b mobility", [comp], infl, {"pre_post": (s0, s1), "converged": tf.fit.converged,
+                                                  "raw": per.table})
+
+
+def h2c(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE) -> Effect:
+    design = design or Design.from_data(wd)
+    ref = _ref(wd, ref_cov)
+    tf1 = fit_target(wd, "darkness", design)
+    c1, i1, s1 = _contrast_components(tf1, ref, [("DARKNESS prevalence", [1], None, -1)], early, late)
+    tf2 = fit_target(wd, "night", design)
+    c2, i2, s2 = _contrast_components(tf2, ref, [("night danger+concealment share", [1], [1, 2], -1)], early, late)
+    # influence matrices share the author cluster ordering only if factorised identically: they are
+    # (same wd.cov[cluster] order), so stack
+    return Effect("H2c darkness", c1 + c2, np.column_stack([i1, i2]),
+                  {"era_shares": {**s1, **s2}, "night_dsl_corrected": "night_uncorrected" not in wd.info,
+                   "converged": tf1.fit.converged and tf2.fit.converged})
+
+
+# ------------------------------------------------------------------ H3
+
+def function_series(wd: WorkData, decades: np.ndarray | None = None) -> pd.DataFrame:
+    """DSL decade series (prevalence per passage, work-averaged) for each H3 pair, with SEs."""
+    rows = []
+    for grp, tgt in H3_PAIRS.items():
+        r = ratio_shares(wd, tgt, [1], None, by=wd.cov.decade.values)
+        for _, x in r.table.iterrows():
+            rows.append({"group": grp, "decade": int(x["group"]), "fn_rate": x.estimate, "fn_se": x.se})
+    out = pd.DataFrame(rows)
+    if decades is not None:
+        out = out[out.decade.isin(decades)]
+    return out
+
+
+def _z(a: np.ndarray) -> np.ndarray:
+    s = a.std()
+    return (a - a.mean()) / s if s > 0 else a * 0
+
+
+def divergence(kw: np.ndarray, fn: np.ndarray) -> float:
+    """D = 1 - Pearson r of z-scored series = mean squared z-difference / 2. Range [0, 2]."""
+    return float(np.mean((_z(kw) - _z(fn)) ** 2) / 2)
+
+
+def h3(wd: WorkData, keywords: pd.DataFrame, n_boot: int = 2000, block: int = 3, seed: int = 0,
+       min_works: int = 30) -> Effect:
+    """keywords: columns decade, group (comm|travel|dark), kw_rate. Decades with < min_works works
+    are dropped. Statistic: mean over pairs of D. Test: H0 = function rates are an affine function of
+    keyword rates and differ only by DSL sampling error (parametric bootstrap); estimate = D_obs -
+    E_H0[D] (excess divergence, expected > 0). CI for D: circular moving-block bootstrap over decades
+    (same blocks for every pair), each replicate also perturbed by the function-rate sampling error."""
+    rng = np.random.default_rng(seed)
+    ok = wd.cov.decade.value_counts()
+    decs = sorted(ok[ok >= min_works].index)
+    fs = function_series(wd, decs)
+    m = fs.merge(keywords, on=["group", "decade"])
+    groups = [g for g in H3_PAIRS if g in set(m.group)]
+    kw = np.array([m[m.group == g].sort_values("decade").kw_rate.values for g in groups])
+    fn = np.array([m[m.group == g].sort_values("decade").fn_rate.values for g in groups])
+    se = np.array([m[m.group == g].sort_values("decade").fn_se.values for g in groups])
+    T = kw.shape[1]
+    Dobs = float(np.mean([divergence(kw[i], fn[i]) for i in range(len(groups))]))
+    # H0: fn = a + b kw + error(se)
+    null = np.empty(n_boot)
+    fitted = []
+    for i in range(len(groups)):
+        b, a = np.polyfit(kw[i], fn[i], 1)
+        fitted.append(a + b * kw[i])
+    fitted = np.array(fitted)
+    for r in range(n_boot):
+        fstar = fitted + rng.normal(0, 1, fitted.shape) * se
+        null[r] = np.mean([divergence(kw[i], fstar[i]) for i in range(len(groups))])
+    p = float((1 + (null >= Dobs).sum()) / (n_boot + 1))
+    excess = Dobs - float(null.mean())
+    # block bootstrap CI for D
+    nb = int(np.ceil(T / block))
+    boot = np.empty(n_boot)
+    for r in range(n_boot):
+        starts = rng.integers(0, T, nb)
+        idx = (starts[:, None] + np.arange(block)).ravel()[:T] % T
+        fstar = fn[:, idx] + rng.normal(0, 1, (len(groups), T)) * se[:, idx]
+        boot[r] = np.mean([divergence(kw[i, idx], fstar[i]) for i in range(len(groups))])
+    lo, hi = np.quantile(boot, [0.025, 0.975])
+    # z-equivalent SE so the Component carries the parametric p
+    z = stats.norm.isf(p / 2) if p < 1 else 0.0
+    se_eq = abs(excess) / z if z > 0 else float("inf")
+    comp = Component("excess divergence D - E_H0[D]", excess, se_eq, +1)
+    per_pair = {g: divergence(kw[i], fn[i]) for i, g in enumerate(groups)}
+    return Effect("H3 mention != function", [comp], None,
+                  {"D": Dobs, "D_ci": (float(lo), float(hi)), "p_param": p, "per_pair": per_pair,
+                   "decades": decs, "null_mean": float(null.mean())})
+
+
+# ------------------------------------------------------------------ multiplicity
+
+def holm(p: list[float] | np.ndarray) -> np.ndarray:
+    """Holm step-down adjusted p-values."""
+    p = np.asarray(p, float)
+    m = len(p)
+    order = np.argsort(p)
+    adj = np.empty(m)
+    run = 0.0
+    for i, j in enumerate(order):
+        run = max(run, (m - i) * p[j])
+        adj[j] = min(1.0, run)
+    return adj
+
+
+def confirmatory(wd: WorkData, keywords: pd.DataFrame, alpha: float = 0.05, design: Design | None = None,
+                 n_boot: int = 2000) -> tuple[pd.DataFrame, dict[str, Effect]]:
+    design = design or Design.from_data(wd)
+    effs = {"H1": h1(wd, design), "H2a": h2a(wd, design), "H2b": h2b(wd, design), "H2c": h2c(wd, design),
+            "H3": h3(wd, keywords, n_boot=n_boot)}
+    ps = [e.p for e in effs.values()]
+    adj = holm(ps)
+    rows = []
+    for (k, e), pa in zip(effs.items(), adj):
+        for c in e.components:
+            rows.append({"test": k, "component": c.label, "estimate": c.estimate, "se": c.se,
+                         "lo": c.ci()[0], "hi": c.ci()[1], "expected_sign": c.expected_sign,
+                         "p_test": e.p, "p_holm": pa, "reject": pa < alpha})
+    return pd.DataFrame(rows), effs
+
+
+# ------------------------------------------------------------------ composition
+
+def _cell_sums(wd, target, num, den, cell_codes, n_cells, a):
+    Y = wd.Y[target]
+    N = Y[:, num].sum(1)
+    Dn = Y[:, den].sum(1) if den is not None else np.ones(len(Y))
+    return (np.bincount(cell_codes, a * N, n_cells), np.bincount(cell_codes, a * Dn, n_cells),
+            np.bincount(cell_codes, a, n_cells))
+
+
+def _author_boot_weights(wd: WorkData, B: int, seed: int) -> np.ndarray:
+    codes, uniq = pd.factorize(wd.cov.author_key)
+    rng = np.random.default_rng(seed)
+    cnt = rng.multinomial(len(uniq), np.full(len(uniq), 1 / len(uniq)), size=B)
+    return cnt[:, codes].astype(float)          # (B, n_works)
+
+
+def shift_share(wd: WorkData, target: str, num: list[int], den: list[int] | None,
+                period_a: tuple, period_b: tuple, by: str = "genre", B: int = 200, seed: int = 0) -> pd.DataFrame:
+    """Symmetric (Bennet) shift-share of the change in a ratio share between two year windows:
+    total = within (sum_g sbar_g dtheta_g) + composition (sum_g thetabar_g ds_g), exact.
+    s_g = genre share of the denominator mass (obstacles for shares, works for prevalence).
+    CIs from an author-cluster bootstrap."""
+    yr = wd.cov.year.values
+    per = np.where((yr >= period_a[0]) & (yr <= period_a[1]), 0, np.where((yr >= period_b[0]) & (yr <= period_b[1]), 1, -1))
+    m = per >= 0
+    sub = wd.subset(m)
+    per = per[m]
+    gcodes, glev = pd.factorize(sub.cov[by])
+    G = len(glev)
+    cell = per * G + gcodes
+
+    def decomp(a):
+        Ns, Ds, _ = _cell_sums(sub, target, num, den, cell, 2 * G, a)
+        Ns, Ds = Ns.reshape(2, G), Ds.reshape(2, G)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            th = Ns / Ds
+        th = np.where(np.isnan(th), th[::-1], th)          # missing cell: no within change
+        th = np.nan_to_num(th)
+        s = Ds / Ds.sum(1, keepdims=True)
+        within = ((s[0] + s[1]) / 2 * (th[1] - th[0])).sum()
+        comp = ((th[0] + th[1]) / 2 * (s[1] - s[0])).sum()
+        tot = Ns[1].sum() / Ds[1].sum() - Ns[0].sum() / Ds[0].sum()
+        return np.array([tot, within, comp])
+
+    est = decomp(np.ones(len(sub)))
+    W = _author_boot_weights(sub, B, seed)
+    bs = np.array([decomp(w) for w in W])
+    lo, hi = np.nanquantile(bs, [0.025, 0.975], axis=0)
+    return pd.DataFrame({"part": ["total", "within_" + by, "composition"], "estimate": est,
+                         "lo": lo, "hi": hi, "boot_se": bs.std(0)})
+
+
+def shift_share_series(wd: WorkData, target: str, num, den, by: str = "genre", B: int = 100,
+                       min_works: int = 30) -> pd.DataFrame:
+    """Decade-to-decade shift-share decomposition (adjacent decades with >= min_works works)."""
+    vc = wd.cov.decade.value_counts()
+    decs = sorted(vc[vc >= min_works].index)
+    rows = []
+    for a, b in zip(decs[:-1], decs[1:]):
+        t = shift_share(wd, target, num, den, (a, a + 9), (b, b + 9), by, B)
+        rows.append({"from": a, "to": b, **{f"{p}": e for p, e in zip(t.part, t.estimate)},
+                     **{f"{p}_lo": e for p, e in zip(t.part, t.lo)}, **{f"{p}_hi": e for p, e in zip(t.part, t.hi)}})
+    return pd.DataFrame(rows)
+
+
+def fixed_composition_trend(wd: WorkData, target: str, num: list[int], den: list[int] | None,
+                            cells: tuple = ("genre", "origin"), ref: tuple = (1840, 1900), by: str = "decade",
+                            B: int = 200, seed: int = 0) -> pd.DataFrame:
+    """Post-stratified trend: theta*_t = sum_c s*_c Nbar_ct / sum_c s*_c Dbar_ct, s*_c = the work mix of
+    genre x origin cells in the reference window (pooled 1840-1900). Empty cells in period t are
+    dropped and s* renormalised; `ref_coverage` reports the share of s* that was available."""
+    cov = wd.cov
+    ckey = cov[list(cells)].astype(str).agg("|".join, axis=1)
+    ccodes, clev = pd.factorize(ckey)
+    C = len(clev)
+    inref = (cov.year >= ref[0]) & (cov.year <= ref[1])
+    sstar = np.bincount(ccodes[inref.values], minlength=C).astype(float)
+    sstar /= sstar.sum()
+    pcodes, plev = pd.factorize(cov[by])
+    order = np.argsort(plev)
+    cell = pcodes * C + ccodes
+
+    def trend(a):
+        Ns, Ds, Ws = _cell_sums(wd, target, num, den, cell, len(plev) * C, a)
+        Ns, Ds, Ws = (x.reshape(len(plev), C) for x in (Ns, Ds, Ws))
+        have = Ws > 0
+        with np.errstate(invalid="ignore", divide="ignore"):
+            Nb, Db = np.where(have, Ns / np.where(have, Ws, 1), 0), np.where(have, Ds / np.where(have, Ws, 1), 0)
+        sw = sstar[None, :] * have
+        fixed = (sw * Nb).sum(1) / (sw * Db).sum(1)
+        raw = Ns.sum(1) / Ds.sum(1)
+        return fixed, raw, sw.sum(1)
+
+    f, r, covg = trend(np.ones(len(cov)))
+    W = _author_boot_weights(wd, B, seed)
+    bf = np.array([trend(w)[0] for w in W])
+    br = np.array([trend(w)[1] for w in W])
+    out = pd.DataFrame({by: np.asarray(plev), "raw": r, "raw_lo": np.nanquantile(br, 0.025, 0),
+                        "raw_hi": np.nanquantile(br, 0.975, 0), "fixed": f,
+                        "fixed_lo": np.nanquantile(bf, 0.025, 0), "fixed_hi": np.nanquantile(bf, 0.975, 0),
+                        "ref_coverage": covg, "n_works": np.bincount(pcodes),
+                        "n_authors": cov.groupby(pcodes).author_key.nunique().values})
+    return out.iloc[order].reset_index(drop=True)

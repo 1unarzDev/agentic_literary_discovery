@@ -428,6 +428,11 @@ class Worker:
         return out
 
     def _lease_count(self) -> int:
+        from .keepawake import battery_ok
+        ok, msg = battery_ok()
+        if not ok:
+            self.log(f"[power] {msg}")
+            return 0
         rates = [self.rates.rate(s) for s in self.stages if self.rates.rate(s)]
         rate = min(rates) if rates else None
         n = lease_size(rate, ttl_s=LEASE_TTL_S)
