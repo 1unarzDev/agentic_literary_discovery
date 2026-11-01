@@ -1,4 +1,9 @@
-"""``ald doctor --bench``: the real stage prompt on bundled sample passages."""
+"""``ald doctor --bench``: the real stage prompt on bundled sample passages.
+
+The 48 bundled passages are real public-domain prose cut like production shards (~330 words of passage plus
+120-word context windows), so prompt length and prefill cost match production. An earlier set of six short
+excerpts without context, cycled over and over, overstated label throughput ~2.6x (docs/perf_report.md).
+"""
 
 from __future__ import annotations
 
@@ -30,14 +35,14 @@ def sample_passages() -> list[dict[str, Any]]:
 
 
 def bench_level(backend: OllamaBackend, stage: Stage, passages: list[dict[str, Any]], concurrency: int,
-                seconds: float, *, digest: str, backend_version: str) -> dict[str, Any]:
+                seconds: float, *, digest: str, backend_version: str, offset: int = 0) -> dict[str, Any]:
     done = 0
     gen = 0
     prompt = 0
     lat: list[float] = []
     valid = 0
     errors = 0
-    i = 0
+    i = offset  # different passages per level: repeating one would hit Ollama's prompt cache (unrealistic)
     t0 = time.perf_counter()
     deadline = t0 + seconds
     lock = threading.Lock()
@@ -121,9 +126,10 @@ def run_bench(backend: OllamaBackend, registry: Registry, stages: list[str], *, 
             log(f"[bench] WARNING: {st.model_ref} is only {frac:.0%} on GPU (rest on CPU); "
                 f"results will be slow. Close other GPU apps / models and re-run.")
         res = []
-        for c in levels:
+        for k, c in enumerate(levels):
             log(f"[bench] {st.name}: concurrency {c} for {per:.0f}s")
-            res.append(bench_level(backend, st, passages, c, per, digest=d, backend_version=bv))
+            res.append(bench_level(backend, st, passages, c, per, digest=d, backend_version=bv,
+                                   offset=1 + k * 11))
         best = max(res, key=lambda r: r["passages_per_hour"])
         out[st.name] = {"levels": res, "best_concurrency": best["concurrency"],
                         "passages_per_hour": best["passages_per_hour"], "tok_s": best["tok_s"],
