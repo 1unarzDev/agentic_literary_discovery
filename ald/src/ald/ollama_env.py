@@ -35,11 +35,17 @@ DROPIN = Path("/etc/systemd/system/ollama.service.d/ald.conf")
 Log = Callable[[str], None]
 
 
-def wanted_env(num_parallel: int | None, accel: str) -> dict[str, str]:
+def wanted_env(num_parallel: int | None, accel: str, kv_cache_type: str | None = None) -> dict[str, str]:
     env = {"OLLAMA_NUM_PARALLEL": str(max(1, int(num_parallel or 1))), "OLLAMA_KEEP_ALIVE": KEEP_ALIVE}
-    if accel in ("cuda", "metal", "rocm"):
-        env["OLLAMA_FLASH_ATTENTION"] = "1"
+    if accel in ("cuda", "metal", "rocm") or kv_cache_type:
+        env["OLLAMA_FLASH_ATTENTION"] = "1"  # a quantized KV cache requires flash attention
+    if kv_cache_type:
+        env["OLLAMA_KV_CACHE_TYPE"] = kv_cache_type
     return env
+
+
+def tier_env(registry: Any, tier: str, accel: str) -> dict[str, str]:
+    return wanted_env(registry.num_parallel_hint(tier), accel, registry.kv_cache_type_hint(tier))
 
 
 def _marker() -> Path:

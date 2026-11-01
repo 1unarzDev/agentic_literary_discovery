@@ -68,11 +68,15 @@ def find_uv(which: Callable[[str], str | None] = shutil.which) -> str | None:
     return None
 
 
-def windows_update_script(install_cmd: list[str], relaunch: str, pid: int, log_path: Path) -> str:
+def windows_update_script(install_cmd: list[str], relaunch: str, pid: int, log_path: Path,
+                          pause_file: Path | None = None) -> str:
     """A .cmd that waits for ``pid`` (the running worker, whose files are locked while it runs) to exit,
     runs the uv install, then relaunches the worker (old or new version) either way."""
     q = subprocess.list2cmdline
     log = f'"{log_path}"'
+    if pause_file is None:
+        from .config import pause_marker
+        pause_file = pause_marker()
     return "\r\n".join([
         "@echo off",
         "setlocal",
@@ -82,8 +86,14 @@ def windows_update_script(install_cmd: list[str], relaunch: str, pid: int, log_p
         "if not errorlevel 1 ( ping -n 3 127.0.0.1 >nul & goto wait )",
         f"echo [%date% %time%] {q(install_cmd)} >> {log}",
         f"{q(install_cmd)} >> {log} 2>&1",
-        f"echo [%date% %time%] uv exit %errorlevel%; relaunching >> {log}",
+        f"echo [%date% %time%] uv exit %errorlevel% >> {log}",
+        # Respect a manual pause: `ald pause` (marker file) or an admin disabling the task.
+        f'if exist "{pause_file}" ( echo paused: not relaunching >> {log} & goto end )',
+        'schtasks /Query /TN ald-worker /FO LIST 2>nul | find /i "Disabled" >nul && '
+        f'( echo task disabled: not relaunching >> {log} & goto end )',
+        f"echo relaunching >> {log}",
         f"{relaunch} >> {log} 2>&1",
+        ":end",
         "endlocal",
         "",
     ])

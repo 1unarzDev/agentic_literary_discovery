@@ -40,6 +40,11 @@ def data_dir() -> Path:
     return (h / "data") if h else Path(platformdirs.user_data_dir(APP, appauthor=False))
 
 
+def pause_marker() -> Path:
+    """Exists while the worker is paused (`ald pause`); read by the worker and the Windows update helper."""
+    return data_dir() / "paused"
+
+
 def config_path() -> Path:
     return config_dir() / "config.json"
 

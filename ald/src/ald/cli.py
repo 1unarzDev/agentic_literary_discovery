@@ -311,7 +311,7 @@ def setup(
     reg, src = load_registry(cfg, registry_path)
     tier = tier_override or cfg.tier or reg.select_tier(hw.usable_vram_gb)["name"]
     from . import ollama_env as oenv
-    want_env = oenv.wanted_env(reg.num_parallel_hint(tier), hw.accel)
+    want_env = oenv.tier_env(reg, tier, hw.accel)
     if not backend.available():
         started = start_ollama(hw.os, want_env if cfg.manage_ollama else None)
         if started and _wait_for_ollama(backend, 45):
@@ -643,6 +643,28 @@ def self_update() -> None:
     cmd = uv_install_cmd(wheel, uv)
     console.print("$ " + " ".join(cmd))
     raise typer.Exit(subprocess.run(cmd).returncode)
+
+
+@app.command()
+def pause() -> None:
+    """Pause work: the worker finishes nothing new, uploads what it has, frees the GPU, and stays paused
+    (also across restarts and updates) until `ald resume`."""
+    import time
+    m = cfgmod.pause_marker()
+    m.parent.mkdir(parents=True, exist_ok=True)
+    m.write_text(f"paused {time.strftime('%Y-%m-%d %H:%M:%S')}\n", encoding="utf-8")
+    console.print("paused: the worker uploads partial results and frees the GPU within ~10 s. `ald resume` continues.")
+
+
+@app.command()
+def resume() -> None:
+    """Resume work after `ald pause`."""
+    m = cfgmod.pause_marker()
+    if m.exists():
+        m.unlink()
+        console.print("resumed: the worker continues within ~10 s.")
+    else:
+        console.print("not paused.")
 
 
 @app.command()

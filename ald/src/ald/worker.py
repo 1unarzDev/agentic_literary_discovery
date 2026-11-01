@@ -685,9 +685,18 @@ class Worker:
     # ------------------------------------------------------------------
     # Running one job
     # ------------------------------------------------------------------
+    def paused(self) -> bool:
+        from .config import pause_marker
+        return pause_marker().exists()
+
     def _interrupt_reason(self, hj: HeldJob) -> str | None:
         if self.stop.is_set():
             return "stopped"
+        now = self.clock.monotonic()
+        if now - getattr(self, "_last_pause_check", -1e18) >= 5.0:
+            self._last_pause_check = now
+            if self.paused():
+                return "paused"
         if hj.revoked.is_set():
             return "revoked"
         if self.window.expired():
@@ -719,6 +728,23 @@ class Worker:
         finally:
             self._current = None
             self._release_gpu_lock()
+
+    def ensure_model_context(self, st: Stage) -> bool:
+        """Two stages may share a model with different pinned num_ctx (e.g. label and cloze). Ollama keeps
+        the loaded context size, so a resident copy with another num_ctx is unloaded before this job: one
+        model never runs with two num_ctx values at once. Returns True if it unloaded."""
+        try:
+            ctx = self.backend.loaded_context(st.model_ref)
+        except BackendError:
+            return False
+        if ctx is None or ctx == st.num_ctx:
+            return False
+        self.log(f"[gpu] {st.model_ref} is loaded with num_ctx {ctx}; stage {st.name} pins {st.num_ctx}: reloading")
+        try:
+            self.backend.unload(st.model_ref)
+        except BackendError:
+            return False
+        return True
 
     def _unload_stage_models(self, why: str) -> None:
         if self._registry is None:
@@ -791,6 +817,7 @@ class Worker:
         # Between jobs: only this stage's model may stay resident on the GPU.
         if st.unload_others(self.registry.unload_others):
             self.unload_non_pinned(keep={st.model_ref})
+        self.ensure_model_context(st)
         residency_checked = False
         residency_tries = 0
 
@@ -930,6 +957,8 @@ class Worker:
     def maybe_apply_update(self) -> bool:
         """Between jobs: release prefetched leases, flush, install, re-exec.
         Returns True if leasing must stay paused (required update failed)."""
+        if self.paused():
+            return False
         if not self.auto_update or not self._update_pending():
             return self._update_required and not self.auto_update
         d = getattr(self, "_last_decision", None)
@@ -998,9 +1027,9 @@ class Worker:
         try:
             reg = self._registry
             tier = self.tier or (reg.select_tier(self.hw.usable_vram_gb)["name"] if reg else None)
-            hint = reg.num_parallel_hint(tier) if (reg and tier) else None
-            ollama_env.ensure(ollama_env.wanted_env(hint, self.hw.accel), url=self.cfg.ollama_url, log=self.log,
-                              service_mode=self.service_mode)
+            env = (ollama_env.tier_env(reg, tier, self.hw.accel) if (reg and tier)
+                   else ollama_env.wanted_env(None, self.hw.accel))
+            ollama_env.ensure(env, url=self.cfg.ollama_url, log=self.log, service_mode=self.service_mode)
             self.backend._version = None
             self._backend_version_cache = None
         except Exception as e:  # noqa: BLE001 - never fatal: resolve_stages reports Ollama as unavailable
@@ -1094,6 +1123,18 @@ class Worker:
                     break
                 if self._registry_changed:
                     self.resolve_stages()
+                    self.ensure_ollama()  # tier hints (NUM_PARALLEL, KV cache type) may have changed
+                    self.resolve_stages()
+                if self.paused():
+                    if self.activity != "paused":
+                        self.log("[pause] paused by `ald pause`; `ald resume` continues")
+                    self.activity = "paused"
+                    self._idle_gpu_unload()
+                    self._release_gpu_lock()
+                    self._save_state()
+                    if self.exit_when_idle or self.clock.sleep(10.0, self.stop):
+                        break
+                    continue
                 if not in_active_hours(self.active_hours, self.clock.time()):
                     if self.activity != "outside_hours":
                         self.log(f"[window] outside active hours {self.active_hours}; pausing")

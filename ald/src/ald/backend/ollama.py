@@ -145,6 +145,14 @@ class OllamaBackend:
                 return (vram / size) if size > 0 else None
         return None
 
+    def loaded_context(self, model_ref: str) -> int | None:
+        """``context_length`` (per slot) of the resident copy of ``model_ref``, or None if not loaded."""
+        for m in self.ps():
+            if self.same_model(m.get("name") or m.get("model"), model_ref):
+                v = m.get("context_length")
+                return int(v) if v else None
+        return None
+
     def pull(self, model_ref: str, progress: Callable[[dict[str, Any]], None] | None = None) -> None:
         try:
             with self._http.stream("POST", "/api/pull", json={"model": model_ref, "stream": True},

@@ -44,6 +44,7 @@ REGISTRY_SCHEMA: dict[str, Any] = {
                         {"type": "object", "properties": {
                             "min_vram_gb": {"type": "number", "minimum": 0},
                             "num_parallel_hint": {"type": "integer", "minimum": 1},
+                            "kv_cache_type_hint": {"enum": ["f16", "q8_0", "q4_0", None]},
                             "stages": {"type": "array", "items": {"type": "string"}},
                             "allowed_stages": {"type": "array", "items": {"type": "string"}},
                         }},
@@ -346,6 +347,12 @@ class Registry:
         t = self.tier(tier_name)
         return int(t["num_parallel_hint"]) if t and t.get("num_parallel_hint") else None
 
+    def kv_cache_type_hint(self, tier_name: str) -> str | None:
+        """Tier ``kv_cache_type_hint`` (e.g. "q8_0") -> OLLAMA_KV_CACHE_TYPE (needs flash attention)."""
+        t = self.tier(tier_name)
+        v = t.get("kv_cache_type_hint") if t else None
+        return str(v) if v else None
+
     def pin_is_active(self, pin_hash: str) -> bool:
         """If the registry carries ``active_pins`` (the coordinator uses it to
         deactivate pins), a pin outside it is stale and must not run."""
@@ -366,12 +373,14 @@ def normalize_tiers(tiers: Any) -> list[dict[str, Any]]:
             else:
                 out.append({"name": name, "min_vram_gb": float(v.get("min_vram_gb", 0.0)),
                             "allowed_stages": list(v.get("stages", v.get("allowed_stages", []))),
-                            "num_parallel_hint": v.get("num_parallel_hint")})
+                            "num_parallel_hint": v.get("num_parallel_hint"),
+                            **({"kv_cache_type_hint": v["kv_cache_type_hint"]} if v.get("kv_cache_type_hint") else {})})
     else:
         for t in tiers:
             out.append({"name": t["name"], "min_vram_gb": float(t["min_vram_gb"]),
                         "allowed_stages": list(t.get("allowed_stages", t.get("stages", []))),
-                        "num_parallel_hint": t.get("num_parallel_hint")})
+                        "num_parallel_hint": t.get("num_parallel_hint"),
+                        **({"kv_cache_type_hint": t["kv_cache_type_hint"]} if t.get("kv_cache_type_hint") else {})})
     return out
 
 

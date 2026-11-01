@@ -29,7 +29,7 @@ def _unicode_ok() -> bool:
     import sys
     enc = (getattr(sys.stdout, "encoding", None) or "").lower().replace("-", "")
     return enc.startswith("utf")
-STATE_STYLE = {"working": "green", "idle": "yellow", "waiting_gpu_lock": "cyan", "outside_hours": "blue",
+STATE_STYLE = {"paused": "yellow", "working": "green", "idle": "yellow", "waiting_gpu_lock": "cyan", "outside_hours": "blue",
                "no_stages": "red", "stopped": "red", "starting": "cyan"}
 
 
@@ -120,7 +120,7 @@ def local_summary(cfg: Config) -> dict[str, Any]:
         "latest_version": ping.get("latest_client_version") if ping else None,
         "update_available": bool(upd and upd.update_available), "coordinator": cfg.coordinator_url,
         "name": cfg.name, "worker_id": cfg.worker_id, "gpu_lock": cfg.gpu_lock, "active_hours": cfg.active_hours,
-        "data_dir": str(root),
+        "data_dir": str(root), "paused": cfgmod.pause_marker().exists(),
     }
 
 
@@ -132,6 +132,8 @@ def render_status(s: dict[str, Any]) -> Panel:
     t.add_row("Worker", Text.assemble((f"{s['state']}", f"bold {style}"),
                                       f"  {s['worker_detail']}" if not s["worker_running"] else
                                       f"  pid {s['pid']}{' (service)' if s['service'] else ''}"))
+    if s.get("paused"):
+        t.add_row("Paused", Text("yes: `ald resume` to continue", "bold yellow"))
     t.add_row("Coordinator", f"{s['coordinator']}  last contact {ago(s['last_contact'])}")
     t.add_row("Keep-awake", Text("held", "green") if s["keep_awake"] else Text("not held", "yellow"))
     b = s["battery"] or {}
