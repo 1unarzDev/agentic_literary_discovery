@@ -58,6 +58,41 @@ Two fixes, released in ald 0.1.5:
 
 With both fixes the worker can reach c=4..8, where the plateau is flat; it starts from the benchmark's best level.
 
+## Why production ran at about half (or less) of the bench
+
+From the result index (`/v1/admin/results` stats) for COLLIN's real label shards:
+
+| | prompt tokens / passage | gen tokens / passage | gen tok/s | passages/h |
+|---|---|---|---|---|
+| bench, old sample set (NP=4, c=4) | 1,810 | ~150 | 110 | 2,650 |
+| production shard `w01…00127` (NP=4, c=4, ald 0.1.5) | 2,530 | 153 | 42 | **998** |
+| production before 0.1.5 (NP=2, c=3; coordinator's 1 h figure) | 2,530 | ~150 | - | ~790 |
+
+Generated tokens per passage are the same in bench and production, so the difference is prefill and prompt
+caching:
+1. **The bench passages were not like production passages.** The bundled set was six short excerpts (79-149
+   words, no context), and each level cycled through them. Ollama keeps each slot's last prompt in its KV cache,
+   so a repeated identical prompt costs almost no prefill. Real passages are about 350 words plus 2x120 words of
+   context, which is 40% more prompt tokens, and each one is new: only the shared system prompt (codebook, about
+   1,600 tokens) can be reused. **Fixed in ald 0.1.6+:**
+   - The bench now uses 48 distinct production-like passages (cut from public-domain novels exactly like shards).
+   - Each concurrency level starts at a different offset.
+   - Benchmarks after this change predict production. The NP/c tables above came from the old set: the relative
+     results (NP=4 best, NP=8 harmful, c >= NP) stand, but their absolute numbers are inflated.
+2. **About 20% of real label outputs are flagged** (82/400 in both shards above): schema failures and evidence
+   quotes that do not verify. Each schema failure costs a second request (the retry prompt), so the effective
+   request count is about 1.1-1.2x the passage count. The bench passages produced valid output 100% of the time.
+3. Before 0.1.5 the server also ran at NP=2 with the client capped at c=3 (the fit model), which is below the
+   NP=4 optimum. 0.1.5 raised NP to 4 and lifted the cap.
+4. Per-shard overhead is small: lease, download, upload, checkpoint. Stage switches (workcheck ↔ label) unload
+   and reload an 8 GB model, about 10-20 s each.
+
+Levers, in order of expected gain:
+- A leaner label prompt or a shorter context window. The system prompt dominates prefill. This is being A/B
+  tested separately.
+- Keeping NP=4 on t12.
+- Fewer schema retries.
+
 ## Linux: RTX 4070 Ti SUPER 16 GB, tier t16
 
 See the Linux section below. This machine shares its GPU with another study, so every run here waits on
