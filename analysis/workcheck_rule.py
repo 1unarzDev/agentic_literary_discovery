@@ -112,7 +112,7 @@ def decide(form: str | None, valid, model_tr, cat: str, cat_tr: bool,
 def build(catalog_fallback: bool = False) -> pd.DataFrame:
     w = pd.read_parquet(WORK / "works.parquet",
                         columns=["work_id", "Title", "Authors", "Subjects", "Bookshelves", "split", "decade"])
-    w = w[(w.split == "discovery") & w.decade.between(1800, 1920)].copy()
+    w = w[w.decade.between(1800, 1920)].copy()  # catalog rule applies to both splits (metadata is not sealed)
     con = duckdb.connect(str(WORK / "ald.duckdb"), read_only=True)
     r = con.execute("SELECT passage_id, valid_schema, output_json, created FROM results WHERE stage='workcheck'").df()
     con.close()
