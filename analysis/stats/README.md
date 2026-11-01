@@ -47,6 +47,16 @@ Set `OMP_NUM_THREADS=1` for the multiprocess runs, because BLAS threads oversubs
 - Resolution: an `annotator == "adjudicated"` row wins. Otherwise the teacher's row wins, since the teacher adjudicates (plan §4.5). Otherwise the first row is used. Pass a different `prefer` order to `resolve_human` if needed.
 - `weight` = N_cell / n_cell exactly as `select_annotation.py` writes it.
 
+**Registered audit design (prereg v0.3)**:
+- `draw_audit(lab_conf, teaching_authors, rng, n_target=1800, group_col="dgroup")`, where `dgroup = select_annotation.domain_group(row)`. The new `group_col` keyword defaults to `"group"`, so existing calls are unchanged.
+- **Human label** = the mean one-hot over retained non-expert annotators (`dsl.human_soft`; `prepare(human_mode="mean")`).
+- The expert (`teacher`) and any annotator excluded by the κ rule are passed as `exclude_annotators`. The rule is locus κ vs the expert < 0.40 on the 30 expert items (`annotators.py`).
+- π is recomputed per cell from retained labels (`recompute_pi=True`).
+- The battery CLI applies all of this and writes `annotator_agreement.csv` and `overlap_agreement.csv`.
+- **H3's p-value is calibrated ×10** (`models.H3_P_INFLATE`).
+- **Family:** H1 is the single primary test; H2a–c and H3 are Holm among themselves. H2c is darkness prevalence only; night function is exploratory (`h2c(include_night=True)`).
+- Final-design power: `uv run python -m analysis.stats.power --final --reps 20`, written to `out/power_final.csv`.
+
 **audit_frame.parquet** (new; `select_annotation.py` now writes it): `passage_id, audit_cell, pi_audit` for **every** passage in the audit pool, not just the audited ones.
 
 - DSL needs π for unaudited passages too.

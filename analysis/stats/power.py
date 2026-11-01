@@ -155,7 +155,8 @@ def final_point(args) -> list[dict]:
     assignment, 10% overlap pairs) with per-annotator error; 30 expert items (a random subsample of
     the audit, 10 per era) labelled by every annotator and by the expert (= truth); exclusion rule;
     DSL with annotator-mean soft labels; H1, H2a, H2b, H2c(darkness), H3."""
-    W, noise, strata, ann_err, era_diff, seed = args
+    W, noise, strata, ann_err, era_diff, seed = args[:6]
+    kw_noise = args[6] if len(args) > 6 else 0.05
     rng = np.random.default_rng(seed + 11)
     c = simulate(SimConfig(n_works=2 * W, noise=NOISE[noise], seed=seed), audit=False)
     lab = c.labels[(c.labels.split == "confirmation") & (c.labels.stratum == "random")].reset_index(drop=True)
@@ -219,8 +220,34 @@ def final_point(args) -> list[dict]:
             out.append({**base, "test": name, "component": c1.label, "est": c1.estimate, "se": c1.se,
                         "truth_rep": c0.estimate, "p": c1.p_two,
                         "fallback": bool(name != "H2b" and e1.extra.get("link", "logit") != "logit")})
+    # expert-nested sensitivity (two-phase DSL: annotator mean on the audit, expert on the 30-item
+    # probability subsample, pi_h|audit = 10 / n_audit_in_era) - raw g, identity link, H1 material
+    T = dsl.TARGETS["locus"]
+    hum = human[~human.annotator.isin({"teacher"} | excl)]
+    sid, S = dsl.human_soft(hum, T)
+    pos = pd.Series(np.arange(len(lab)), index=lab.passage_id)
+    R3 = np.zeros(len(lab), bool)
+    R3[pos.loc[sid].values] = True
+    Y3 = np.zeros((len(lab), T.K))
+    Y3[pos.loc[sid].values] = S
+    pi3 = dsl.audit_design(lab, hum, frame, labelled_ids=set(sid))
+    Rh = np.zeros(len(lab), bool)
+    Rh[pos.loc[expert].values] = True
+    yh = np.zeros(len(lab), int)
+    yh[pos.loc[expert].values] = T.fn(ex_rows)
+    era_lab = sel.era.values
+    n_era = pd.Series(era_of.loc[ids].values).value_counts()
+    pih = np.array([10 / n_era.get(e, 10) for e in era_lab])
+    Yt = dsl.pseudo_outcomes_two_phase(T.fn(lab), Y3, yh, R3, np.where(R3, pi3, 1), Rh, pih, T.K)
+    wde = dsl.aggregate_to_works(lab, {"locus": Yt}, "expert_nested")
+    models.LINK["default"] = "identity"
+    en = models.h1(wde, design).components[0]
+    e0 = models.h1(wo, design).components[0]
+    models.LINK["default"] = "logit"
+    out.append({**base, "test": "H1 expert-nested", "component": en.label, "est": en.estimate, "se": en.se,
+                "truth_rep": e0.estimate, "p": en.p_two, "fallback": False})
     for track in (False, True):
-        e3 = models.h3(wd, keyword_series(c, track=track, seed=seed), n_boot=500, seed=seed)
+        e3 = models.h3(wd, keyword_series(c, track=track, noise=kw_noise, seed=seed), n_boot=500, seed=seed)
         out.append({**base, "test": "H3", "component": "tracking (null)" if track else "divergent",
                     "est": e3.components[0].estimate, "se": e3.components[0].se, "truth_rep": np.nan,
                     "p": e3.extra["p_param"], "fallback": False})
@@ -241,19 +268,23 @@ def summarise_final(raw: pd.DataFrame) -> pd.DataFrame:
     return s
 
 
-def run_final(reps: int = 10, procs: int = 8) -> pd.DataFrame:
+def run_final(reps: int = 10, procs: int = 8, extra: bool = False) -> pd.DataFrame:
     scen = [(7750, "good", "dgroup", FINAL["ann_error"], 0.0),       # registered design, pilot-like noise
             (7750, "base", "dgroup", FINAL["ann_error"], 0.0),
             (7750, "good", "group", FINAL["ann_error"], 0.0),        # ablation: locus strata
             (7750, "good", "dgroup", (0, 0, 0, 0), 0.0),             # ablation: expert-quality annotators
             (7750, "good", "dgroup", FINAL["ann_error"], 0.10)]      # risk: annotators worse on early prose
-    jobs = [sc + (500 + r,) for sc in scen for r in range(reps)]
+    tag = ""
+    if extra:   # trained annotators (kappa ~0.78) and an H3 size check with noise-free keyword series
+        scen = [(7750, "good", "dgroup", (0.15, 0.15, 0.18, 0.18), 0.0), (7750, "good", "dgroup", FINAL["ann_error"], 0.0)]
+        tag = "_extra"
+    jobs = [sc + (500 + r,) + ((0.0,) if extra else ()) for sc in scen for r in range(reps)]
     with mp.get_context("fork").Pool(procs) as pool:
         raw = pd.DataFrame([r for rows in pool.imap_unordered(final_point, jobs) for r in rows])
     OUT.mkdir(exist_ok=True)
-    raw.to_csv(OUT / "power_final_raw.csv", index=False)
+    raw.to_csv(OUT / f"power_final{tag}_raw.csv", index=False)
     s = summarise_final(raw)
-    s.to_csv(OUT / "power_final.csv", index=False)
+    s.to_csv(OUT / f"power_final{tag}.csv", index=False)
     return s
 
 
@@ -301,7 +332,8 @@ if __name__ == "__main__":
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--curve", action="store_true", help="audit-size curve at the base point (use --reps 12)")
     ap.add_argument("--final", action="store_true", help="registered final design (prereg v0.3), use --reps 10")
+    ap.add_argument("--extra", action="store_true", help="with --final: trained-annotator + H3-size scenarios")
     a = ap.parse_args()
-    s = run_final(a.reps, a.procs) if a.final else main(a.reps, a.procs, a.quick, a.curve)
+    s = run_final(a.reps, a.procs, a.extra) if a.final else main(a.reps, a.procs, a.quick, a.curve)
     pd.set_option("display.width", 220)
     print(s.round(4).to_string())

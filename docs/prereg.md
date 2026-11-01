@@ -1,4 +1,4 @@
-# Pre-registration: What Stands in the Way (confirmatory analysis), DRAFT v0.2
+# Pre-registration: What Stands in the Way (confirmatory analysis), DRAFT v0.3
 
 **OSF registration hash:** `OSF-HASH-PLACEHOLDER` (fill in on registration; `ald sync` / `POST /v1/admin/unseal` refuse to unseal Confirmation results until this line holds the real hash)
 
@@ -24,6 +24,10 @@
 
 Every hypothesis is tested on the **Confirmation half** (authors hashed 50/50, stratified by decade × origin × genre).
 
+**Family.**
+- **H1 is the single primary confirmatory test**, tested at α = 0.05.
+- **H2a, H2b, H2c and H3 are secondary confirmatory tests**, Holm-corrected among themselves (§5.3). Each is reported with its registered MDE (§7.4), so a null is read against what the design could detect.
+
 Eras, revised at G0 because PG is thin before 1840:
 
 | Era | Years |
@@ -36,10 +40,10 @@ The study window is 1800–1929.
 
 | ID | Hypothesis | Direction | Estimand (Confirmation half) |
 |---|---|---|---|
-| **H1** inward turn | Among plot obstacles, the material/external share falls **and** the internal/psychological share rises from E to L, holding the genre × origin × length mix fixed | Δ_material < 0 **and** Δ_internal > 0 | Standardised era shares of locus among obstacles; Δ = L − E for material and for internal |
+| **H1** inward turn (primary) | Among plot obstacles, the material/external share falls **and** the internal/psychological share rises from E to L, holding the genre × origin × length mix fixed | Δ_material < 0 **and** Δ_internal > 0 | Standardised era shares of locus among obstacles; Δ = L − E for material and for internal |
 | **H2a** communication | Among communication failures, intentional withholding rises relative to infrastructure + accidental loss | Δ > 0 | Standardised share withholding / (withholding + infrastructure + accidental_loss), L − E |
 | **H2b** mobility | DISTANCE_TRAVEL obstacles become less prevalent after railway diffusion | Δ < 0 | Standardised prevalence per passage, 1850–1884 minus 1800–1849 (G0 window) |
-| **H2c** darkness | DARKNESS_VISIBILITY prevalence falls **and** night's danger + concealment share falls | both Δ < 0 | (i) standardised prevalence, L − E; (ii) standardised share (danger + concealment) / (danger + concealment + intimacy + labor + leisure) among night passages, L − E |
+| **H2c** darkness | DARKNESS_VISIBILITY prevalence falls | Δ < 0 | Standardised prevalence per passage, L − E. The night-function part (danger + concealment share) is **exploratory**: humans do not label `night_function`, so it cannot be DSL-corrected (R4). |
 | **H3** mention ≠ function | Decade keyword rates for technology terms do **not** track the corresponding obstacle-function rates | excess divergence > 0 | D = mean over 3 pairs of (1 − r) between z-scored decade series; excess = D − E_H0[D] |
 
 H3 pairs (keyword group → function rate per passage):
@@ -55,7 +59,8 @@ Keyword rates come from HTRC EF 2.0 plus our corpus, per 10k words, using the le
 Not confirmatory, and reported descriptively only:
 - the H2b "barrier → setting" function shift (the schema has no travel-function field);
 - H2c's "earlier in urban settings" (there is no setting-location field);
-- the social share in H1.
+- the social share in H1;
+- night's function shares (exploratory, uncorrected model labels).
 
 ## 2. Design
 
@@ -79,8 +84,8 @@ Not confirmatory, and reported descriptively only:
 ### 3.1 Passages
 - **Random backbone.** 24 random ~350-word passages per work (seeded), with offsets and sha256. All confirmatory estimates use the random backbone only.
 - **Enrichment.** Up to 24 extra passages per work from the comm / mobility / darkness lexicon strata (≤ 8 each), with union-of-frames inclusion probabilities recorded.
-  - Enrichment passages are used for exemplars and descriptive deep dives.
-  - They enter a confirmatory estimate **only if** the human audit samples them with known probability (§3.4, recommendation R3). DSL requires a positive audit inclusion probability for every analysed passage.
+  - Enrichment passages are used for exemplars and descriptive deep dives only.
+  - **Decision (v0.3): the enrichment strata are not in the audit frame.** No confirmatory estimate uses them, because DSL needs a positive audit probability for every analysed passage. The domain-stratified audit (§3.4) already over-samples predicted-communication passages. The binding constraint for H2a is human-label noise and volume, not the number of communication passages in the frame: §7.4 puts H2a's MDE at 35–200 pp under any audit allocation we can afford.
 
 ### 3.2 Existing data
 - Model labels exist for the Discovery half.
@@ -100,21 +105,36 @@ Not confirmatory, and reported descriptively only:
 - **Work weights.** In a closed decade d, each labelled work gets `work_weight = N_d / n_d` (works in the decade's primary set over works labelled), so decades are not under-weighted.
 - **Early era.** The cells 1800s–1840s are never closed early: the whole of every early work is labelled.
 
-### 3.4 Human audit (DSL / PPI)
-- **Draw.** The audit is drawn by `analysis/select_annotation.py::draw_audit` (seed 20261105):
-  - strata: era (3) × predicted group (material / social / internal / no obstacle) × split;
-  - equal allocation, with `n_cell = min(per, N_cell)`;
-  - simple random sampling within each cell;
-  - first-order inclusion probability π = n_cell / N_cell.
-- **Records.** π is recorded for **every** pool passage in `audit_frame.parquet` at selection time.
-- **Double coding.** 40 items are double-coded for κ, and the teacher adjudicates disagreements.
-- **Planned size** at the time of writing: about 200 items over both halves, so about 100–110 in Confirmation.
-  - §7 shows this is far too small for the confirmatory tests.
-  - The final size and allocation will be fixed in the registered version (see R1–R3), before unsealing.
+### 3.4 Human audit (DSL / PPI), registered final design
+- **Population.** The Confirmation half only, random backbone, non-teaching authors.
+- **Draw.**
+  - `analysis/select_annotation.py::draw_audit(lab_conf, teaching_authors, rng, n_target=1800, group_col="dgroup")`, with seed 20261105.
+  - `lab_conf` is the Confirmation label table, with `era` and `dgroup = domain_group(row)`.
+- **Strata.** Era (3) × predicted primary-domain group (8: comm, distance, darkness, material_other, social, internal, other, no_obstacle).
+  - Allocation is equal, with `n_cell = min(per, N_cell)`.
+  - Items are drawn by simple random sampling within each cell.
+  - π = n_cell / N_cell.
+  - These are about 24 cells. Expected unique items: about 1,760, because a few early-era cells are smaller than the allocation.
+- **Records.** π is recorded for **every** pool passage in `audit_frame.parquet` at selection time (R5).
+- **Annotators.** The student plus about 3 non-expert peers, about 500 labels each.
+  - **Assignment** is random and balanced. The items are shuffled once, and annotator k receives items k, k+4, k+8, …, so every annotator gets a random sample of every cell.
+  - **Overlap.** About 10% of items are labelled by a second, randomly chosen annotator, for κ.
+  - **Blinding.** Annotators see only the passage and its context: no model label, no title, author or date, and the item order is random.
+- **Expert-reference items.** 30 items, 10 per era, are drawn **as a simple random subsample of the audit sample**. The English teacher (the expert) labels them, and so does every annotator. They are used for:
+  - **κ certification and the exclusion rule** (§5.1);
+  - the **expert-nested sensitivity analysis** (§5.1).
+
+  They are **not** weighted into the primary DSL estimate. The teacher's labels are excluded from the primary human label.
+- **Teaching set.** About 60 Discovery items, labelled by the student only. These authors are excluded from the audit pool. The set is used for training and for the codebook only.
+- **Human schema.** `has_obstacle`; a **single main domain**; `locus`; and `failure_cause` (only when the main domain is COMMUNICATION_INFORMATION). Humans do not label night_function.
 - **Relabelling.** After the v1.0 relabel, the strata stay defined by the selection-time labels. The DSL predictor is the v1.0 label. This is valid because π is known.
 
 ### 3.5 Sample size
-Fixed by the corpus: about 7,750 works per half, of which the early era has about 200 works and about 90–100 authors (G0). There is no optional stopping on hypothesis outcomes.
+Fixed by the corpus: about 7,750 works per half, of which the early era has about 200 works and about 90–100 authors (G0).
+
+Human audit: about 1,760 unique Confirmation items, about 2,000 labels including overlaps, plus 30 expert items.
+
+There is no optional stopping on hypothesis outcomes.
 
 ## 4. Variables
 
@@ -128,7 +148,8 @@ Fixed by the corpus: about 7,750 works per half, of which the early era has abou
   - `message_valence`
   - `confidence`
   - `quote_status`
-- **Human labels:** `has_obstacle`, `domains`, `locus`, `failure_cause`. Humans do not label `night_function`.
+- **Human labels:** `has_obstacle`, a single main domain (stored as a one-element `domains` list), `locus`, and `failure_cause` (communication only). Humans do not label `night_function`.
+- **Estimand construct.** DSL targets the **human-label construct**: the mean label of the retained non-expert annotators. For H2b and H2c this means prevalence as the *main* domain. The model's second domain enters only through the calibration g.
 - **Derived outcome categories** (`analysis/stats/dsl.py::TARGETS`). Category 0 means "not counted"; `insufficient_context` counts as no obstacle.
 
 | Target | Categories |
@@ -154,35 +175,59 @@ Fixed by the corpus: about 7,750 works per half, of which the early era has abou
 
 ## 5. Analysis plan
 
-### 5.1 DSL correction
-For each target and passage i, with Ŷᵢ the model one-hot, Yᵢ the human one-hot, Rᵢ the audit indicator and πᵢ the audit probability:
+### 5.1 DSL correction and human labels
+For each target and passage i, with Ŷᵢ the model one-hot, Yᵢ the human label, Rᵢ the audit indicator and πᵢ the audit probability:
 
   Ỹᵢ = gᵢ + (Rᵢ / πᵢ)(Yᵢ − gᵢ)
 
-- gᵢ is a **cross-fitted** calibration P(Y | Ŷ). It is learned on audited passages in the other 4 of 5 author folds, with 1/π weights and +1 pseudo-count on the model's own label.
+- gᵢ is a **cross-fitted** calibration P(Y | Ŷ). It is learned on audited passages in the other 4 of 5 author folds, with 1/π weights and +1 pseudo-count on the model's own label. Discovery teaching labels may also be used to fit g, since any g is valid.
 - E[Ỹᵢ] = Yᵢ for any g, so the estimates are design-unbiased for the human-label estimand.
 - Passages are aggregated to works (within-work Hájek weights).
 - Sensitivity: the raw model label as g, and an era-stratified g.
 - Cross-check: stratified PPI for era means (Angelopoulos et al. 2023).
 
+**How annotators enter (registered rules):**
+1. **Human label = annotator mean.** Yᵢ is the **mean of the one-hot labels of all retained non-expert annotators** who labelled item i. An overlap pair that disagrees gives a soft label (0.5/0.5). There is no majority vote and no adjudication of overlaps: adjudicated items would be measured more accurately than single-coded ones, mixing two measurement processes within the sample. DSL is linear in Yᵢ, so soft labels are exact.
+2. **Annotator noise.**
+   - Non-expert error is treated as part of the construct being measured, and the inference is valid for it. Confirmatory p-values test H0: Δ = 0 for that construct.
+   - If annotator error does not depend on era, which balanced random assignment is designed to ensure, the human-label contrast is an *attenuated* version of the expert contrast with the same sign and the same null. The **test** of H1's direction is therefore valid for the expert construct too; only the effect size is shrunk.
+   - Simulation attenuation: × 0.62–0.66 at κ ≈ 0.6, × 0.82 at κ ≈ 0.75 (§7.4).
+   - Effect sizes are reported as human-construct estimates, next to an attenuation-corrected range (below).
+3. **Exclusion rule.**
+   - Before any model label of the Confirmation half is unsealed, compute each annotator's Cohen's κ against the expert on the 30 expert items, on the 4-category H1 construct `locus` (none / material / social / internal).
+   - **An annotator with κ < 0.40, or with fewer than 20 expert items, is excluded**, and all of their labels are dropped. Code: `annotators.expert_agreement` + `annotators.exclusions`.
+   - κ on 30 items has an SE of about 0.1. In simulation, annotators whose true κ was 0.59–0.68 were wrongly excluded in 15–35% of replicates, about one annotator in five or six.
+4. **π after exclusions or skipped items.**
+   - π is recomputed per cell as (pool passages in the cell with at least one retained label) / N_cell (`dsl.audit_design(labelled_ids=…)`).
+   - This is valid because items were randomly assigned to annotators.
+   - Skips are assumed random within cells. Skip rates are reported by cell, and a cell with > 10% skips is flagged.
+5. **Era-differential reliability check.**
+   - Report overlap κ by era (`annotators.overlap_agreement`), and expert κ by era: 10 items per era, descriptive only.
+   - Differential error can bias the contrast in either direction. In simulation, early-era error raised by 0.10 moved the H1 estimate by +27% of the contrast.
+   - **If overlap κ differs between E and L by more than 0.15, H1 is reported with the expert-nested sensitivity estimate (6) beside it, and the verdict carries the flag "differential annotator reliability".**
+6. **Expert-nested sensitivity (exploratory).** A two-phase DSL: annotator mean on the audit, and the expert on the 30-item probability subsample, with π_expert|audit = 10 / n_audit,era (`dsl.pseudo_outcomes_two_phase`). This targets the expert construct without bias, but its SE is about 17–30 pp. It is reported as a sensitivity range and never tested.
+7. **Attenuation-corrected range (descriptive).** The human-construct estimate is divided by the attenuation implied by the annotators' expert agreement (the share-level misclassification matrix on the 30 items). It is reported with an interval but not tested.
+
 ### 5.2 Models
-- **H1, H2a, H2c(ii).** Multinomial logit of the work-level DSL soft outcomes on ns(year, df = 4) + genre + origin + log length. Fitting solves the estimating equations Σ w xᵢ(Ỹᵢ − pᵢ(β)) = 0. Work weights are as in §3.3.
-- **H2b and H2c(i).** Binary logit with the same covariates. For H2b, the time term is the indicator year ≥ 1850, fitted on 1800–1884 works.
+- **H1, H2a.** Multinomial logit of the work-level DSL soft outcomes on ns(year, df = 4) + genre + origin + log length. Fitting solves the estimating equations Σ w xᵢ(Ỹᵢ − pᵢ(β)) = 0. Work weights are as in §3.3.
+- **H2b and H2c.** Binary logit with the same covariates. For H2b, the time term is the indicator year ≥ 1850, fitted on 1800–1884 works.
 - **Link fallback (pre-registered).** If the logit fails to converge, the same model is fitted with the identity link and that fit is reported (`fit_target`). DSL pseudo-outcome totals can be negative in sparse cells, and then the MLE does not exist. The fallback is flagged in output; see §7.2 for how often it happens.
 - **Estimand: g-computation.** For each era, average the fitted category probabilities over the pooled reference covariate table (a fixed-seed 3,000-work subsample of the primary set) × **the era's empirical work-year distribution**. Uniform years would give the near-empty 1800s as much weight as the 1840s, which inflated the SE by about 1.7× in simulation. Then take the ratio of the relevant categories. The contrast is L − E (H2b: M-window − E).
 - **SEs.** Delta method with the author-clustered (CR1) sandwich.
 - **Tests.**
   - Two-sided z-tests; a claim requires the pre-declared sign.
-  - Multi-part hypotheses (H1, H2c) use the intersection-union p = max of the parts.
+  - H1 has two parts (material falls, internal rises) and uses the intersection-union p = max of the parts.
 - **H3.**
   - Decade series: DSL ratio estimates per decade. Decades with fewer than 30 works are dropped.
   - D: the mean over pairs of 1 − Pearson r of z-scored series.
   - p-value: a parametric bootstrap (B = 2000) under H0, "the true function series equals the keyword series in z-units (perfect positive tracking), observed with the estimated DSL sampling error".
+  - **Calibration.** In 140 simulated replicates of the registered design, this p-value had size about 0.15 at nominal 0.05, and nominal 0.005 gave size about 0.05. The registered H3 p-value is therefore **p_cal = min(1, 10 × p)** (`models.H3_P_INFLATE`), and p_cal enters Holm.
   - CI for D: a circular moving-block bootstrap over decades (block = 3), with sampling error added.
 
 ### 5.3 Multiplicity
-- Holm–Bonferroni across the five tests (H1, H2a, H2b, H2c, H3) at family-wise α = 0.05.
-- Effect sizes with 95% CIs are the headline numbers.
+- **Primary.** H1 is tested at α = 0.05: two-sided, declared sign, intersection-union over its two parts.
+- **Secondary.** Holm–Bonferroni across H2a, H2b, H2c and H3 at family-wise α = 0.05. They are reported whatever the H1 result.
+- Effect sizes with 95% CIs are the headline numbers. Every secondary result is printed with its registered MDE (§7.4).
 - At most 2 open-discovery promotions (plan §4.6) form a separate family, corrected with BH at q = 0.05.
 
 ### 5.4 Composition
@@ -194,7 +239,10 @@ For each target and passage i, with Ŷᵢ the model one-hot, Yᵢ the human one-
 ### 5.5 Exclusions and missing data
 - **Excluded:** non-fiction, translations, quality failures, and works with conflicting dates (`docs/data_quality.md`).
 - **Rejected labels.** Passages whose label failed the deterministic gates (non-verbatim quote, schema failure) are treated as `has_obstacle = no` for the model label. The DSL correction handles any resulting bias because audited items keep their human label. The rejection rate is reported per decade.
-- **Humans.** A missing human label (skipped item) keeps R = 0 for that passage. π is not recomputed. The count is reported.
+- **Humans.**
+  - A missing human label (a skipped item, or an excluded annotator's item with no other label) has R = 0.
+  - π is recomputed per cell from the retained labels (§5.1, rule 4).
+  - Counts are reported.
 - **No outlier removal.**
 
 ### 5.6 Robustness battery (`analysis/stats/battery.py`)
@@ -220,9 +268,14 @@ Battery notes:
 - **H3.** The permutation check does not apply to H3. A check that cannot run because data are missing counts as **failed**.
 
 ### 5.7 Verdict rule
-- **Supported:** Holm-significant, **and** passes at least ⌈7/9 × number of applicable checks⌉, **and** has the same sign in replication.
-- **Unstable:** Holm-significant, but fails the battery or replication.
-- **Null:** not Holm-significant. A significant effect in the opposite direction is reported as "null (opposite sign)".
+- **Supported:**
+  - for H1: p < 0.05;
+  - for a secondary test: Holm-significant among the secondary tests;
+  - **and** passes at least ⌈7/9 × number of applicable checks⌉;
+  - **and** has the same sign in replication.
+- **Unstable:** significant at its level, but fails the battery or replication.
+- **Null:** not significant at its level. A significant effect in the opposite direction is reported as "null (opposite sign)".
+- **Reporting nulls.** A null secondary result is reported as "not detected (registered MDE = X pp)", never as evidence of absence.
 
 The verdict is computed mechanically by `battery.verdict`.
 
@@ -237,7 +290,7 @@ The verdict is computed mechanically by `battery.verdict`.
 ## 6. Inference criteria and validation gates
 - α = 0.05 family-wise (Holm).
 - **Benchmark gate** before trusting H1–H3: the pipeline recovers ≥ 8 of 10 injected shifts and claims ≤ 1 of 10 confounded nulls (plan §4.8).
-- **Simulation gate:** DSL 95% CI coverage within [0.92, 0.98] on synthetic corpora that match the registered design (§7.2). If the gate fails at the registered audit size, the affected test is reported as underpowered or descriptive, never as confirmatory.
+- **Simulation gate:** DSL 95% CI coverage within [0.92, 0.98] on synthetic corpora that match the registered design (§7.2). At ≥ 500 labels it was met for the human construct. Under the registered annotator noise, the model SE matched the empirical SD of the H1 estimate (6.3 vs 6.9 pp). If the gate fails at the registered audit size, the affected test is reported as underpowered or descriptive, never as confirmatory.
 
 ## 7. Power and validation (simulation, `analysis/stats/power.py`, `validate.py`)
 
@@ -275,7 +328,7 @@ More findings from the power runs:
 - **Allocation.** Over-allocating the audit to the E and L eras (45/10/45) did **not** help (17.5 vs 15.8 pp at 1,008), so equal allocation across eras is kept.
 - **H2 tests are weaker still.** In the coverage study at 504 labels, the SE of the DARKNESS E→L prevalence contrast was 2.0–2.2 pp against a simulated effect of −2.8 pp. Communication-cause and night-function shares rest on a few dozen audited passages.
 
-**Decision rule (plan §4.7).** If the H1 MDE exceeds 8 pp, collapse before freezing. **At any human-audit size below about 3,800 Confirmation labels, the MDE exceeds 8 pp.** The registered version must therefore adopt one of the following before unsealing (recommendations R1–R6, §7.3):
+**Decision rule (plan §4.7), superseded in v0.3 by §7.4.** If the H1 MDE exceeds 8 pp, collapse before freezing. **At any human-audit size below about 3,800 Confirmation labels, the MDE exceeds 8 pp.** The registered version must therefore adopt one of the following before unsealing (recommendations R1–R6, §7.3):
 - (i) enlarge the audit;
 - (ii) declare H1 the single primary test and H2a–c secondary (still Holm-corrected, but expected to be underpowered);
 - (iii) report the registered MDE alongside every result.
@@ -298,7 +351,15 @@ Further validation findings:
 
 Figure: `analysis/stats/figs/dsl_coverage.png`.
 
-### 7.3 Design recommendations (to resolve before the registered version)
+### 7.3 Design recommendations from v0.2 (status in v0.3)
+
+Status:
+- **R1:** adopted. 1,800 Confirmation items.
+- **R3:** adopted, with domain strata. §7.4 finds no measurable gain from them.
+- **R4:** adopted. Night function is exploratory.
+- **R5:** adopted.
+- **R6:** adopted.
+- **R2:** still advised.
 - **R1. Audit size.**
   - Put the whole human audit into the **Confirmation** half. Discovery already has the teaching set, and Discovery audit labels may still be used to train the calibration g, since any g is valid.
   - Cut the human task to `has_obstacle` + `locus` (+ `failure_cause` when communication is in play), so about 1,000 Confirmation labels become feasible. That gives an H1 MDE of about 12.5–16 pp.
@@ -308,6 +369,50 @@ Figure: `analysis/stats/figs/dsl_coverage.png`.
 - **R4. Night labels.** Humans (or the 60-item Tier-3/user check, drawn as a probability sample) must label `night_function`, or H2c(ii) is uncorrected and should be dropped from the confirmatory family.
 - **R5. Audit frame.** Persist `audit_frame.parquet` (π for every pool passage) at selection time. This is now implemented in `select_annotation.py`. DSL cannot be computed after the v1.0 relabel without it.
 - **R6. Replication.** ELTeC (1841+) and Chicago (1880+) cannot replicate E-vs-L contrasts. The battery's replication item for H1 and H2b–c is therefore the ELTeC 1841–49 vs L contrast plus the slope sign. The verdict rule is unchanged.
+
+### 7.4 Registered final design (v0.3): MDEs and power (`power.py --final`, 20 replicates per scenario)
+
+Design simulated:
+- 7,750 Confirmation works.
+- `draw_audit(…, n_target=1800, group_col="dgroup")`, giving about 1,760 unique items.
+- 4 non-expert annotators with item error 0.25 / 0.28 / 0.31 / 0.34, i.e. true locus κ vs expert of about 0.68 / 0.66 / 0.62 / 0.59 (mean measured on the 30 items: 0.59).
+- 10% overlap; 30 expert items; the κ < 0.40 exclusion rule applied.
+- Annotator-mean soft labels; calibrated DSL; logit with fallback; "good" (pilot-like) LLM noise.
+- The "truth" is the expert construct on the human schema.
+- MDE = (z₁₋α/₂ + z₀.₈) × SE, using the RMS model SE. Secondary tests are also shown at α = 0.0125, the first Holm step for 4 tests.
+
+| Test | Simulated effect (expert construct) | Mean estimate (human construct) | Attenuation | SE (pp) | MDE (pp) α = 0.05 | MDE (pp) at test level | Power at simulated effect |
+|---|---|---|---|---|---|---|---|
+| **H1** material share (primary) | −12.7 pp | −8.4 pp | 0.66 | 6.3 | **17.6** | 17.6 | 0.35 |
+| **H1** internal share (primary) | +8.2 pp | +5.2 pp | 0.63 | 3.5 | **9.7** | 9.7 | 0.50 |
+| H2a withholding share | +24.4 pp | +17.5 pp | 0.72 | 70 (empirical SD 34) | ≥ 35 (35–196 across scenarios) | ≥ 42 | 0.15 |
+| H2b DISTANCE prevalence, 1850–84 vs 1800–49 | −1.2 pp | −0.2 pp | — | 1.9 | 5.3 | 6.3 | 0.05 |
+| H2c DARKNESS prevalence | −1.1 pp | −1.5 pp | — | 1.7 | 4.8 | 5.7 | 0.10 |
+| H3 excess divergence | divergent scenario | — | — | — | — | — | 0.40 at calibrated α (size 0.05 under tracking) |
+
+The H1 test needs both parts, so its power is at most the material part's power, about 0.35.
+
+Ablations (same design except the named change):
+
+| Change | H1 material: estimate / SE / MDE (pp) | Power, material / internal |
+|---|---|---|
+| Registered (κ ≈ 0.6 annotators) | −8.4 / 6.3 / 17.6 | 0.35 / 0.50 |
+| "Base" LLM noise | −7.8 / 6.6 / 18.4 | 0.20 / 0.15 |
+| **Trained annotators (κ ≈ 0.74 measured)** | −10.4 / 5.5 / 15.3 | **0.45 / 0.60** |
+| Expert-quality annotators | −14.0 / 4.1 / 11.5 | 0.95 / 0.85 |
+| Locus-group strata instead of domain strata | −3.7 / 5.1 / 14.4 (empirical SD 7.5 vs 6.9) | 0.25 / 0.40 |
+| Annotators worse on early prose (+0.10 error, E only) | −10.6 / 6.8 / 19.0 | 0.30 / 0.30 |
+
+Further findings:
+- **Domain strata** (R3) bought no detectable precision for H2. SE for H2b / H2c was 1.9 / 1.7 pp under domain strata against 1.7 / 1.4 pp under locus strata. For H1 the two designs agree within Monte Carlo error. Domain strata are kept because they guarantee audited communication passages for H2a.
+- **Expert-nested sensitivity:** SE 17–31 pp, so it is unusable for testing. It is retained only as the registered sensitivity range.
+- **Exclusion rule:** at least one annotator was excluded in 15–35% of replicates, even though every annotator's true κ was ≥ 0.59, because κ estimated on 30 items is noisy.
+- **H3:** the uncalibrated size was 0.15 at nominal 0.05, hence the ×10 calibration (§5.2).
+
+**Interpretation for the registration:**
+- H1 is valid as a test of direction, but it is power-limited (≈ 35–50%) by **annotator noise** rather than by the number of labels. Moving annotators from κ ≈ 0.6 to κ ≈ 0.75 is worth more than another 1,000 labels.
+- **Recommended before the probability sample starts:** a training round on the Discovery teaching items with feedback, and a **certification pre-test: κ ≥ 0.60 on 20 Discovery items vs the student's adjudicated key**. Only certified peers then label audit items. The registered exclusion floor (κ < 0.40 on the expert items) stays as written.
+- **H2a, H2b, H2c** have MDEs of 35+ / 5 / 5 pp against plausible effects of about 1–2 pp in prevalence, so they are expected nulls at this design. They are registered as secondary, so that their estimates and CIs are reported honestly and not read as evidence of absence.
 
 ## 8. Deviations policy
 - **Before registration.** Any change in this draft is logged in the change log below.
@@ -321,8 +426,23 @@ Figure: `analysis/stats/figs/dsl_coverage.png`.
   4. **Model.** The primary model is author-cluster-robust (GEE-type) rather than a GLMM. A GLMM on naive labels is a sensitivity check only, since DSL soft outcomes are not a likelihood.
   5. **Night function.** The night_function component of H2c is not DSL-corrected unless humans label it on a probability sample (R4).
   6. **Replication.** ELTeC and Chicago cannot replicate the full E-vs-L contrasts (coverage).
+  7. **Family (v0.3).** H1 is the single primary test. H2a, H2b, H2c and H3 are secondary, Holm among themselves. The plan's single Holm family of 5 is replaced.
+  8. **Night function.** H2c is reduced to DARKNESS prevalence, and night function is exploratory.
+  9. **Human audit (v0.3).**
+     - About 1,800 Confirmation-only items, drawn with era × predicted-domain strata, labelled by non-expert annotators.
+     - Human label = annotator mean. The teacher is the expert reference on 30 items; there is no adjudication of overlaps.
+     - Exclusion rule κ < 0.40.
+     - π is recomputed after exclusions.
+  10. **H3 calibration.** The H3 p-value is simulation-calibrated (×10).
 - **Unforeseen problems.** If an analysis cannot be run as registered (e.g., an era with no audited obstacles), the nearest pre-specified fallback is used: the identity link, then the raw DSL ratio contrast without covariates. The fallback is reported as such.
 
 ## 9. Change log
 - v0.1 (2026-10-31): first draft from plan v2 §3–4.
 - v0.2 (2026-10-31): G0 eras; fixed spline knots; empirical era-year g-computation; work weights for adaptive stopping; power and coverage simulation; design recommendations R1–R6.
+- v0.3 (2026-11-01): coordinator/user decisions:
+  - H1 primary; H2a–c and H3 secondary; H2c reduced to darkness prevalence.
+  - Final audit design (1,800 Confirmation items, domain strata, 4 non-expert annotators, 30 expert items).
+  - Annotator rules: mean soft labels, κ exclusion, π recomputation, era-differential reliability check, expert-nested sensitivity.
+  - Enrichment strata excluded from the audit frame.
+  - H3 calibration.
+  - Final-design MDEs (§7.4).

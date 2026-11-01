@@ -31,6 +31,7 @@ MID = (1850, 1884)
 LATE = (1885, 1929)
 HINGE_B = 1850               # H2b railway cut: 1800-1849 vs 1850-1884
 H3_PAIRS = {"comm": "comm_infra", "travel": "distance", "dark": "darkness"}
+H3_P_INFLATE = 10.0          # calibrated H3 p-value multiplier (see h3)
 
 
 # ------------------------------------------------------------------ design
@@ -385,13 +386,18 @@ def h3(wd: WorkData, keywords: pd.DataFrame, n_boot: int = 2000, block: int = 3,
         fstar = fn[:, idx] + rng.normal(0, 1, (len(groups), T)) * se[:, idx]
         boot[r] = np.mean([divergence(kw[i, idx], fstar[i]) for i in range(len(groups))])
     lo, hi = np.quantile(boot, [0.025, 0.975])
-    # z-equivalent SE so the Component carries the parametric p
+    # simulation calibration (power.py --final, 140 replicates): the parametric null under-states
+    # the variability of DSL decade series (thin early decades, construct mismatch), giving size ~0.15
+    # at nominal 0.05; nominal 0.005 gives ~0.05. Registered: p_cal = min(1, H3_P_INFLATE * p).
+    p_raw = p
+    p = min(1.0, H3_P_INFLATE * p_raw)
+    # z-equivalent SE so the Component carries the calibrated p
     z = stats.norm.isf(p / 2) if p < 1 else 0.0
     se_eq = abs(excess) / z if z > 0 else float("inf")
     comp = Component("excess divergence D - E_H0[D]", excess, se_eq, +1)
     per_pair = {g: divergence(kw[i], fn[i]) for i, g in enumerate(groups)}
     return Effect("H3 mention != function", [comp], None,
-                  {"D": Dobs, "D_ci": (float(lo), float(hi)), "p_param": p, "per_pair": per_pair,
+                  {"D": Dobs, "D_ci": (float(lo), float(hi)), "p_param": p_raw, "p_cal": p, "per_pair": per_pair,
                    "decades": decs, "null_mean": float(null.mean())})
 
 

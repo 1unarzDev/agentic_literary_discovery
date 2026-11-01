@@ -258,7 +258,17 @@ def run_all(labels_path: str, human_path: str, frame_path: str | None, keywords_
     labels, human = pd.read_parquet(labels_path), pd.read_parquet(human_path)
     frame = pd.read_parquet(frame_path) if frame_path else None
     kw = pd.read_csv(keywords_path)
-    wd = prepare(labels, human, frame, split=split)
+    # registered annotator rules (prereg §5.1): expert rows never enter DSL; kappa exclusion
+    from analysis.stats import annotators as ann
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    excl: set = set()
+    if expert in set(human.annotator):
+        rep_k = ann.expert_agreement(human, expert=expert)
+        excl = ann.exclusions(rep_k)
+        rep_k.assign(excluded=rep_k.annotator.isin(excl)).to_csv(out / "annotator_agreement.csv", index=False)
+        ann.overlap_agreement(human, labels, expert=expert).to_csv(out / "overlap_agreement.csv", index=False)
+    wd = prepare(labels, human, frame, split=split, exclude_annotators={expert} | excl)
     design = models.Design.from_data(wd)
     tab, effs = models.confirmatory(wd, kw, design=design)
     holm_rej = tab.groupby("test").reject.first().to_dict()
@@ -272,8 +282,6 @@ def run_all(labels_path: str, human_path: str, frame_path: str | None, keywords_
     fns = {"H1": functools.partial(models.h1, design=design), "H2a": functools.partial(models.h2a, design=design),
            "H2b": functools.partial(models.h2b, design=design), "H2c": functools.partial(models.h2c, design=design),
            "H3": functools.partial(models.h3, keywords=kw, n_boot=500)}
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
     tabs = []
     for k, fn in fns.items():
         r = run_battery(k, fn, wd, bool(holm_rej[k]), effs[k], alt=alt, segmentation=seg, replication_wd=rep,
