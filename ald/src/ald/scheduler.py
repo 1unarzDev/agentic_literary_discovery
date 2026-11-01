@@ -529,3 +529,103 @@ def in_active_hours(spec: str | None, now: float) -> bool:
     if start == end:
         return True
     return start <= cur < end if start < end else (cur >= start or cur < end)
+
+
+# --------------------------------------------------------------------------
+# Weekly schedule:  "mon-fri 21:00-05:00,07:00-15:00; sat-sun 21:00-05:00"
+# --------------------------------------------------------------------------
+DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
+def _parse_days(tok: str) -> list[int]:
+    tok = tok.strip().lower()
+    if tok in ("daily", "*", "all", "every"):
+        return list(range(7))
+    out: list[int] = []
+    for part in tok.split(","):
+        part = part.strip()
+        if "-" in part:
+            a, b = (x.strip()[:3] for x in part.split("-", 1))
+            i, j = DAYS.index(a), DAYS.index(b)
+            out.extend((i + k) % 7 for k in range((j - i) % 7 + 1))
+        else:
+            out.append(DAYS.index(part[:3]))
+    return sorted(set(out))
+
+
+def _parse_hhmm(s: str) -> int:
+    hh, mm = (int(x) for x in s.strip().split(":"))
+    if not (0 <= hh <= 24 and 0 <= mm < 60) or (hh == 24 and mm):
+        raise ValueError(f"bad time {s!r}")
+    return hh * 60 + mm
+
+
+def parse_schedule(spec: str) -> list[tuple[int, int, int]]:
+    """-> [(weekday 0=Mon, start_min, end_min)]. A span whose end is not after its start runs past
+    midnight into the next day (e.g. "fri 21:00-05:00" covers Friday 21:00 to Saturday 05:00).
+    Rules: ``<days> <HH:MM-HH:MM>[,<HH:MM-HH:MM>...]`` separated by ';'. Days: mon..sun, ranges (mon-fri,
+    sat-sun), lists (mon,wed) or daily. Raises ValueError on bad syntax."""
+    rules: list[tuple[int, int, int]] = []
+    for clause in (c.strip() for c in spec.split(";")):
+        if not clause:
+            continue
+        try:
+            days_tok, spans_tok = clause.split(None, 1)
+            days = _parse_days(days_tok)
+        except ValueError as e:
+            raise ValueError(f"bad schedule clause {clause!r}: expected '<days> HH:MM-HH:MM[,...]'") from e
+        for span in spans_tok.replace(" ", "").split(","):
+            if "-" not in span:
+                raise ValueError(f"bad time span {span!r} in {clause!r}")
+            a, b = span.split("-", 1)
+            start, end = _parse_hhmm(a), _parse_hhmm(b)
+            for d in days:
+                rules.append((d, start, end))
+    if not rules:
+        raise ValueError("empty schedule")
+    return rules
+
+
+def legacy_hours_to_schedule(active_hours: str | None) -> str | None:
+    return f"daily {active_hours}" if active_hours else None
+
+
+def in_schedule(spec: str | None, now: float) -> bool:
+    """True if local time ``now`` is inside the weekly schedule (None/"" = always). A malformed schedule
+    never stops work."""
+    if not spec:
+        return True
+    try:
+        rules = parse_schedule(spec)
+    except ValueError:
+        return True
+    t = _dt.datetime.fromtimestamp(now)
+    wd, cur = t.weekday(), t.hour * 60 + t.minute
+    for d, start, end in rules:
+        if start == end:  # 24 h starting at `start`
+            if (wd == d and cur >= start) or (wd == (d + 1) % 7 and cur < start):
+                return True
+        elif start < end:
+            if wd == d and start <= cur < end:
+                return True
+        elif (wd == d and cur >= start) or (wd == (d + 1) % 7 and cur < end):
+            return True
+    return False
+
+
+def next_schedule_change(spec: str | None, now: float) -> float | None:
+    """Epoch of the next minute at which the in/out state flips (window start when outside, end when
+    inside), searched up to 8 days ahead; None if it never changes."""
+    if not spec:
+        return None
+    try:
+        parse_schedule(spec)
+    except ValueError:
+        return None
+    t0 = _dt.datetime.fromtimestamp(now).replace(second=0, microsecond=0)
+    state = in_schedule(spec, now)
+    for k in range(1, 8 * 24 * 60 + 1):
+        t = t0 + _dt.timedelta(minutes=k)
+        if in_schedule(spec, t.timestamp()) != state:
+            return t.timestamp()
+    return None

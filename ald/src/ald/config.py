@@ -121,7 +121,8 @@ class Config:
     # `ald work` settings (edit with `ald config`; the background service reads them at every start).
     max_concurrency: int | None = None   # upper bound for auto-tuned concurrency (default 8)
     stages: list[str] | None = None      # subset of the tier's stages (default: all allowed)
-    active_hours: str | None = None      # "HH:MM-HH:MM" local time, may wrap midnight (default: always)
+    schedule: str | None = None          # weekly windows, e.g. "mon-fri 21:00-05:00,07:00-15:00; sat-sun 21:00-05:00"
+    active_hours: str | None = None      # legacy: "HH:MM-HH:MM" daily (= schedule "daily HH:MM-HH:MM")
     gpu_lock: str | None = None          # flock(2) path shared with other GPU programs (Linux/macOS)
     auto_update: bool = True
     keep_awake: bool = True              # False = allow sleep while working

@@ -123,7 +123,8 @@ After saving, the menu offers to restart the worker.
 |---|---|
 | `name` | display name |
 | `disk_budget_gb` | disk ald may use (default 10 GB; it always leaves 20 GB free) |
-| `active_hours` | work only in this daily window, e.g. `22:00-07:00` |
+| `schedule` | weekly work windows in local time, e.g. `mon-fri 21:00-05:00,07:00-15:00; sat-sun 21:00-05:00` (a span may cross midnight: Friday 21:00-05:00 runs into Saturday). Outside a window ald finishes its current batch, then idles (and updates itself); `ald status` shows when the next window starts |
+| `active_hours` | legacy daily window, e.g. `22:00-07:00` (ignored when `schedule` is set) |
 | `max_concurrency` | upper bound for the auto-tuned number of parallel requests (default 8) |
 | `stages` | only take these stages, e.g. `label,workcheck` |
 | `gpu_lock` | share the GPU with other programs (Linux/macOS) |
@@ -134,7 +135,7 @@ After saving, the menu offers to restart the worker.
 
 ## Stopping, pausing, uninstalling
 
-- **Pause only at night / by day:** `ald config set active_hours 22:00-07:00 --restart`.
+- **Pause only at night / by day:** `ald config set schedule "daily 22:00-07:00" --restart`.
 - **Pause now:** `ald service uninstall` stops the worker and removes the background service. Work in progress
   is uploaded as partial results and handed back. To resume, run the install command again; it skips what is
   already installed and needs no new invite, or run `ald service install`.

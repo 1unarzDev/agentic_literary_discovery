@@ -752,7 +752,10 @@ def work(
                                               help="Prevent system sleep while working (config; default on)."),
     stages: Optional[str] = typer.Option(None, "--stages", help="Comma-separated subset of allowed stages (config)."),
     active_hours: Optional[str] = typer.Option(None, "--active-hours",
-                                               help="Only work between HH:MM-HH:MM local time, daily (config)."),
+                                               help="Legacy: only work HH:MM-HH:MM daily (use --schedule)."),
+    schedule: Optional[str] = typer.Option(None, "--schedule",
+                                           help='Weekly windows (config), e.g. "mon-fri 21:00-05:00,07:00-15:00; '
+                                                'sat-sun 21:00-05:00". Local time; spans may cross midnight.'),
     until: Optional[str] = typer.Option(None, "--until", help="Stop leasing near HH:MM (local time)."),
     hours: Optional[float] = typer.Option(None, "--hours", help="Run for N hours."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the plan without leasing."),
@@ -777,7 +780,8 @@ def work(
                      max_concurrency=max_concurrency or cfg.max_concurrency or 8, window=window,
                      auto_update=cfg.auto_update and not no_auto_update, argv=argv, auto_pull=not dry_run,
                      gpu_lock=gpu_lock or cfg.gpu_lock, service_mode=service_mode,
-                     active_hours=active_hours or cfg.active_hours)
+                     active_hours=active_hours or cfg.active_hours,
+                     schedule=schedule or (None if active_hours else cfg.schedule))
     keep_awake = cfg.keep_awake if keep_awake is None else keep_awake
     if dry_run:
         try:

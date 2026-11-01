@@ -283,10 +283,12 @@ def test_config_menu_scripted(cli_home):
     from rich.console import Console
     from ald import ui
     from ald.config import Config
-    answers = iter(["3", "22:00-07:00", "4", "0", "4", "3", "8", "no", "s", "n"])  # "0" is rejected, then 3
+    answers = iter(["3", "mon-fri 25:00-01:00", "3", "mon-fri 21:00-05:00,07:00-15:00; sat-sun 21:00-05:00",
+                    "5", "0", "5", "3", "9", "no", "s", "n"])  # bad schedule and "0" are rejected, then retried
     changed = ui.config_menu(Console(file=io.StringIO()), lambda q: next(answers), restart=lambda: [])
     cfg = Config.load()
-    assert changed and cfg.active_hours == "22:00-07:00" and cfg.max_concurrency == 3 and cfg.keep_awake is False
+    assert changed and cfg.schedule == "mon-fri 21:00-05:00,07:00-15:00; sat-sun 21:00-05:00"
+    assert cfg.max_concurrency == 3 and cfg.keep_awake is False
 
 
 def test_config_set_cli(cli_home):

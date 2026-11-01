@@ -45,7 +45,7 @@ from .scheduler import (
     RunWindow, StorageManager, lease_size, should_prefetch,
 )
 from .gpulock import GpuLock
-from .scheduler import in_active_hours
+from .scheduler import in_schedule, next_schedule_change
 from .updater import Updater, decide
 
 LEASE_TTL_S = 600.0
@@ -130,6 +130,7 @@ class Worker:
         service_mode: bool = False,
         manage_ollama: bool = False,
         active_hours: str | None = None,
+        schedule: str | None = None,
         gpu_used_fn: Callable[[], float | None] | None = None,
         ram_available_fn: Callable[[], float] | None = None,
     ):
@@ -193,6 +194,8 @@ class Worker:
         self.updater.service_mode = service_mode
         self.manage_ollama = manage_ollama
         self.active_hours = active_hours
+        from .scheduler import legacy_hours_to_schedule
+        self.schedule = schedule or legacy_hours_to_schedule(active_hours)
         if gpu_used_fn is None:
             from .hw import gpu_memory_used_gb
             gpu_used_fn = gpu_memory_used_gb
@@ -1202,7 +1205,9 @@ class Worker:
                 "passages_done": self.passages_done, "client_version": CLIENT_VERSION,
                 "registry_version": self._registry.version if self._registry else None,
                 "pid": os.getpid(), "last_contact": self.last_contact, "report": self.report(),
-                "active_hours": self.active_hours, "service": self.service_mode,
+                "active_hours": self.active_hours, "schedule": self.schedule, "service": self.service_mode,
+                "schedule_next_change": next_schedule_change(self.schedule, self.clock.time()),
+                "in_schedule": in_schedule(self.schedule, self.clock.time()),
             })
         except OSError:
             pass
@@ -1256,11 +1261,13 @@ class Worker:
                     if self.exit_when_idle or self.clock.sleep(60.0, self.stop):
                         break
                     continue
-                if not in_active_hours(self.active_hours, self.clock.time()):
+                if not in_schedule(self.schedule, self.clock.time()):
                     self.check_for_update()  # idle anyway: a good time to update (never while paused)
                     self.maybe_apply_update()
                     if self.activity != "outside_hours":
-                        self.log(f"[window] outside active hours {self.active_hours}; pausing")
+                        nxt = next_schedule_change(self.schedule, self.clock.time())
+                        when = _dt.datetime.fromtimestamp(nxt).strftime("%a %H:%M") if nxt else "?"
+                        self.log(f"[window] outside schedule '{self.schedule}'; idle until {when}")
                     self.activity = "outside_hours"
                     self._idle_gpu_unload()
                     self._save_state()

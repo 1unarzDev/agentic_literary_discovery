@@ -121,6 +121,7 @@ def local_summary(cfg: Config) -> dict[str, Any]:
         "update_available": bool(upd and upd.update_available), "coordinator": cfg.coordinator_url,
         "name": cfg.name, "worker_id": cfg.worker_id, "gpu_lock": cfg.gpu_lock, "active_hours": cfg.active_hours,
         "data_dir": str(root), "paused": cfgmod.pause_marker().exists(),
+        "schedule": cfg.schedule or (f"daily {cfg.active_hours}" if cfg.active_hours else None),
     }
 
 
@@ -173,11 +174,19 @@ def render_status(s: dict[str, Any]) -> Panel:
     elif s["latest_version"]:
         v += "  (latest)"
     t.add_row("Version", v)
+    sched = s.get("schedule")
+    if sched:
+        from .scheduler import in_schedule, next_schedule_change
+        now = time.time()
+        inside = in_schedule(sched, now)
+        nxt = next_schedule_change(sched, now)
+        when = _dt.datetime.fromtimestamp(nxt).strftime("%a %Y-%m-%d %H:%M") if nxt else "never"
+        t.add_row("Schedule", Text.assemble(
+            (("inside" if inside else "outside") + " window", "green" if inside else "yellow"),
+            f"  {'window ends' if inside else 'next window starts'} {when}  ({sched})"))
     extra = []
     if s["gpu_lock"]:
         extra.append(f"gpu-lock {s['gpu_lock']}")
-    if s["active_hours"]:
-        extra.append(f"active hours {s['active_hours']}")
     if extra:
         t.add_row("Settings", "; ".join(extra))
     return Panel(t, title=f"ald status - {s['name'] or ''}", subtitle=s["data_dir"], expand=False)
@@ -275,7 +284,9 @@ SETTINGS: list[tuple[str, str, str]] = [
     # key, label, kind
     ("name", "Display name (re-join to change it on the coordinator)", "str"),
     ("disk_budget_gb", "Disk budget for ald (GB; empty = 10 GB, always keeps 20 GB free)", "float"),
-    ("active_hours", "Work only between HH:MM-HH:MM daily (empty = always)", "hours"),
+    ("schedule", 'Weekly work windows, e.g. "mon-fri 21:00-05:00,07:00-15:00; sat-sun 21:00-05:00" '
+                 "(local time; empty = always)", "schedule"),
+    ("active_hours", "Legacy daily window HH:MM-HH:MM (ignored when a schedule is set)", "hours"),
     ("max_concurrency", "Max concurrent requests (empty = 8; auto-tuned below it)", "int"),
     ("stages", "Stages subset, comma-separated (empty = all allowed for the tier)", "list"),
     ("gpu_lock", "GPU lock file shared with other programs (Linux/macOS; empty = none)", "str"),
@@ -313,6 +324,10 @@ def parse_setting(kind: str, raw: str) -> Any:
         return v
     if kind == "list":
         return [x.strip() for x in raw.replace(" ", ",").split(",") if x.strip()]
+    if kind == "schedule":
+        from .scheduler import parse_schedule
+        parse_schedule(raw)  # raises ValueError with a readable message
+        return raw
     if kind == "hours":
         from .scheduler import in_active_hours
         a, b = raw.split("-", 1)
