@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORK = ROOT / "data/work"
 SHARDS = WORK / "shards"
 SEED = 20261031
-SHARD_SIZE = {"workcheck": 200, "label": 400, "alt_label": 400, "cloze": 500}
+SHARD_SIZE = {"workcheck": 200, "label": 400, "alt_label": 400, "baseline_small": 400, "cloze": 500}
 DUP_RATE = 0.05
 
 
@@ -189,6 +189,11 @@ def build_jobs(works: pd.DataFrame, waves: set[str] | None, exclude_works: set[s
                f"AND work_id NOT IN (SELECT work_id FROM excluded) AND hash(passage_id || 'alt') % 10 = 0 "
                f"ORDER BY hash(passage_id || 'w08')")
         alljobs += write_shards("w08_alt_label", "alt_label", 40, iter_query(con, sql), "discovery")
+    if want("w09_baseline_small"):
+        sql = (f"SELECT {PCOLS} FROM ranked WHERE split='discovery' AND stratum='random' AND k < 12 "
+               f"AND work_id NOT IN (SELECT work_id FROM excluded) AND hash(passage_id || 'alt') % 10 = 0 "
+               f"ORDER BY hash(passage_id || 'w09')")
+        alljobs += write_shards("w09_baseline_small", "baseline_small", 45, iter_query(con, sql), "discovery")
     return alljobs
 
 

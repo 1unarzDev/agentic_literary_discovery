@@ -66,13 +66,17 @@ STAGES = {
     "alt_label": dict(model_ref="qwen3.5:9b-q4_K_M", schema=LABEL_SCHEMA, system_template=LABEL_SYSTEM,
                       user_template=LABEL_USER, num_ctx=8192, num_predict=400, evidence_field="evidence_quote",
                       vram_gb_required=8.5, model_size_gb=6.6, kv_gb_per_slot=0.5, priority=40),
+    "baseline_small": dict(model_ref="qwen3.5:4b-q4_K_M", schema=LABEL_SCHEMA, system_template=LABEL_SYSTEM,
+                           user_template=LABEL_USER, num_ctx=8192, num_predict=400, evidence_field="evidence_quote",
+                           vram_gb_required=5.0, model_size_gb=3.3, kv_gb_per_slot=0.35, priority=45),
     "embed": dict(model_ref="embeddinggemma:300m-bf16", schema=None, system_template="", user_template="{text}",
                   num_ctx=2048, num_predict=0, evidence_field=None, api="embed",
                   vram_gb_required=0.0, model_size_gb=0.6, kv_gb_per_slot=0.0, priority=50),
 }
 TIERS = {
     "cpu": {"min_vram_gb": 0, "stages": ["embed"], "num_parallel_hint": 2},
-    "t8": {"min_vram_gb": 7.5, "stages": ["workcheck", "embed"], "num_parallel_hint": 4},
+    "t6": {"min_vram_gb": 5.5, "stages": ["workcheck", "baseline_small", "embed"], "num_parallel_hint": 2},
+    "t8": {"min_vram_gb": 7.5, "stages": ["workcheck", "baseline_small", "embed"], "num_parallel_hint": 4},
     "t12": {"min_vram_gb": 11.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 2},
     "t16": {"min_vram_gb": 15.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 6},
     "t24": {"min_vram_gb": 23.5, "stages": ["label", "workcheck", "cloze", "alt_label", "embed"], "num_parallel_hint": 8},

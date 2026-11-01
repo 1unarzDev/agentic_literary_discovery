@@ -55,8 +55,8 @@ class GpuLock:
     def held(self) -> bool:
         return self._fd is not None
 
-    def acquire(self, stop: threading.Event | None = None) -> bool:
-        """Block until the lock is ours. False if ``stop`` was set while waiting."""
+    def acquire(self, stop: threading.Event | None = None, abort: Callable[[], bool] | None = None) -> bool:
+        """Block until the lock is ours. False if ``stop`` was set (or ``abort()`` became true) while waiting."""
         if not self.enabled or self.held:
             return True
         assert self.path is not None
@@ -75,7 +75,10 @@ class GpuLock:
                     waited = True
                 if stop is None:
                     time.sleep(self.poll_s)
-                elif stop.wait(self.poll_s):
+                    stopped = False
+                else:
+                    stopped = stop.wait(self.poll_s)
+                if stopped or (abort is not None and abort()):
                     os.close(fd)
                     return False
 

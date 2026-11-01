@@ -703,11 +703,13 @@ class Worker:
         hj.started = True
         try:
             # --gpu-lock: the lock covers this shard's inference (heartbeats keep the lease alive meanwhile).
-            self.activity = "waiting_gpu_lock" if self.gpu_lock.enabled else "working"
-            if not self.gpu_lock.acquire(self.stop):
+            # --gpu-lock: the run loop waits for the lock BEFORE leasing, so no job is held while waiting.
+            # A prefetched job that finds the lock taken (someone was waiting) goes straight back.
+            if not self.gpu_lock.try_acquire():
+                self.log(f"[gpu-lock] {self.gpu_lock.path} taken by another process; handing {hj.job_id} back")
                 self.store.remove_job(hj.job_id)
                 self._release([hj.job_id])
-                return "stopped"
+                return "gpu_busy"
             self._gpu_models_loaded = True
             self.activity = "working"
             return self._run_job(hj)
@@ -1117,12 +1119,18 @@ class Worker:
                     continue
                 hj = self._queue.popleft() if self._queue else None
                 if hj is None:
+                    if self.gpu_lock.enabled and not self.gpu_lock.held:
+                        self.activity = "waiting_gpu_lock"
+                        self._save_state()
+                        if not self.gpu_lock.acquire(self.stop):
+                            break
                     got = self.lease_jobs()
                     hj = self._queue.popleft() if got and self._queue else None
                 if hj is None:
                     idle += 1
                     self.activity = "idle"
                     self._idle_gpu_unload()
+                    self._release_gpu_lock()
                     if self.exit_when_idle and idle >= self.idle_polls_before_exit:
                         break
                     if not self.window.allow_new_lease(None):

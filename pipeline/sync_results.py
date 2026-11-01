@@ -37,6 +37,8 @@ def cfg():
 
 
 def load_texts(ids: set[str]) -> dict[str, str]:
+    if not ids:
+        return {}
     con = duckdb.connect()
     con.execute("CREATE TEMP TABLE want(id VARCHAR)")
     con.executemany("INSERT INTO want VALUES (?)", [(i,) for i in ids])

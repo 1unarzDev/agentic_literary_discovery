@@ -161,3 +161,39 @@ def test_try_acquire_never_waits(tmp_path):
     p.wait()
     assert lk.try_acquire() is True and lk.held
     lk.release()
+
+
+@posix
+def test_worker_waits_for_lock_before_leasing(env, tmp_path):
+    """While another process holds the lock, the worker holds no lease."""
+    path = tmp_path / "gpu.lock"
+    env.coord.add_job("job-a", "label", _label_pin(env), make_passages("a", 2))
+    p = _holder(path, 30)
+    assert p.stdout.readline().strip() == "locked"
+    w = env.make_worker(gpu_lock=str(path))
+    w.gpu_lock.poll_s = 0.05
+    t = threading.Thread(target=w.run)
+    t.start()
+    for _ in range(100):
+        if w.activity == "waiting_gpu_lock":
+            break
+        time.sleep(0.02)
+    time.sleep(0.2)
+    assert w.activity == "waiting_gpu_lock" and env.coord.state == {"job-a": "queued"}
+    p.kill()
+    p.wait()
+    t.join(timeout=20)
+    assert env.coord.state == {"job-a": "done"} and not w.gpu_lock.held
+
+
+@posix
+def test_prefetched_job_handed_back_when_lock_taken(env, tmp_path, monkeypatch):
+    path = tmp_path / "gpu.lock"
+    env.coord.add_job("job-a", "label", _label_pin(env), make_passages("a", 2))
+    w = env.make_worker(gpu_lock=str(path))
+    w.startup()
+    [hj] = w.lease_jobs()
+    w._queue.clear()
+    monkeypatch.setattr(w.gpu_lock, "try_acquire", lambda: False)
+    assert w.run_job(hj) == "gpu_busy"
+    assert env.coord.state == {"job-a": "queued"}
