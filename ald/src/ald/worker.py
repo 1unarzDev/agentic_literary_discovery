@@ -959,9 +959,26 @@ class Worker:
         self.flush_outbox(force=True)
         self.check_for_update(force=True)
         self.ensure_ollama()
+        self.refresh_service_definition()
         self.resolve_stages()
         self.unload_non_pinned()
         self._save_state()
+
+    def refresh_service_definition(self) -> None:
+        """After an auto-update, bring the installed unit / plist / task up to the current definition."""
+        if not self.service_mode:
+            return
+        from . import service as svc
+        marker = self.root / "service_def.json"
+        if (read_json(marker, {}) or {}).get("version") == svc.SERVICE_DEF_VERSION:
+            return
+        try:
+            msg = svc.refresh_definition()
+            if msg:
+                self.log(f"[service] {msg}")
+            atomic_write_json(marker, {"version": svc.SERVICE_DEF_VERSION, "client_version": CLIENT_VERSION})
+        except Exception as e:  # noqa: BLE001
+            self.log(f"[service] could not refresh the service definition: {e}")
 
     def ensure_ollama(self, min_interval_s: float = 0.0) -> None:
         """Start Ollama if it is down and keep the tier's OLLAMA_* settings applied (see ollama_env)."""

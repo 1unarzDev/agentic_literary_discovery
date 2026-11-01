@@ -809,6 +809,8 @@ def _print_plan(p: Any, w: Any) -> None:
 def service_install(extra: Optional[str] = typer.Option(None, "--args", help="Extra args for `ald work`.")) -> None:
     """Install (or rewrite) and start the background service that runs `ald work`."""
     msgs = svc.install(extra=extra.split() if extra else None)
+    cfgmod.atomic_write_json(cfgmod.data_dir() / "service_def.json",
+                             {"version": svc.SERVICE_DEF_VERSION, "client_version": CLIENT_VERSION})
     for m in msgs:
         console.print(m, markup=False, highlight=False)
     if any(m.startswith("FAILED") for m in msgs) or any(" -> 127" in m for m in msgs) or \

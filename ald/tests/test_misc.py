@@ -235,3 +235,34 @@ def test_windows_xml_has_repeating_trigger():
     xml = service.windows_task_xml(["C:\\py\\pythonw.exe", "-m", "ald"], "PC\\a", s4u=False, workdir="C:\\")
     assert "<Interval>PT10M</Interval>" in xml and "<MultipleInstancesPolicy>IgnoreNew" in xml
     assert "<Count>999</Count>" in xml
+
+
+def test_refresh_definition_keeps_extra_args_linux(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    p = tmp_path / "systemd" / "user" / "ald-worker.service"
+    p.parent.mkdir(parents=True)
+    p.write_text("[Service]\nExecStart=/h/.local/bin/ald work --keep-awake --service --gpu-lock /tmp/g.lock\nRestart=on-failure\n")
+    calls = []
+    msg = service.refresh_definition(run=lambda c: (calls.append(c), P(0, "", ""))[1], platform="linux")
+    unit = p.read_text()
+    assert "Restart=always" in unit and unit.rstrip().count("--gpu-lock /tmp/g.lock") == 1
+    assert ["systemctl", "--user", "daemon-reload"] in calls and "refreshed" in msg
+    assert not any("restart" in " ".join(c) for c in calls)  # never restarts the running worker
+
+
+def test_refresh_definition_windows_keeps_logon_type(monkeypatch):
+    monkeypatch.setattr(service, "_windows_user", lambda: "PC\\vol")
+    old = "<Task><Principals><Principal><LogonType>S4U</LogonType></Principal></Principals>" \
+          "<Actions><Exec><Arguments>-m ald work --keep-awake --service --max-concurrency 2</Arguments></Exec></Actions></Task>"
+    created = []
+
+    def run(c):
+        if c[:2] == ["schtasks", "/Query"]:
+            return P(0, old, "")
+        created.append(Path(c[c.index("/XML") + 1]).read_bytes().decode("utf-16"))
+        return P(0, "SUCCESS", "")
+
+    msg = service.refresh_definition(run=run, platform="win32")
+    assert "S4U" in msg and len(created) == 1
+    assert "<LogonType>S4U</LogonType>" in created[0] and "--service --max-concurrency 2</Arguments>" in created[0]
+    assert "<Interval>PT10M</Interval>" in created[0]

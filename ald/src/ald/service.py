@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Callable
 
 UNIT = "ald-worker.service"
+SERVICE_DEF_VERSION = 2  # bump when the unit / plist / task definition changes; workers refresh it themselves
 LABEL = "org.ald.worker"
 TASK = "ald-worker"
 
@@ -335,3 +336,55 @@ def status(run: Runner = _run, platform: str = sys.platform) -> str:
         r = run(["schtasks", "/Query", "/TN", TASK, "/V", "/FO", "LIST"])
         return r.stdout or r.stderr
     return "unsupported platform"
+
+
+def _extra_after_service(args: list[str]) -> list[str]:
+    return args[args.index("--service") + 1:] if "--service" in args else []
+
+
+def refresh_definition(run: Runner = _run, platform: str = sys.platform) -> str:
+    """Rewrite the installed service definition in the current format WITHOUT restarting the running worker
+    (called by a service-mode worker after an update). Keeps extra `ald work` args and, on Windows, the
+    logon type. Returns a log line ('' if there is nothing to refresh)."""
+    import re
+    import shlex
+    if platform.startswith("linux"):
+        p = _systemd_path()
+        if not p.exists():
+            return ""
+        m = re.search(r"^ExecStart=(.*)$", p.read_text(encoding="utf-8"), re.M)
+        extra = _extra_after_service(shlex.split(m.group(1))) if m else []
+        p.write_text(systemd_unit(work_command(extra)), encoding="utf-8", newline="\n")
+        r = run(["systemctl", "--user", "daemon-reload"])
+        return f"refreshed {p} (daemon-reload -> {r.returncode})"
+    if platform == "darwin":
+        p = _plist_path()
+        if not p.exists():
+            return ""
+        args = re.findall(r"<string>(.*?)</string>", p.read_text(encoding="utf-8"))
+        extra = _extra_after_service(args)
+        p.write_text(launchd_plist(work_command(extra), Path.home() / "Library" / "Logs" / "ald-worker.log"),
+                     encoding="utf-8", newline="\n")
+        return f"refreshed {p} (applies at next login)"
+    if platform == "win32":
+        import tempfile
+        r = run(["schtasks", "/Query", "/TN", TASK, "/XML"])
+        if r.returncode != 0:
+            return ""
+        s4u = "<LogonType>S4U</LogonType>" in r.stdout
+        m = re.search(r"<Arguments>(.*?)</Arguments>", r.stdout)
+        extra = _extra_after_service(shlex.split(m.group(1).replace("&quot;", '"'))) if m else []
+        xml = windows_task_xml(windows_command(extra), _windows_user(), s4u=s4u,
+                               workdir=os.environ.get("USERPROFILE", str(Path.home())))
+        fd, path = tempfile.mkstemp(suffix=".xml")
+        with os.fdopen(fd, "wb") as f:
+            f.write(xml.encode("utf-16"))
+        try:
+            r = run(["schtasks", "/Create", "/TN", TASK, "/XML", path, "/F"])  # no fallback: never downgrade
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        return f"refreshed task {TASK} ({'S4U' if s4u else 'interactive'}) -> {r.returncode}"
+    return ""
