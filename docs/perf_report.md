@@ -58,6 +58,28 @@ Two fixes, released in ald 0.1.5:
 
 With both fixes the worker can reach c=4..8, where the plateau is flat; it starts from the benchmark's best level.
 
+## v0.9 label pin (num_ctx 4096, q8_0 KV cache, flash attention): RTX 3060, realistic bench
+
+Registry v8. 48 distinct passages of ~330 words plus context (prompt ≈ 2,475 tokens). The worker was paused with
+`ald pause`. Every run was 100% on GPU (`/api/ps` size_vram = size). Passages/hour:
+
+| c | NP=2 | **NP=4** | NP=6 |
+|---|---|---|---|
+| 1 | 1,549 | 1,524 | 1,528 |
+| 2 | 1,778 | 1,741 | 1,761 |
+| 4 | 1,663 | 1,966 | 2,136 |
+| 6 | 1,724 | 2,108 | 2,143 |
+| 8 | 1,774 | **2,227** | 2,093 |
+| model (`/api/ps` size = size_vram) | 1.49 GB | 2.20 GB | 2.92 GB |
+| nvidia-smi used | 9.8 / 12 GB | 10.6 / 12 GB | 11.3 / 12 GB |
+
+- **t12 → NP=4**, with c up to 8. That is +25% over NP=2. NP=6 is no faster and leaves only about 1 GB of VRAM
+  headroom.
+- v0.9 vs v0.8 on the same card: 2,227 vs 1,369 passages/h at each version's best setting, so +63%.
+- Each extra slot costs about 0.36 GB at q8_0 / 4096.
+- t16 (expected; the Linux sweep confirms): NP=6, with about 11.3 GB used of 16 GB. Where another program keeps
+  VRAM resident, NP=4.
+
 ## Re-run with production-like bench passages (ald 0.1.7+): the decisive table
 
 Same machine (COLLIN, RTX 3060 12 GB) and same v0.8 label pin (num_ctx 8192, f16 KV cache, flash attention).
