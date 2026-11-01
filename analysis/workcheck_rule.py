@@ -41,7 +41,7 @@ FIC = re.compile(r"(?<!\w)[Ff]iction(?!al)|[Ss]tories|\bTales\b|[Ff]airy tales|\
                  r"|Penny dreadfuls|Bildungsromans|Satire|Romances(?!.*History and criticism)|Fables|Parables|Novels")
 NON = re.compile(r"History and criticism|Biography|Description and travel|Juvenile literature|Authorship|Criticism"
                  r"|\bletters\b|Correspondence|Sermons|Essays|Addresses|Speeches|Handbooks|Textbooks|Etiquette"
-                 r"|Cookery|Diaries|Memoirs|Voyages and travels(?!.*[Ff]iction)")
+                 r"|Cookery|Diaries|Memoirs|Voyages and travels(?!.*[Ff]iction)|-- Knowledge --|[Ii]n literature\b")
 WEAK_NON = re.compile(r"Juvenile literature")  # LoC uses it for children's non-fiction, but also animal/moral tales
 VERSE = re.compile(r"Poetry|Poems|Ballads|Verse|Drama(?!.*[Ff]iction)|Plays\b|Songs")
 COLL = re.compile(r"Short stories|Children's stories|\bTales\b|Legends|Folklore|Fairy tales|Anthologies")

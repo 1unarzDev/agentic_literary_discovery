@@ -241,7 +241,8 @@ def cross_tab(stage: str) -> str:
     shared = set(base.passage_id) & set(df[df.stage != stage].passage_id)
     pc = duckdb.connect()
     pc.execute("CREATE TEMP TABLE want(id VARCHAR)")
-    pc.executemany("INSERT INTO want VALUES (?)", [(i,) for i in shared])
+    if shared:
+        pc.executemany("INSERT INTO want VALUES (?)", [(i,) for i in shared])
     pw = pc.execute(f"SELECT passage_id, work_id FROM read_parquet('{WORK / 'passages.parquet'}') "
                     "WHERE split='discovery' AND passage_id IN (SELECT id FROM want)").df()
     pc.close()
