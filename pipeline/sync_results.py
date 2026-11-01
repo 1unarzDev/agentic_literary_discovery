@@ -36,15 +36,43 @@ def cfg():
     return c["url"].rstrip("/"), {"Authorization": f"Bearer {c['admin_token']}"}
 
 
-def load_texts(ids: set[str]) -> dict[str, str]:
+def load_texts(ids: set[str]) -> dict[str, tuple[str, str, str]]:
+    """passage_id -> (text, ctx_before, ctx_after)"""
     if not ids:
         return {}
     con = duckdb.connect()
     con.execute("CREATE TEMP TABLE want(id VARCHAR)")
     con.executemany("INSERT INTO want VALUES (?)", [(i,) for i in ids])
-    rows = con.execute(f"SELECT passage_id, text FROM read_parquet('{WORK / 'passages.parquet'}') "
+    rows = con.execute(f"SELECT passage_id, text, ctx_before, ctx_after FROM read_parquet('{WORK / 'passages.parquet'}') "
                        "WHERE passage_id IN (SELECT id FROM want)").fetchall()
-    return dict(rows)
+    return {r[0]: (r[1], r[2] or "", r[3] or "") for r in rows}
+
+
+VERIFIED = {"exact", "normalized"}
+
+
+def check_quote(out: dict, src: tuple[str, str, str] | None) -> str:
+    """QA pass 2 rules (no new pin needed):
+    n/a (no obstacle) | exact | normalized | trimmed (straddles boundary; >=6 in-passage words verify) |
+    context (quote lies in context, not passage -> sensitivity flag) | fuzzy_flag | hallucinated | no_quote | no_source"""
+    if (out or {}).get("has_obstacle") != "yes":
+        return "n/a"
+    q = (out or {}).get("evidence_quote") or ""
+    if not q.strip() or q.strip().lower() == "none":
+        return "no_quote"
+    if src is None:
+        return "no_source"
+    text, cb, ca = src
+    st = verify_quote(q, text).status
+    if st in VERIFIED:
+        return st
+    if verify_quote(q, cb + "\n" + ca).status in VERIFIED:
+        return "context"
+    w = q.split()
+    for k in range(len(w) - 1, 5, -1):  # longest in-passage prefix/suffix of >=6 words
+        if verify_quote(" ".join(w[:k]), text).status in VERIFIED or verify_quote(" ".join(w[-k:]), text).status in VERIFIED:
+            return "trimmed"
+    return st
 
 
 def sync_once(c: httpx.Client, url: str) -> int:
@@ -74,7 +102,7 @@ def sync_once(c: httpx.Client, url: str) -> int:
                          "latency_ms": o.get("latency_ms"), "error": o.get("error")})
     df = pd.DataFrame(recs)
     # re-verify quotes on label-type stages against our own passage text
-    lab = df.stage.isin(["label", "alt_label", "adjudicate"])
+    lab = df.stage.isin(["label", "alt_label", "adjudicate", "baseline_small"])
     texts = load_texts(set(df.loc[lab, "passage_id"]))
     status = []
     for pid, out, is_lab in zip(df.passage_id, df.output_json, lab):
@@ -82,11 +110,10 @@ def sync_once(c: httpx.Client, url: str) -> int:
             status.append(None)
             continue
         try:
-            q = (json.loads(out) or {}).get("evidence_quote") or ""
+            o = json.loads(out) or {}
         except Exception:  # noqa: BLE001
-            q = ""
-        src = texts.get(pid)
-        status.append("no_quote" if not q else ("no_source" if src is None else verify_quote(q, src).status))
+            o = {}
+        status.append(check_quote(o, texts.get(pid)))
     df["quote_status"] = status
     batch = RES / f"batch_{int(time.time())}.parquet"
     df.to_parquet(batch, index=False)
@@ -112,10 +139,35 @@ def build_views() -> None:
     con.close()
 
 
+def reverify_all() -> None:
+    """Recompute quote_status for every stored batch with the current rules."""
+    for f in sorted(RES.glob("batch_*.parquet")):
+        df = pd.read_parquet(f)
+        lab = df.stage.isin(["label", "alt_label", "adjudicate", "baseline_small"])
+        texts = load_texts(set(df.loc[lab, "passage_id"]))
+        st = []
+        for pid, out, is_lab in zip(df.passage_id, df.output_json, lab):
+            if not is_lab:
+                st.append(None)
+                continue
+            try:
+                o = json.loads(out) or {}
+            except Exception:  # noqa: BLE001
+                o = {}
+            st.append(check_quote(o, texts.get(pid)))
+        df["quote_status"] = st
+        df.to_parquet(f, index=False)
+    build_views()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--loop", type=int, default=0, help="seconds between syncs (0 = once)")
+    ap.add_argument("--reverify", action="store_true")
     a = ap.parse_args()
+    if a.reverify:
+        reverify_all()
+        return
     url, h = cfg()
     with httpx.Client(timeout=120, headers=h) as c:
         while True:
