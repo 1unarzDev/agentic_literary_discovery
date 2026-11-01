@@ -93,6 +93,9 @@ class Design:
             B = ns_basis(yr, self.knots)
             cols += list(B.T)
             names += [f"ns{i}" for i in range(B.shape[1])]
+        elif self.time == "linear":
+            cols.append((yr - 1885.0) / 100.0)
+            names.append("year_lin")
         else:
             cols.append((yr >= self.cut).astype(float))
             names.append(f"post{self.cut}")
@@ -314,6 +317,41 @@ def h1(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, la
         W, p = wald([comps[0].estimate, comps[1].estimate], shares["_cov"][:2, :2])
         extra.update({"two_sided": True, "wald": W, "p_test": p, "classification": classify_h1(comps[0], comps[1], p)})
     return Effect(name, comps, infl, extra)
+
+
+def h1_contrast(wd: WorkData, design: Design | None = None, ref_cov=None, time: str = "spline",
+                window: tuple | None = None, years_a=None, years_b=None, cut: int = 1880,
+                name: str = "H1 contrast", fit_cache: dict | None = None) -> Effect:
+    """General two-sided locus contrast (same Wald test + classification as h1) for alternative H1
+    statistics (levers.py, prereg v0.5 §7.6):
+      time="spline", years = empirical era years  -> E vs L / M vs L (h1, h1_mid_late)
+      time="linear", window=(1840,1929), years_a=[1840], years_b=[1929]  -> linear-in-year trend
+      time="step",   window=(1840,1929), cut=1880, years 1879 vs 1880    -> pre/post-1880 step
+    fit_cache lets several contrasts share one fit (keyed by time/window/cut)."""
+    base = design or Design.from_data(wd)
+    d = Design(base.knots, base.genres, base.origins, base.loglen_mean, time, cut, base.extra)
+    ref = _ref(wd, ref_cov)
+    key = (time, window, cut)
+    if fit_cache is not None and key in fit_cache:
+        tf = fit_cache[key]
+    else:
+        sub = wd if window is None else wd.subset((wd.cov.year.values >= window[0]) & (wd.cov.year.values <= window[1]))
+        tf = fit_target(sub, "locus", d)
+        if fit_cache is not None:
+            fit_cache[key] = tf
+    comps, grads = [], []
+    for label, num in (("material share", [1]), ("internal share", [3])):
+        sa, ga = standardized_share(tf, ref, years_a, num, [1, 2, 3])
+        sb, gb = standardized_share(tf, ref, years_b, num, [1, 2, 3])
+        g = gb - ga
+        comps.append(Component(label, sb - sa, float(np.sqrt(max(g @ tf.fit.cov @ g, 0))), 0, True))
+        grads.append(g)
+    G = np.column_stack(grads)
+    V = G.T @ tf.fit.cov @ G
+    W, p = wald([c.estimate for c in comps], V)
+    infl = tf.fit.cluster_influence() @ G
+    return Effect(name, comps, infl, {"two_sided": True, "wald": W, "p_test": p,
+                                      "classification": classify_h1(comps[0], comps[1], p), "link": tf.fit.link})
 
 
 def h1_mid_late(wd: WorkData, design: Design | None = None, ref_cov=None) -> Effect:
