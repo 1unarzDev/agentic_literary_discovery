@@ -28,6 +28,9 @@ Optional settings:
 - Linux only, `--system-ollama`: install Ollama with its official script as a system service in `/usr/local`.
   This uses `sudo` and may ask for your password. Without it, Ollama goes in `~/.local/ollama`, needs no sudo,
   and ald starts and stops it.
+- macOS/Linux, `--gpu-lock /path/to/lockfile`: share the GPU with other programs. The lock is an advisory
+  `flock`, compatible with `flock /path/to/lockfile <cmd>`. The background service then runs
+  `ald work --gpu-lock …`. The install-time benchmark is skipped if the lock is busy.
 
 ## What the installer does (5-30 minutes, most of it downloading models)
 
