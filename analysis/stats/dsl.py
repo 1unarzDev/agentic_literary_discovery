@@ -223,7 +223,9 @@ def pseudo_outcomes(Yhat_code: np.ndarray, Y_code: np.ndarray, labelled: np.ndar
 # ------------------------------------------------------------------ work-level data
 
 WORK_COLS = ["work_id", "author_key", "year", "decade", "genre", "origin", "split"]
-OPT_WORK_COLS = ["n_words", "date_confidence", "memorization", "setting_period"]
+OPT_WORK_COLS = ["n_words", "date_confidence", "memorization", "setting_period", "work_weight"]
+# work_weight: 1 / P(work labelled) under adaptive stopping (cell = decade x stratum closes early,
+# whole works in seeded order), so closed decades are not under-weighted. Default 1.
 
 
 @dataclass
@@ -389,6 +391,8 @@ def ratio_shares(wd: WorkData, target: str, num: Iterable[int], den: Iterable[in
     """
     Y = wd.Y[target]
     num = list(num)
+    if weights is None and "work_weight" in wd.cov:
+        weights = wd.cov.work_weight.values
     a = np.ones(len(Y)) if weights is None else np.asarray(weights, float)
     Dw = Y[:, list(den)].sum(1) if den is not None else np.ones(len(Y))
     by = np.asarray(by)

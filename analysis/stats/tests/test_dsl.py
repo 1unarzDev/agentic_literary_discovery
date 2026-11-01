@@ -154,3 +154,19 @@ def test_ratio_shares_contrast_and_prepare_info(dsl_wd):
     assert np.allclose(r.est.sum(1), 1)
     d, s = r.contrast("a", "b", 1)
     assert s > 0 and np.isfinite(d)
+
+
+def test_work_weight_equals_duplication(oracle_wd):
+    m = oracle_wd.cov.decade.values < 1880
+    w = np.where(m, 2.0, 1.0)
+    wd_w = dsl.WorkData(oracle_wd.cov.assign(work_weight=w), oracle_wd.Y)
+    dup = np.r_[np.arange(len(m)), np.where(m)[0]]
+    wd_d = dsl.WorkData(oracle_wd.cov.iloc[dup].reset_index(drop=True), {k: v[dup] for k, v in oracle_wd.Y.items()})
+    era = lambda wd: np.where(wd.cov.year < 1850, "a", "b")
+    a = dsl.ratio_shares(wd_w, "locus", [1], [1, 2, 3], era(wd_w))
+    b = dsl.ratio_shares(wd_d, "locus", [1], [1, 2, 3], era(wd_d))
+    assert np.allclose(a.est, b.est)
+    d = models.Design.from_data(oracle_wd)
+    fa = models.fit_target(wd_w, "locus", d, link="identity").fit.beta
+    fb = models.fit_target(wd_d, "locus", d, link="identity").fit.beta
+    assert np.allclose(fa, fb)

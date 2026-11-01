@@ -9,3 +9,4 @@ research/codex_tasks/logs/
 coordinator/node_modules/
 coordinator/.wrangler/
 dist/
+logs/

@@ -127,13 +127,14 @@ def fit_target(wd: WorkData, target: str, design: Design, cluster: str = "author
     link = link or LINK["default"]
     cols = [n for n, k in zip(names, keep) if k]
     cl = wd.cov[cluster].values
+    w = wd.cov.work_weight.values if "work_weight" in wd.cov else None
     if link == "logit":
-        fit = fit_mnlogit(X[:, keep], Y, clusters=cl, columns=cols)
+        fit = fit_mnlogit(X[:, keep], Y, weights=w, clusters=cl, columns=cols)
         if not fit.converged:
-            fit = fit_linear(X[:, keep], Y, clusters=cl, columns=cols)
+            fit = fit_linear(X[:, keep], Y, weights=w, clusters=cl, columns=cols)
             fit.link = "identity"; fit.n_iter = -1  # -1 marks the logit->identity fallback
     else:
-        fit = fit_linear(X[:, keep], Y, clusters=cl, columns=cols)
+        fit = fit_linear(X[:, keep], Y, weights=w, clusters=cl, columns=cols)
     return TargetFit(fit, design, keep, fit.columns)
 
 
