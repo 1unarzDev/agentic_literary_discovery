@@ -47,7 +47,7 @@ This is the most important question in the study. Ask yourself: *if this obstacl
 | **Social** <kbd>s</kbd> | other people and society: someone opposing, rules, class, money, law, a lie or a secret kept by someone else | a father who forbids the marriage; a debt; "a governess can't marry the heir"; a rival who hides the letter |
 | **Inner** <kbd>i</kbd> | the character's own mind: fear, pride, guilt, shyness, doubt, indecision | "she was too proud to ask"; "he could not bring himself to speak" |
 
-Each kind of obstacle has a **usual** source (the page shows it as a hint after you pick a kind). Go with the usual one unless the passage clearly says otherwise. For example, an illness that the passage presents as "nerves" or imagined could be inner.
+Each kind of obstacle has a **usual** source (see the cheat sheet below), but always decide from what the passage says. For example, an illness that the passage presents as "nerves" or imagined could be inner.
 
 ## Kinds of obstacle: cheat sheet
 

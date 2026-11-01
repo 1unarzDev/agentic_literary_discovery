@@ -97,7 +97,6 @@ legend .hint, .flabel .hint { font-weight: 400; color: var(--muted); white-space
 .dim { opacity: .45; }
 kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; min-width: 1.5em; text-align: center; color: var(--ink-2); background: var(--paper); }
 .hidden { display: none !important; }
-.usual { font-size: 12.5px; color: var(--muted); margin-top: 4px; min-height: 1em; }
 textarea { width: 100%; min-height: 48px; resize: vertical; font: inherit; font-size: 14px; color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 7px 9px; }
 textarea:focus, .opt:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 details summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ink-2); }
@@ -217,7 +216,6 @@ details[open] summary { margin-bottom: 6px; }
       <fieldset id="locusSet" style="margin-top:14px">
         <legend><span>3. Where does the resistance come from?</span><span class="hint">m / s / i</span></legend>
         <div class="seg" id="loci"></div>
-        <div class="usual" id="usual"></div>
       </fieldset>
 
       <details id="extras" style="margin-top:14px">
@@ -412,11 +410,6 @@ details[open] summary { margin-bottom: 6px; }
   function press(container, pred) {
     Array.prototype.forEach.call(container.children, function (b) { b.setAttribute("aria-pressed", pred(b.dataset.v) ? "true" : "false"); });
   }
-  function usualLocus() {
-    if (!state.domain) return null;
-    if (state.domain === "COMMUNICATION_INFORMATION") { var f = byV(FCS, state.failure_cause); return f ? f.locus : null; }
-    return byV(DOMAINS, state.domain).locus;
-  }
   function render() {
     if (!state) return;
     press($("hasObstacle"), function (v) { return v === state.has_obstacle; });
@@ -428,8 +421,6 @@ details[open] summary { margin-bottom: 6px; }
     $("domainSet").classList.toggle("dim", !!other);
     $("locusSet").classList.toggle("dim", !!other);
     $("fcSet").classList.toggle("hidden", state.domain !== "COMMUNICATION_INFORMATION");
-    var u = usualLocus();
-    $("usual").textContent = u ? "Usually " + nameOf(LOCI, u).toLowerCase() + " for this kind, unless the passage says otherwise." : "";
     var ev = $("evList"); ev.innerHTML = "";
     if (!state.evidence.length) {
       var li0 = document.createElement("li"); li0.className = "ev-empty"; li0.style.border = "0"; li0.style.background = "none"; li0.style.padding = "0";
