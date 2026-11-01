@@ -140,3 +140,23 @@ def test_windows_update_helper_respects_pause_and_disabled(tmp_path):
     i_inst, i_pause, i_dis, i_run = (s.index("uv tool install"), s.index("paused: not relaunching"),
                                      s.index('find /i "Disabled"'), s.index("schtasks /Run"))
     assert i_inst < i_pause < i_run and i_dis < i_run and ":end" in s
+
+
+def test_schema_failures_reported_in_stats_and_log(env):
+    env.coord.add_job("job-q", "label", label_pin(env), make_passages("w1", 4))
+    env.ollama.invalid_for = {"Passage 0 of w1", "Passage 1 of w1"}
+    env.ollama.always_invalid = {"Passage 0 of w1", "Passage 1 of w1"}  # still invalid after the retry
+    w = env.make_worker()
+    w.run()
+    stats = json.loads(env.coord.puts[-1]["headers"]["x-stats"])
+    assert stats["n_schema_invalid"] == 2 and stats["n_retried"] == 2 and stats["schema_error_sample"]
+    assert any("[quality]" in m and "2/4" in m for m in env.logs)
+    assert w.report()["schema_fail_rate"] == 0.5 and w.report()["quality_stage"] == "label"
+
+
+def test_tuner_starts_at_tier_parallel_hint(env, registry_raw):
+    w = env.make_worker(max_concurrency=8)
+    w.startup()
+    hint = w.registry.num_parallel_hint(w.tier)
+    if hint:
+        assert all(t.current == min(hint, t.max_c) for t in w.tuners.values())

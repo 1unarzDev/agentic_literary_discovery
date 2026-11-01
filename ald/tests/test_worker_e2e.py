@@ -49,7 +49,9 @@ def test_lease_to_result_put(env):
     assert h["x-model-digest"] == env.registry.stages["label"].model_digest
     assert h["x-backend-version"].startswith("ollama/0.12.5")
     stats = json.loads(h["x-stats"])
-    assert set(stats) == {"n_ok", "n_flagged", "tok_s", "wall_s", "prompt_tokens", "gen_tokens"}
+    assert set(stats) == {"n_ok", "n_flagged", "tok_s", "wall_s", "prompt_tokens", "gen_tokens",
+                          "n_schema_invalid", "n_evidence_unverified", "n_retried"}
+    assert stats["n_schema_invalid"] == 0 and stats["n_evidence_unverified"] == 0
     assert stats["n_ok"] == 6 and stats["n_flagged"] == 0 and stats["gen_tokens"] == 6 * 40
     lines = put["lines"]
     assert [l["passage_id"] for l in lines] == [f"w1_p{i:04d}" for i in range(6)]  # shard order

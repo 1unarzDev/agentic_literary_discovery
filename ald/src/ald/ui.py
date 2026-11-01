@@ -258,8 +258,11 @@ def render_fleet(f: dict[str, Any]) -> Group:
     for r in f.get("quality_24h") or []:
         n = (r.get("n_ok") or 0) + (r.get("n_flagged") or 0)
         if n:
-            qual.append(f"{r['stage']}: {r.get('n_flagged') or 0}/{n} flagged "
-                        f"({100 * (r.get('n_flagged') or 0) / n:.1f}%: schema failures + unverified quotes)")
+            part = f"{r['stage']}: {100 * (r.get('n_flagged') or 0) / n:.1f}% flagged of {n}"
+            if r.get("n_schema_invalid") is not None:
+                part += (f" (schema {100 * (r.get('n_schema_invalid') or 0) / n:.1f}%, "
+                         f"quote {100 * (r.get('n_evidence_unverified') or 0) / n:.1f}%)")
+            qual.append(part)
     foot = Text.assemble(("Fleet passages/hour, last 24 h: ", "bold"), sparkline(hourly),
                          f"  (now {hourly[-1] if hourly else 0}, peak {max(hourly) if hourly else 0})\n",
                          ("Quality, 24 h: ", "bold"), "; ".join(qual) or "no results yet",

@@ -73,6 +73,8 @@ async function fleetStatus(env: AppEnv["Bindings"], withIds: boolean) {
     ).bind(h24),
     db.prepare(
       `SELECT stage, SUM(json_extract(stats_json, '$.n_ok')) AS n_ok, SUM(json_extract(stats_json, '$.n_flagged')) AS n_flagged,
+              SUM(json_extract(stats_json, '$.n_schema_invalid')) AS n_schema_invalid,
+              SUM(json_extract(stats_json, '$.n_evidence_unverified')) AS n_evidence_unverified,
               COUNT(*) AS results FROM results WHERE created >= ?1 GROUP BY stage`,
     ).bind(h24),
   ]);

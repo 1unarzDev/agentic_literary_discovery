@@ -191,6 +191,7 @@ class Worker:
         self.manage_ollama = manage_ollama
         self.active_hours = active_hours
         self.activity = "starting"
+        self.last_quality: dict[str, Any] | None = None
         self.keep_awake: Any = None  # KeepAwake (set by `ald work`)
         self.last_contact: float | None = None
         self.gpu_fraction: dict[str, float] = {}
@@ -323,8 +324,10 @@ class Worker:
         for s in ok:
             st = reg.stages[s]
             cap = max(1, self.fit.max_concurrency(st, self.max_concurrency))
-            hint = reg.num_parallel_hint(tier) or 2
-            start = int((self.cfg.bench or {}).get(s, {}).get("best_concurrency", hint))
+            # Start at the tier's server parallelism (what Ollama can actually run at once); the tuner then
+            # moves up or down. A saved benchmark only decides the start when the tier has no hint.
+            hint = reg.num_parallel_hint(tier)
+            start = int(hint or (self.cfg.bench or {}).get(s, {}).get("best_concurrency", 2))
             if s not in self.tuners:
                 self.tuners[s] = ConcurrencyTuner(start=min(start, cap), max_c=cap, clock=self.clock)
             else:
@@ -373,13 +376,24 @@ class Worker:
         self._last_flush = self.clock.monotonic()
         return counts
 
+    @staticmethod
+    def quality(lines: list[dict[str, Any]]) -> dict[str, Any]:
+        """Schema failures (after the retry), unverifiable evidence quotes, retries, and one sample error.
+        Rows without an evidence quote (e.g. lean anyOf "no obstacle" rows) are not evidence failures."""
+        schema = [l for l in lines if not l.get("valid_schema", False)]
+        sample = next((str(l.get("error"))[:200] for l in schema if l.get("error")), None)
+        return {"n_schema_invalid": len(schema),
+                "n_evidence_unverified": sum(1 for l in lines if "evidence_unverified" in (l.get("flags") or [])),
+                "n_retried": sum(1 for l in lines if "retried" in (l.get("flags") or [])),
+                **({"schema_error_sample": sample} if sample else {})}
+
     def _stats(self, lines: list[dict[str, Any]], wall_s: float) -> dict[str, Any]:
         gen = sum(int(l.get("gen_tokens", 0) or 0) for l in lines)
         prompt = sum(int(l.get("prompt_tokens", 0) or 0) for l in lines)
         flagged = sum(1 for l in lines if is_flagged(l))
         return {"n_ok": len(lines) - flagged, "n_flagged": flagged,
                 "tok_s": round(gen / wall_s, 2) if wall_s > 0 else 0.0, "wall_s": round(wall_s, 2),
-                "prompt_tokens": prompt, "gen_tokens": gen}
+                "prompt_tokens": prompt, "gen_tokens": gen, **self.quality(lines)}
 
     def _enqueue_result(self, job_id: str, lines: list[dict[str, Any]], meta: dict[str, Any], partial: bool) -> None:
         body = encode_jsonl_gz(lines)
@@ -608,6 +622,9 @@ class Worker:
             "gpu_fraction": self.gpu_fraction.get(stage) if stage else None,
             "gpu": self.hw.gpu_summary[:120], "client_version": CLIENT_VERSION, "service": self.service_mode,
             "gpu_lock": bool(self.gpu_lock.enabled),
+            "quality_stage": (self.last_quality or {}).get("stage"),
+            "schema_fail_rate": (self.last_quality or {}).get("schema_fail_rate"),
+            "evidence_fail_rate": (self.last_quality or {}).get("evidence_fail_rate"),
         }
 
     def heartbeat_once(self) -> dict[str, Any] | None:
@@ -892,6 +909,14 @@ class Worker:
         if wall > 0 and ran > 0:
             self.rates.update(hj.stage, ran, wall)
         lines = [done[p] for p in order if p in done and p not in skip]
+        if lines:
+            q = self.quality(lines)
+            n = len(lines)
+            self.last_quality = {"stage": hj.stage, "schema_fail_rate": round(q["n_schema_invalid"] / n, 4),
+                                 "evidence_fail_rate": round(q["n_evidence_unverified"] / n, 4)}
+            if q["n_schema_invalid"] > max(1, 0.02 * n):
+                self.log(f"[quality] {hj.job_id} stage {hj.stage} ({st.model_ref}): {q['n_schema_invalid']}/{n} "
+                         f"outputs fail the schema even after the retry; first error: {q.get('schema_error_sample')}")
         if reason is None and len(lines) >= n_total:
             self._enqueue_result(hj.job_id, lines, meta, partial=False)
             self.flush_outbox(force=True)
