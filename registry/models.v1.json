@@ -1,6 +1,6 @@
 {
-  "registry_version": "2026-11-01.0005",
-  "codebook_version": "v0.5",
+  "registry_version": "2026-11-01.0253",
+  "codebook_version": "v0.9",
   "tiers": {
     "cpu": {
       "min_vram_gb": 0,
@@ -36,7 +36,8 @@
         "alt_label",
         "embed"
       ],
-      "num_parallel_hint": 4
+      "num_parallel_hint": 4,
+      "kv_cache_type_hint": "q8_0"
     },
     "t16": {
       "min_vram_gb": 15.5,
@@ -47,7 +48,8 @@
         "alt_label",
         "embed"
       ],
-      "num_parallel_hint": 6
+      "num_parallel_hint": 6,
+      "kv_cache_type_hint": "q8_0"
     },
     "t24": {
       "min_vram_gb": 23.5,
@@ -58,7 +60,8 @@
         "alt_label",
         "embed"
       ],
-      "num_parallel_hint": 8
+      "num_parallel_hint": 8,
+      "kv_cache_type_hint": "q8_0"
     }
   },
   "stages": {
@@ -138,7 +141,7 @@
       "priority": 10,
       "model_digest": "sha256:d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
       "ollama_version_range": ">=0.40.0,<1.0.0",
-      "codebook_version": "v0.5",
+      "codebook_version": "v0.9",
       "temperature": 0,
       "seed": 0,
       "think": false,
@@ -147,138 +150,161 @@
     "label": {
       "model_ref": "gemma4:12b-it-q4_K_M",
       "schema": {
-        "type": "object",
-        "properties": {
-          "has_obstacle": {
-            "type": "string",
-            "enum": [
-              "yes",
-              "no",
-              "insufficient_context"
-            ]
-          },
-          "domains": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "DISTANCE_TRAVEL",
-                "COMMUNICATION_INFORMATION",
-                "DARKNESS_VISIBILITY",
-                "ILLNESS_BODY_DEATH",
-                "MONEY_PROPERTY_LAW",
-                "SOCIAL_RANK_CONVENTION",
-                "INTERPERSONAL_CONFLICT",
-                "INNER_STATE",
-                "NATURE_WEATHER",
-                "OTHER"
-              ]
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "has_obstacle": {
+                "type": "string",
+                "enum": [
+                  "yes"
+                ]
+              },
+              "locus": {
+                "type": "string",
+                "enum": [
+                  "material_external",
+                  "social_institutional",
+                  "internal_psychological"
+                ]
+              },
+              "locus_reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "DISTANCE_TRAVEL",
+                    "COMMUNICATION_INFORMATION",
+                    "DARKNESS_VISIBILITY",
+                    "ILLNESS_BODY_DEATH",
+                    "MONEY_PROPERTY_LAW",
+                    "SOCIAL_RANK_CONVENTION",
+                    "INTERPERSONAL_CONFLICT",
+                    "INNER_STATE",
+                    "NATURE_WEATHER",
+                    "OTHER"
+                  ]
+                },
+                "maxItems": 2,
+                "minItems": 1
+              },
+              "failure_cause": {
+                "type": "string",
+                "enum": [
+                  "infrastructure",
+                  "accidental_loss",
+                  "intentional_withholding",
+                  "misinterpretation",
+                  "success_resolution",
+                  "none"
+                ]
+              },
+              "message_valence": {
+                "type": "string",
+                "enum": [
+                  "catastrophic",
+                  "romantic",
+                  "financial",
+                  "practical",
+                  "none"
+                ]
+              },
+              "technology_named": {
+                "type": "string",
+                "enum": [
+                  "letter",
+                  "note",
+                  "telegram",
+                  "telephone",
+                  "messenger",
+                  "railway",
+                  "coach",
+                  "steamship",
+                  "carriage",
+                  "horse",
+                  "foot",
+                  "gas",
+                  "electric",
+                  "candle",
+                  "lamp",
+                  "none"
+                ]
+              },
+              "night_function": {
+                "type": "string",
+                "enum": [
+                  "danger",
+                  "concealment",
+                  "intimacy",
+                  "labor",
+                  "leisure",
+                  "none"
+                ]
+              },
+              "resolution_hint": {
+                "type": "string",
+                "enum": [
+                  "by_technology",
+                  "by_person",
+                  "by_chance",
+                  "unresolved",
+                  "unknown"
+                ]
+              },
+              "obstacle_summary": {
+                "type": "string"
+              },
+              "evidence_quote": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              }
             },
-            "maxItems": 2
-          },
-          "locus": {
-            "type": "string",
-            "enum": [
-              "material_external",
-              "social_institutional",
-              "internal_psychological",
-              "none"
+            "required": [
+              "has_obstacle",
+              "locus",
+              "locus_reason",
+              "domains",
+              "failure_cause",
+              "message_valence",
+              "technology_named",
+              "night_function",
+              "resolution_hint",
+              "obstacle_summary",
+              "evidence_quote",
+              "confidence"
             ]
           },
-          "locus_reason": {
-            "type": "string"
-          },
-          "failure_cause": {
-            "type": "string",
-            "enum": [
-              "infrastructure",
-              "accidental_loss",
-              "intentional_withholding",
-              "misinterpretation",
-              "success_resolution",
-              "none"
+          {
+            "type": "object",
+            "properties": {
+              "has_obstacle": {
+                "type": "string",
+                "enum": [
+                  "no",
+                  "insufficient_context"
+                ]
+              },
+              "confidence": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "has_obstacle",
+              "confidence"
             ]
-          },
-          "message_valence": {
-            "type": "string",
-            "enum": [
-              "catastrophic",
-              "romantic",
-              "financial",
-              "practical",
-              "none"
-            ]
-          },
-          "technology_named": {
-            "type": "string",
-            "enum": [
-              "letter",
-              "note",
-              "telegram",
-              "telephone",
-              "messenger",
-              "railway",
-              "coach",
-              "steamship",
-              "carriage",
-              "horse",
-              "foot",
-              "gas",
-              "electric",
-              "candle",
-              "lamp",
-              "none"
-            ]
-          },
-          "night_function": {
-            "type": "string",
-            "enum": [
-              "danger",
-              "concealment",
-              "intimacy",
-              "labor",
-              "leisure",
-              "none"
-            ]
-          },
-          "resolution_hint": {
-            "type": "string",
-            "enum": [
-              "by_technology",
-              "by_person",
-              "by_chance",
-              "unresolved",
-              "unknown"
-            ]
-          },
-          "obstacle_summary": {
-            "type": "string"
-          },
-          "evidence_quote": {
-            "type": "string"
-          },
-          "confidence": {
-            "type": "number"
           }
-        },
-        "required": [
-          "has_obstacle",
-          "domains",
-          "locus",
-          "failure_cause",
-          "message_valence",
-          "technology_named",
-          "night_function",
-          "resolution_hint",
-          "obstacle_summary",
-          "evidence_quote",
-          "confidence"
         ]
       },
-      "system_template": "You are a careful literary annotator of nineteenth- and early-twentieth-century fiction. Apply this codebook exactly.\n\n# Codebook v0.5: Plot obstacles (draft; v0.9 due Nov 5, frozen v1.0 Nov 8)\n\n## The core question\n**In this passage, is something standing in the way of what a character wants, in a way that matters for what happens next?**\n\nA *plot obstacle* is anything that **blocks, delays, or endangers a character's goal** and plausibly shapes later events or decisions. All three conditions must hold:\n1. **A character with a goal.** The goal can be explicit (\"she longed to reach London\") or clearly implied (escaping, marrying, learning a secret, saving someone).\n2. **Something impeding it.** A thing, a person, a rule, a feeling, or a lack (of news, light, money).\n3. **Narrative consequence.** The impediment is part of the action and not mere description. A storm described as scenery doesn't count. A storm that keeps the doctor from arriving does.\n\n**Not obstacles:**\n- A letter that is merely mentioned.\n- A dark room described for atmosphere.\n- A generic complaint (\"times were hard\").\n- A narrator's essayistic reflection with no character goal at stake.\n\nWhen the passage is too fragmentary to tell, choose `insufficient_context`.\n\n## Fields\n\n### `has_obstacle`: yes | no | insufficient_context\n\n### `domain` (pick the 1–2 that best answer \"what kind of thing is in the way?\")\n| Code | In the way is… | Examples |\n|---|---|---|\n| DISTANCE_TRAVEL | Physical distance, the difficulty or slowness of a journey, missed coaches or trains, impassable roads | \"Forty miles of bad road lay between them\"; she misses the last train |\n| COMMUNICATION_INFORMATION | Messages that fail, are delayed, lost, intercepted, forged, unanswered or misread; secrets; ignorance of a key fact; mistaken identity | the letter under the carpet; the telegram that comes too late; a concealed will |\n| DARKNESS_VISIBILITY | Not being able to see: night, fog, lack of light, concealment by darkness | lost on the moor at night; can't read the face in the gloom |\n| ILLNESS_BODY_DEATH | Sickness, injury, weakness, pregnancy, death or dying | fever confines him; her father's death leaves her unprotected |\n| MONEY_PROPERTY_LAW | Poverty, debt, inheritance and entail, contracts, courts, police, legal status | the entail; the debtors' prison; a will |\n| SOCIAL_RANK_CONVENTION | Class, propriety, reputation, marriage rules, gender norms, family authority as *a rule* | \"a governess cannot marry the heir\"; scandal would ruin her |\n| INTERPERSONAL_CONFLICT | A specific person actively opposing, deceiving, threatening or thwarting | the villain locks her in; a rival's plot |\n| INNER_STATE | The character's own doubt, fear, pride, guilt, desire, conscience or indecision | he cannot bring himself to speak; her pride forbids it |\n| NATURE_WEATHER | Storms, floods, snow, sea, wild terrain, animals | snowed in; the boat founders |\n| OTHER | Something clearly an obstacle that fits none of the above | |\n\nWhen several apply, pick the **proximate** one: the thing that, if removed, would let the character proceed. A villain who intercepts a letter is coded `COMMUNICATION_INFORMATION` (failure cause `intentional_withholding`) plus `INTERPERSONAL_CONFLICT`.\n\n### `locus` (where the resistance comes from)\n- **material_external**: physical world and infrastructure (distance, darkness, weather, illness, lost objects, technical failure).\n- **social_institutional**: other people, rules, law, money, rank, convention, deliberate deception by others.\n- **internal_psychological**: the character's own mind.\n\nDefault mapping:\n\n| Domains | Locus |\n|---|---|\n| DISTANCE, DARKNESS, NATURE, ILLNESS | material |\n| MONEY/LAW, SOCIAL_RANK, INTERPERSONAL | social |\n| INNER_STATE | internal |\n| COMMUNICATION | depends on the failure cause: infrastructure or accidental → material; withholding or misinterpretation by others → social; the character's own refusal to write or speak → internal |\n\n**Override the default whenever the passage says otherwise.** For example, illness that is clearly hysteria or \"nerves\" may be internal. Record a one-word reason in `locus_reason`.\n\n### Communication sub-fields (only when the domain is COMMUNICATION_INFORMATION)\n- `failure_cause`:\n  - `infrastructure`: slow post, no telegraph office, distance, closed office, the post hasn't come;\n  - `accidental_loss`: lost, misdelivered, overlooked, arrives at the wrong time;\n  - `intentional_withholding`: withheld, intercepted, burned, forged, deliberately unanswered, secret kept;\n  - `misinterpretation`: message misunderstood, ambiguous, mistaken identity;\n  - `success_resolution`: communication *removes* an obstacle (record this too; it is the counterpart);\n  - `none`.\n- `message_valence` (what the message carries, if one is present): catastrophic (death, illness, ruin, arrest, summons) | romantic | financial | practical | none.\n\n### `technology_named`\nThe communication, travel or light technology that is **named and plot-relevant**: letter | note | telegram | telephone | messenger | railway | coach | steamship | carriage | horse | foot | gas | electric | candle | lamp | none.\n\n### `night_function` (only if the passage happens at night or in darkness)\ndanger | concealment | intimacy | labor | leisure | none.\n\n### `resolution_hint` (if the passage shows it)\nby_technology | by_person | by_chance | unresolved | unknown.\n\n### `obstacle_summary`\nAt most 15 words, **in plain modern English**, naming the obstacle generically (e.g., \"lover's letter intercepted by jealous aunt\"). No character names.\n\n### `evidence_quote`\n**Copy one exact sentence or clause from the passage** that shows the obstacle. It must appear verbatim. Do not paraphrase, fix spelling, or join separate sentences.\n\n### `confidence`\n0–1, how sure you are of `has_obstacle` and `domain`.\n\n## Decision rules for hard cases\n1. **Mention ≠ function.** \"He sealed the letter\" is not an obstacle. \"The letter never reached her, and she married another\" is.\n2. **Reported past obstacles count** if they still shape the present action.\n3. **Hypothetical obstacles** (\"if the post should fail…\") count only if a character acts on the fear.\n4. **Dialogue counts.** A character explaining a barrier (\"I cannot leave my father\") is an obstacle.\n5. **Comic obstacles count** the same as serious ones.\n6. **Don't use outside knowledge** of the book. Judge from the passage and its context only.\n\n\nJudge ONLY from the PASSAGE (context is for orientation). Do not use outside knowledge of the book. evidence_quote must be copied verbatim: 8-30 consecutive words from PASSAGE, unchanged. If has_obstacle is not 'yes', set domains to [], locus 'none', and other sub-fields 'none'. Return only JSON.",
-      "user_template": "CONTEXT BEFORE (orientation only):\n{ctx_before}\n\nPASSAGE:\n{text}\n\nCONTEXT AFTER (orientation only):\n{ctx_after}",
-      "num_ctx": 8192,
-      "num_predict": 400,
+      "system_template": "You are a careful literary annotator of nineteenth- and early-twentieth-century fiction. Apply this codebook exactly.\n\nCODEBOOK v0.9: plot obstacles.\n\nCORE QUESTION: in this passage, is something standing in the way of what a character wants, in a way that matters for what happens next?\nhas_obstacle is \"yes\" only if ALL three hold:\n1. A character with a goal, explicit (\"she longed to reach London\") or clearly implied (escaping, marrying, learning a secret, saving someone).\n2. Something impeding it: a thing, a person, a rule, a feeling, or a lack (of news, light, money).\n3. Narrative consequence: the impediment is part of the action, not mere description. A storm as scenery does not count; a storm that keeps the doctor from arriving does.\nTHREE-PART TEST before answering yes: (a) WHO wants WHAT; (b) WHAT, inside the PASSAGE, stops, delays or endangers it; (c) WHERE the passage shows it changing what the character can do or what happens. If you cannot point to (b) and (c) inside the PASSAGE, answer \"no\".\nNOT obstacles: a letter merely mentioned; a dark room described for atmosphere; a generic complaint (\"times were hard\"); a narrator's essayistic reflection with no character goal at stake; mild discomfort, shyness, fatigue or nervousness the character goes ahead despite; banter, teasing or flirtation; a character merely wondering or speculating; procedural description of work, hunting or travel in which nothing goes wrong; a goal achieved with no impediment left; an obstacle that appears only in CONTEXT BEFORE/AFTER.\n\"insufficient_context\" when the passage is too fragmentary to tell; otherwise \"no\".\n\nlocus: the PROXIMATE SOURCE of the resistance, i.e. the thing that, if removed, would let the character proceed. Judge it from the passage first.\n- material_external: physical world and infrastructure (distance, darkness, weather, terrain, animals, illness, lost objects, technical failure)\n- social_institutional: other people, rules, law, money, rank, convention, deliberate deception or violence by others\n- internal_psychological: only when the blocked character's own feeling, will or judgement is the barrier (pride, fear, guilt, conscience, indecision). The body is not the mind: sickness, injury, sleep or exhaustion is material_external\nTypical pattern only, not a rule: DISTANCE, DARKNESS, NATURE, ILLNESS often material; MONEY/LAW, SOCIAL_RANK, INTERPERSONAL often social; INNER_STATE internal; COMMUNICATION: infrastructure or accident material, withholding or misreading by others social, the character's own refusal to write or speak internal. Follow the source, not the domain: death or injury inflicted by people is social; animals and terrain are material; the character's own pride, fear or conscience is internal even under SOCIAL_RANK_CONVENTION; illness that is clearly \"nerves\" may be internal.\nlocus_reason: at most 6 words naming that proximate source (e.g. \"flooded ford\", \"father forbids the match\", \"fever keeps him abed\", \"her pride forbids asking\").\n\ndomains: 1-2 codes answering \"what kind of thing is in the way?\"; if several apply, the proximate one first.\n- DISTANCE_TRAVEL: distance, slow or difficult journeys, missed coaches or trains, impassable roads\n- COMMUNICATION_INFORMATION: messages failed, delayed, lost, intercepted, forged, unanswered or misread; secrets; ignorance of a key fact; mistaken identity\n- DARKNESS_VISIBILITY: not being able to see (night, fog, lack of light, concealment by darkness or terrain); use it whenever not-seeing is what stops the character, even if weather or terrain causes it\n- ILLNESS_BODY_DEATH: sickness, injury, weakness, pregnancy, death or dying\n- MONEY_PROPERTY_LAW: poverty, debt, inheritance and entail, wills, contracts, courts, police, legal status\n- SOCIAL_RANK_CONVENTION: class, propriety, reputation, marriage rules, gender norms, family authority as a RULE that would stop anyone in that position. A particular person's wishes, dislike, schemes or commands are INTERPERSONAL_CONFLICT; a party, dress or etiquette that is merely present is not an obstacle\n- INTERPERSONAL_CONFLICT: a specific person actively opposing, deceiving, threatening or thwarting\n- INNER_STATE: the character's own doubt, fear, pride, guilt, desire, conscience or indecision\n- NATURE_WEATHER: storms, floods, snow, sea, wild terrain, animals\n- OTHER: clearly an obstacle that fits none of the above\nA villain who intercepts a letter is COMMUNICATION_INFORMATION (failure_cause intentional_withholding) plus INTERPERSONAL_CONFLICT.\n\nfailure_cause and message_valence are \"none\" unless COMMUNICATION_INFORMATION is in domains.\n- infrastructure: slow, long or costly post or telegraph, no telegraph office, distance, closed office, the post hasn't come\n- accidental_loss: lost, misdelivered, overlooked, arrives at the wrong time; a secret forgotten or lost over time\n- intentional_withholding: someone deliberately keeps, intercepts, burns, forges or leaves unanswered the message or fact\n- misinterpretation: message misunderstood, ambiguous, mistaken identity\n- success_resolution: communication removes an obstacle\nmessage_valence (what the message carries): catastrophic (death, illness, ruin, arrest, summons) | romantic | financial | practical | none.\ntechnology_named: the communication, travel or light technology that is named AND plot-relevant, else none.\nnight_function: \"none\" unless the scene is at night or in darkness. concealment = someone hides or moves unseen thanks to the dark; danger = the dark exposes someone to harm or terror; otherwise intimacy, labor or leisure.\nresolution_hint: only if the passage shows it, else unknown.\nobstacle_summary: at most 10 words, plain modern English, naming the obstacle generically, no character names (e.g. \"lover's letter intercepted by jealous aunt\").\nevidence_quote: 6-20 consecutive words copied verbatim from INSIDE the PASSAGE START/END markers that show the obstacle; prefer a sentence well inside the PASSAGE, away from its first and last lines. Never quote the context; if the key sentence runs past a PASSAGE boundary, copy only the part inside. No \"...\", no dropped words, no joined sentences or speakers, no spelling fixes.\nconfidence: 0-1, how sure you are of has_obstacle and domains.\n\nDECISION RULES FOR HARD CASES\n- Mention is not function: \"He sealed the letter\" is not an obstacle; \"The letter never reached her, and she married another\" is.\n- Reported past obstacles count if they still shape the present action.\n- Hypothetical obstacles (\"if the post should fail...\") count only if a character acts on the fear.\n- Dialogue counts: a character explaining a barrier (\"I cannot leave my father\") is an obstacle.\n- Comic obstacles count the same as serious ones. Comic, epistolary and dialect passages follow the same three-part test; a letter-writer's reflections are not an obstacle unless the letter reports something blocking a goal.\n- Judge ONLY from the PASSAGE (context is for orientation). No outside knowledge of the book.\nEXAMPLES: \"Certainly they are not of such strength that I do not gladly seize upon the favor thus extended, and count myself honored and happy.\" The speaker is shy of meeting a queen but goes ahead gladly -> no. \"And Bart, deciding that his sister's whims had already imposed far too many restrictions upon both his own activities and Carver's, carefully refrained from delivering the message.\" -> yes, locus social_institutional, COMMUNICATION_INFORMATION, intentional_withholding.\n\nIf has_obstacle is not \"yes\", output only has_obstacle and confidence. Return only JSON.",
+      "user_template": "CONTEXT BEFORE (orientation only; never quote it):\n{ctx_before}\n\n=== PASSAGE START (judge and quote ONLY this) ===\n{text}\n=== PASSAGE END ===\n\nCONTEXT AFTER (orientation only; never quote it):\n{ctx_after}",
+      "num_ctx": 4096,
+      "num_predict": 200,
       "evidence_field": "evidence_quote",
       "vram_gb_required": 10.0,
       "model_size_gb": 8.0,
@@ -286,7 +312,7 @@
       "priority": 20,
       "model_digest": "sha256:6114515d63c17436a7c0417d82820ac65ad643e2806c5a3c89cb62846436ed0b",
       "ollama_version_range": ">=0.40.0,<1.0.0",
-      "codebook_version": "v0.5",
+      "codebook_version": "v0.9",
       "temperature": 0,
       "seed": 0,
       "think": false,
@@ -307,7 +333,7 @@
       },
       "system_template": "You have seen many books. The passage below comes from a published novel. One proper name has been replaced with [MASK]. Reply with the exact name that was masked (one word). Return only JSON.",
       "user_template": "{text}",
-      "num_ctx": 2048,
+      "num_ctx": 4096,
       "num_predict": 16,
       "evidence_field": null,
       "vram_gb_required": 10.0,
@@ -316,7 +342,7 @@
       "priority": 30,
       "model_digest": "sha256:6114515d63c17436a7c0417d82820ac65ad643e2806c5a3c89cb62846436ed0b",
       "ollama_version_range": ">=0.40.0,<1.0.0",
-      "codebook_version": "v0.5",
+      "codebook_version": "v0.9",
       "temperature": 0,
       "seed": 0,
       "think": false,
@@ -325,138 +351,161 @@
     "alt_label": {
       "model_ref": "qwen3.5:9b-q4_K_M",
       "schema": {
-        "type": "object",
-        "properties": {
-          "has_obstacle": {
-            "type": "string",
-            "enum": [
-              "yes",
-              "no",
-              "insufficient_context"
-            ]
-          },
-          "domains": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "DISTANCE_TRAVEL",
-                "COMMUNICATION_INFORMATION",
-                "DARKNESS_VISIBILITY",
-                "ILLNESS_BODY_DEATH",
-                "MONEY_PROPERTY_LAW",
-                "SOCIAL_RANK_CONVENTION",
-                "INTERPERSONAL_CONFLICT",
-                "INNER_STATE",
-                "NATURE_WEATHER",
-                "OTHER"
-              ]
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "has_obstacle": {
+                "type": "string",
+                "enum": [
+                  "yes"
+                ]
+              },
+              "locus": {
+                "type": "string",
+                "enum": [
+                  "material_external",
+                  "social_institutional",
+                  "internal_psychological"
+                ]
+              },
+              "locus_reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "DISTANCE_TRAVEL",
+                    "COMMUNICATION_INFORMATION",
+                    "DARKNESS_VISIBILITY",
+                    "ILLNESS_BODY_DEATH",
+                    "MONEY_PROPERTY_LAW",
+                    "SOCIAL_RANK_CONVENTION",
+                    "INTERPERSONAL_CONFLICT",
+                    "INNER_STATE",
+                    "NATURE_WEATHER",
+                    "OTHER"
+                  ]
+                },
+                "maxItems": 2,
+                "minItems": 1
+              },
+              "failure_cause": {
+                "type": "string",
+                "enum": [
+                  "infrastructure",
+                  "accidental_loss",
+                  "intentional_withholding",
+                  "misinterpretation",
+                  "success_resolution",
+                  "none"
+                ]
+              },
+              "message_valence": {
+                "type": "string",
+                "enum": [
+                  "catastrophic",
+                  "romantic",
+                  "financial",
+                  "practical",
+                  "none"
+                ]
+              },
+              "technology_named": {
+                "type": "string",
+                "enum": [
+                  "letter",
+                  "note",
+                  "telegram",
+                  "telephone",
+                  "messenger",
+                  "railway",
+                  "coach",
+                  "steamship",
+                  "carriage",
+                  "horse",
+                  "foot",
+                  "gas",
+                  "electric",
+                  "candle",
+                  "lamp",
+                  "none"
+                ]
+              },
+              "night_function": {
+                "type": "string",
+                "enum": [
+                  "danger",
+                  "concealment",
+                  "intimacy",
+                  "labor",
+                  "leisure",
+                  "none"
+                ]
+              },
+              "resolution_hint": {
+                "type": "string",
+                "enum": [
+                  "by_technology",
+                  "by_person",
+                  "by_chance",
+                  "unresolved",
+                  "unknown"
+                ]
+              },
+              "obstacle_summary": {
+                "type": "string"
+              },
+              "evidence_quote": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              }
             },
-            "maxItems": 2
-          },
-          "locus": {
-            "type": "string",
-            "enum": [
-              "material_external",
-              "social_institutional",
-              "internal_psychological",
-              "none"
+            "required": [
+              "has_obstacle",
+              "locus",
+              "locus_reason",
+              "domains",
+              "failure_cause",
+              "message_valence",
+              "technology_named",
+              "night_function",
+              "resolution_hint",
+              "obstacle_summary",
+              "evidence_quote",
+              "confidence"
             ]
           },
-          "locus_reason": {
-            "type": "string"
-          },
-          "failure_cause": {
-            "type": "string",
-            "enum": [
-              "infrastructure",
-              "accidental_loss",
-              "intentional_withholding",
-              "misinterpretation",
-              "success_resolution",
-              "none"
+          {
+            "type": "object",
+            "properties": {
+              "has_obstacle": {
+                "type": "string",
+                "enum": [
+                  "no",
+                  "insufficient_context"
+                ]
+              },
+              "confidence": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "has_obstacle",
+              "confidence"
             ]
-          },
-          "message_valence": {
-            "type": "string",
-            "enum": [
-              "catastrophic",
-              "romantic",
-              "financial",
-              "practical",
-              "none"
-            ]
-          },
-          "technology_named": {
-            "type": "string",
-            "enum": [
-              "letter",
-              "note",
-              "telegram",
-              "telephone",
-              "messenger",
-              "railway",
-              "coach",
-              "steamship",
-              "carriage",
-              "horse",
-              "foot",
-              "gas",
-              "electric",
-              "candle",
-              "lamp",
-              "none"
-            ]
-          },
-          "night_function": {
-            "type": "string",
-            "enum": [
-              "danger",
-              "concealment",
-              "intimacy",
-              "labor",
-              "leisure",
-              "none"
-            ]
-          },
-          "resolution_hint": {
-            "type": "string",
-            "enum": [
-              "by_technology",
-              "by_person",
-              "by_chance",
-              "unresolved",
-              "unknown"
-            ]
-          },
-          "obstacle_summary": {
-            "type": "string"
-          },
-          "evidence_quote": {
-            "type": "string"
-          },
-          "confidence": {
-            "type": "number"
           }
-        },
-        "required": [
-          "has_obstacle",
-          "domains",
-          "locus",
-          "failure_cause",
-          "message_valence",
-          "technology_named",
-          "night_function",
-          "resolution_hint",
-          "obstacle_summary",
-          "evidence_quote",
-          "confidence"
         ]
       },
-      "system_template": "You are a careful literary annotator of nineteenth- and early-twentieth-century fiction. Apply this codebook exactly.\n\n# Codebook v0.5: Plot obstacles (draft; v0.9 due Nov 5, frozen v1.0 Nov 8)\n\n## The core question\n**In this passage, is something standing in the way of what a character wants, in a way that matters for what happens next?**\n\nA *plot obstacle* is anything that **blocks, delays, or endangers a character's goal** and plausibly shapes later events or decisions. All three conditions must hold:\n1. **A character with a goal.** The goal can be explicit (\"she longed to reach London\") or clearly implied (escaping, marrying, learning a secret, saving someone).\n2. **Something impeding it.** A thing, a person, a rule, a feeling, or a lack (of news, light, money).\n3. **Narrative consequence.** The impediment is part of the action and not mere description. A storm described as scenery doesn't count. A storm that keeps the doctor from arriving does.\n\n**Not obstacles:**\n- A letter that is merely mentioned.\n- A dark room described for atmosphere.\n- A generic complaint (\"times were hard\").\n- A narrator's essayistic reflection with no character goal at stake.\n\nWhen the passage is too fragmentary to tell, choose `insufficient_context`.\n\n## Fields\n\n### `has_obstacle`: yes | no | insufficient_context\n\n### `domain` (pick the 1–2 that best answer \"what kind of thing is in the way?\")\n| Code | In the way is… | Examples |\n|---|---|---|\n| DISTANCE_TRAVEL | Physical distance, the difficulty or slowness of a journey, missed coaches or trains, impassable roads | \"Forty miles of bad road lay between them\"; she misses the last train |\n| COMMUNICATION_INFORMATION | Messages that fail, are delayed, lost, intercepted, forged, unanswered or misread; secrets; ignorance of a key fact; mistaken identity | the letter under the carpet; the telegram that comes too late; a concealed will |\n| DARKNESS_VISIBILITY | Not being able to see: night, fog, lack of light, concealment by darkness | lost on the moor at night; can't read the face in the gloom |\n| ILLNESS_BODY_DEATH | Sickness, injury, weakness, pregnancy, death or dying | fever confines him; her father's death leaves her unprotected |\n| MONEY_PROPERTY_LAW | Poverty, debt, inheritance and entail, contracts, courts, police, legal status | the entail; the debtors' prison; a will |\n| SOCIAL_RANK_CONVENTION | Class, propriety, reputation, marriage rules, gender norms, family authority as *a rule* | \"a governess cannot marry the heir\"; scandal would ruin her |\n| INTERPERSONAL_CONFLICT | A specific person actively opposing, deceiving, threatening or thwarting | the villain locks her in; a rival's plot |\n| INNER_STATE | The character's own doubt, fear, pride, guilt, desire, conscience or indecision | he cannot bring himself to speak; her pride forbids it |\n| NATURE_WEATHER | Storms, floods, snow, sea, wild terrain, animals | snowed in; the boat founders |\n| OTHER | Something clearly an obstacle that fits none of the above | |\n\nWhen several apply, pick the **proximate** one: the thing that, if removed, would let the character proceed. A villain who intercepts a letter is coded `COMMUNICATION_INFORMATION` (failure cause `intentional_withholding`) plus `INTERPERSONAL_CONFLICT`.\n\n### `locus` (where the resistance comes from)\n- **material_external**: physical world and infrastructure (distance, darkness, weather, illness, lost objects, technical failure).\n- **social_institutional**: other people, rules, law, money, rank, convention, deliberate deception by others.\n- **internal_psychological**: the character's own mind.\n\nDefault mapping:\n\n| Domains | Locus |\n|---|---|\n| DISTANCE, DARKNESS, NATURE, ILLNESS | material |\n| MONEY/LAW, SOCIAL_RANK, INTERPERSONAL | social |\n| INNER_STATE | internal |\n| COMMUNICATION | depends on the failure cause: infrastructure or accidental → material; withholding or misinterpretation by others → social; the character's own refusal to write or speak → internal |\n\n**Override the default whenever the passage says otherwise.** For example, illness that is clearly hysteria or \"nerves\" may be internal. Record a one-word reason in `locus_reason`.\n\n### Communication sub-fields (only when the domain is COMMUNICATION_INFORMATION)\n- `failure_cause`:\n  - `infrastructure`: slow post, no telegraph office, distance, closed office, the post hasn't come;\n  - `accidental_loss`: lost, misdelivered, overlooked, arrives at the wrong time;\n  - `intentional_withholding`: withheld, intercepted, burned, forged, deliberately unanswered, secret kept;\n  - `misinterpretation`: message misunderstood, ambiguous, mistaken identity;\n  - `success_resolution`: communication *removes* an obstacle (record this too; it is the counterpart);\n  - `none`.\n- `message_valence` (what the message carries, if one is present): catastrophic (death, illness, ruin, arrest, summons) | romantic | financial | practical | none.\n\n### `technology_named`\nThe communication, travel or light technology that is **named and plot-relevant**: letter | note | telegram | telephone | messenger | railway | coach | steamship | carriage | horse | foot | gas | electric | candle | lamp | none.\n\n### `night_function` (only if the passage happens at night or in darkness)\ndanger | concealment | intimacy | labor | leisure | none.\n\n### `resolution_hint` (if the passage shows it)\nby_technology | by_person | by_chance | unresolved | unknown.\n\n### `obstacle_summary`\nAt most 15 words, **in plain modern English**, naming the obstacle generically (e.g., \"lover's letter intercepted by jealous aunt\"). No character names.\n\n### `evidence_quote`\n**Copy one exact sentence or clause from the passage** that shows the obstacle. It must appear verbatim. Do not paraphrase, fix spelling, or join separate sentences.\n\n### `confidence`\n0–1, how sure you are of `has_obstacle` and `domain`.\n\n## Decision rules for hard cases\n1. **Mention ≠ function.** \"He sealed the letter\" is not an obstacle. \"The letter never reached her, and she married another\" is.\n2. **Reported past obstacles count** if they still shape the present action.\n3. **Hypothetical obstacles** (\"if the post should fail…\") count only if a character acts on the fear.\n4. **Dialogue counts.** A character explaining a barrier (\"I cannot leave my father\") is an obstacle.\n5. **Comic obstacles count** the same as serious ones.\n6. **Don't use outside knowledge** of the book. Judge from the passage and its context only.\n\n\nJudge ONLY from the PASSAGE (context is for orientation). Do not use outside knowledge of the book. evidence_quote must be copied verbatim: 8-30 consecutive words from PASSAGE, unchanged. If has_obstacle is not 'yes', set domains to [], locus 'none', and other sub-fields 'none'. Return only JSON.",
-      "user_template": "CONTEXT BEFORE (orientation only):\n{ctx_before}\n\nPASSAGE:\n{text}\n\nCONTEXT AFTER (orientation only):\n{ctx_after}",
-      "num_ctx": 8192,
-      "num_predict": 400,
+      "system_template": "You are a careful literary annotator of nineteenth- and early-twentieth-century fiction. Apply this codebook exactly.\n\nCODEBOOK v0.9: plot obstacles.\n\nCORE QUESTION: in this passage, is something standing in the way of what a character wants, in a way that matters for what happens next?\nhas_obstacle is \"yes\" only if ALL three hold:\n1. A character with a goal, explicit (\"she longed to reach London\") or clearly implied (escaping, marrying, learning a secret, saving someone).\n2. Something impeding it: a thing, a person, a rule, a feeling, or a lack (of news, light, money).\n3. Narrative consequence: the impediment is part of the action, not mere description. A storm as scenery does not count; a storm that keeps the doctor from arriving does.\nTHREE-PART TEST before answering yes: (a) WHO wants WHAT; (b) WHAT, inside the PASSAGE, stops, delays or endangers it; (c) WHERE the passage shows it changing what the character can do or what happens. If you cannot point to (b) and (c) inside the PASSAGE, answer \"no\".\nNOT obstacles: a letter merely mentioned; a dark room described for atmosphere; a generic complaint (\"times were hard\"); a narrator's essayistic reflection with no character goal at stake; mild discomfort, shyness, fatigue or nervousness the character goes ahead despite; banter, teasing or flirtation; a character merely wondering or speculating; procedural description of work, hunting or travel in which nothing goes wrong; a goal achieved with no impediment left; an obstacle that appears only in CONTEXT BEFORE/AFTER.\n\"insufficient_context\" when the passage is too fragmentary to tell; otherwise \"no\".\n\nlocus: the PROXIMATE SOURCE of the resistance, i.e. the thing that, if removed, would let the character proceed. Judge it from the passage first.\n- material_external: physical world and infrastructure (distance, darkness, weather, terrain, animals, illness, lost objects, technical failure)\n- social_institutional: other people, rules, law, money, rank, convention, deliberate deception or violence by others\n- internal_psychological: only when the blocked character's own feeling, will or judgement is the barrier (pride, fear, guilt, conscience, indecision). The body is not the mind: sickness, injury, sleep or exhaustion is material_external\nTypical pattern only, not a rule: DISTANCE, DARKNESS, NATURE, ILLNESS often material; MONEY/LAW, SOCIAL_RANK, INTERPERSONAL often social; INNER_STATE internal; COMMUNICATION: infrastructure or accident material, withholding or misreading by others social, the character's own refusal to write or speak internal. Follow the source, not the domain: death or injury inflicted by people is social; animals and terrain are material; the character's own pride, fear or conscience is internal even under SOCIAL_RANK_CONVENTION; illness that is clearly \"nerves\" may be internal.\nlocus_reason: at most 6 words naming that proximate source (e.g. \"flooded ford\", \"father forbids the match\", \"fever keeps him abed\", \"her pride forbids asking\").\n\ndomains: 1-2 codes answering \"what kind of thing is in the way?\"; if several apply, the proximate one first.\n- DISTANCE_TRAVEL: distance, slow or difficult journeys, missed coaches or trains, impassable roads\n- COMMUNICATION_INFORMATION: messages failed, delayed, lost, intercepted, forged, unanswered or misread; secrets; ignorance of a key fact; mistaken identity\n- DARKNESS_VISIBILITY: not being able to see (night, fog, lack of light, concealment by darkness or terrain); use it whenever not-seeing is what stops the character, even if weather or terrain causes it\n- ILLNESS_BODY_DEATH: sickness, injury, weakness, pregnancy, death or dying\n- MONEY_PROPERTY_LAW: poverty, debt, inheritance and entail, wills, contracts, courts, police, legal status\n- SOCIAL_RANK_CONVENTION: class, propriety, reputation, marriage rules, gender norms, family authority as a RULE that would stop anyone in that position. A particular person's wishes, dislike, schemes or commands are INTERPERSONAL_CONFLICT; a party, dress or etiquette that is merely present is not an obstacle\n- INTERPERSONAL_CONFLICT: a specific person actively opposing, deceiving, threatening or thwarting\n- INNER_STATE: the character's own doubt, fear, pride, guilt, desire, conscience or indecision\n- NATURE_WEATHER: storms, floods, snow, sea, wild terrain, animals\n- OTHER: clearly an obstacle that fits none of the above\nA villain who intercepts a letter is COMMUNICATION_INFORMATION (failure_cause intentional_withholding) plus INTERPERSONAL_CONFLICT.\n\nfailure_cause and message_valence are \"none\" unless COMMUNICATION_INFORMATION is in domains.\n- infrastructure: slow, long or costly post or telegraph, no telegraph office, distance, closed office, the post hasn't come\n- accidental_loss: lost, misdelivered, overlooked, arrives at the wrong time; a secret forgotten or lost over time\n- intentional_withholding: someone deliberately keeps, intercepts, burns, forges or leaves unanswered the message or fact\n- misinterpretation: message misunderstood, ambiguous, mistaken identity\n- success_resolution: communication removes an obstacle\nmessage_valence (what the message carries): catastrophic (death, illness, ruin, arrest, summons) | romantic | financial | practical | none.\ntechnology_named: the communication, travel or light technology that is named AND plot-relevant, else none.\nnight_function: \"none\" unless the scene is at night or in darkness. concealment = someone hides or moves unseen thanks to the dark; danger = the dark exposes someone to harm or terror; otherwise intimacy, labor or leisure.\nresolution_hint: only if the passage shows it, else unknown.\nobstacle_summary: at most 10 words, plain modern English, naming the obstacle generically, no character names (e.g. \"lover's letter intercepted by jealous aunt\").\nevidence_quote: 6-20 consecutive words copied verbatim from INSIDE the PASSAGE START/END markers that show the obstacle; prefer a sentence well inside the PASSAGE, away from its first and last lines. Never quote the context; if the key sentence runs past a PASSAGE boundary, copy only the part inside. No \"...\", no dropped words, no joined sentences or speakers, no spelling fixes.\nconfidence: 0-1, how sure you are of has_obstacle and domains.\n\nDECISION RULES FOR HARD CASES\n- Mention is not function: \"He sealed the letter\" is not an obstacle; \"The letter never reached her, and she married another\" is.\n- Reported past obstacles count if they still shape the present action.\n- Hypothetical obstacles (\"if the post should fail...\") count only if a character acts on the fear.\n- Dialogue counts: a character explaining a barrier (\"I cannot leave my father\") is an obstacle.\n- Comic obstacles count the same as serious ones. Comic, epistolary and dialect passages follow the same three-part test; a letter-writer's reflections are not an obstacle unless the letter reports something blocking a goal.\n- Judge ONLY from the PASSAGE (context is for orientation). No outside knowledge of the book.\nEXAMPLES: \"Certainly they are not of such strength that I do not gladly seize upon the favor thus extended, and count myself honored and happy.\" The speaker is shy of meeting a queen but goes ahead gladly -> no. \"And Bart, deciding that his sister's whims had already imposed far too many restrictions upon both his own activities and Carver's, carefully refrained from delivering the message.\" -> yes, locus social_institutional, COMMUNICATION_INFORMATION, intentional_withholding.\n\nIf has_obstacle is not \"yes\", output only has_obstacle and confidence. Return only JSON.",
+      "user_template": "CONTEXT BEFORE (orientation only; never quote it):\n{ctx_before}\n\n=== PASSAGE START (judge and quote ONLY this) ===\n{text}\n=== PASSAGE END ===\n\nCONTEXT AFTER (orientation only; never quote it):\n{ctx_after}",
+      "num_ctx": 4096,
+      "num_predict": 200,
       "evidence_field": "evidence_quote",
       "vram_gb_required": 8.5,
       "model_size_gb": 6.6,
@@ -464,7 +513,7 @@
       "priority": 40,
       "model_digest": "sha256:56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
       "ollama_version_range": ">=0.40.0,<1.0.0",
-      "codebook_version": "v0.5",
+      "codebook_version": "v0.9",
       "temperature": 0,
       "seed": 0,
       "think": false,
@@ -473,138 +522,161 @@
     "baseline_small": {
       "model_ref": "qwen3.5:4b-q4_K_M",
       "schema": {
-        "type": "object",
-        "properties": {
-          "has_obstacle": {
-            "type": "string",
-            "enum": [
-              "yes",
-              "no",
-              "insufficient_context"
-            ]
-          },
-          "domains": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "DISTANCE_TRAVEL",
-                "COMMUNICATION_INFORMATION",
-                "DARKNESS_VISIBILITY",
-                "ILLNESS_BODY_DEATH",
-                "MONEY_PROPERTY_LAW",
-                "SOCIAL_RANK_CONVENTION",
-                "INTERPERSONAL_CONFLICT",
-                "INNER_STATE",
-                "NATURE_WEATHER",
-                "OTHER"
-              ]
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "has_obstacle": {
+                "type": "string",
+                "enum": [
+                  "yes"
+                ]
+              },
+              "locus": {
+                "type": "string",
+                "enum": [
+                  "material_external",
+                  "social_institutional",
+                  "internal_psychological"
+                ]
+              },
+              "locus_reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "DISTANCE_TRAVEL",
+                    "COMMUNICATION_INFORMATION",
+                    "DARKNESS_VISIBILITY",
+                    "ILLNESS_BODY_DEATH",
+                    "MONEY_PROPERTY_LAW",
+                    "SOCIAL_RANK_CONVENTION",
+                    "INTERPERSONAL_CONFLICT",
+                    "INNER_STATE",
+                    "NATURE_WEATHER",
+                    "OTHER"
+                  ]
+                },
+                "maxItems": 2,
+                "minItems": 1
+              },
+              "failure_cause": {
+                "type": "string",
+                "enum": [
+                  "infrastructure",
+                  "accidental_loss",
+                  "intentional_withholding",
+                  "misinterpretation",
+                  "success_resolution",
+                  "none"
+                ]
+              },
+              "message_valence": {
+                "type": "string",
+                "enum": [
+                  "catastrophic",
+                  "romantic",
+                  "financial",
+                  "practical",
+                  "none"
+                ]
+              },
+              "technology_named": {
+                "type": "string",
+                "enum": [
+                  "letter",
+                  "note",
+                  "telegram",
+                  "telephone",
+                  "messenger",
+                  "railway",
+                  "coach",
+                  "steamship",
+                  "carriage",
+                  "horse",
+                  "foot",
+                  "gas",
+                  "electric",
+                  "candle",
+                  "lamp",
+                  "none"
+                ]
+              },
+              "night_function": {
+                "type": "string",
+                "enum": [
+                  "danger",
+                  "concealment",
+                  "intimacy",
+                  "labor",
+                  "leisure",
+                  "none"
+                ]
+              },
+              "resolution_hint": {
+                "type": "string",
+                "enum": [
+                  "by_technology",
+                  "by_person",
+                  "by_chance",
+                  "unresolved",
+                  "unknown"
+                ]
+              },
+              "obstacle_summary": {
+                "type": "string"
+              },
+              "evidence_quote": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              }
             },
-            "maxItems": 2
-          },
-          "locus": {
-            "type": "string",
-            "enum": [
-              "material_external",
-              "social_institutional",
-              "internal_psychological",
-              "none"
+            "required": [
+              "has_obstacle",
+              "locus",
+              "locus_reason",
+              "domains",
+              "failure_cause",
+              "message_valence",
+              "technology_named",
+              "night_function",
+              "resolution_hint",
+              "obstacle_summary",
+              "evidence_quote",
+              "confidence"
             ]
           },
-          "locus_reason": {
-            "type": "string"
-          },
-          "failure_cause": {
-            "type": "string",
-            "enum": [
-              "infrastructure",
-              "accidental_loss",
-              "intentional_withholding",
-              "misinterpretation",
-              "success_resolution",
-              "none"
+          {
+            "type": "object",
+            "properties": {
+              "has_obstacle": {
+                "type": "string",
+                "enum": [
+                  "no",
+                  "insufficient_context"
+                ]
+              },
+              "confidence": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "has_obstacle",
+              "confidence"
             ]
-          },
-          "message_valence": {
-            "type": "string",
-            "enum": [
-              "catastrophic",
-              "romantic",
-              "financial",
-              "practical",
-              "none"
-            ]
-          },
-          "technology_named": {
-            "type": "string",
-            "enum": [
-              "letter",
-              "note",
-              "telegram",
-              "telephone",
-              "messenger",
-              "railway",
-              "coach",
-              "steamship",
-              "carriage",
-              "horse",
-              "foot",
-              "gas",
-              "electric",
-              "candle",
-              "lamp",
-              "none"
-            ]
-          },
-          "night_function": {
-            "type": "string",
-            "enum": [
-              "danger",
-              "concealment",
-              "intimacy",
-              "labor",
-              "leisure",
-              "none"
-            ]
-          },
-          "resolution_hint": {
-            "type": "string",
-            "enum": [
-              "by_technology",
-              "by_person",
-              "by_chance",
-              "unresolved",
-              "unknown"
-            ]
-          },
-          "obstacle_summary": {
-            "type": "string"
-          },
-          "evidence_quote": {
-            "type": "string"
-          },
-          "confidence": {
-            "type": "number"
           }
-        },
-        "required": [
-          "has_obstacle",
-          "domains",
-          "locus",
-          "failure_cause",
-          "message_valence",
-          "technology_named",
-          "night_function",
-          "resolution_hint",
-          "obstacle_summary",
-          "evidence_quote",
-          "confidence"
         ]
       },
-      "system_template": "You are a careful literary annotator of nineteenth- and early-twentieth-century fiction. Apply this codebook exactly.\n\n# Codebook v0.5: Plot obstacles (draft; v0.9 due Nov 5, frozen v1.0 Nov 8)\n\n## The core question\n**In this passage, is something standing in the way of what a character wants, in a way that matters for what happens next?**\n\nA *plot obstacle* is anything that **blocks, delays, or endangers a character's goal** and plausibly shapes later events or decisions. All three conditions must hold:\n1. **A character with a goal.** The goal can be explicit (\"she longed to reach London\") or clearly implied (escaping, marrying, learning a secret, saving someone).\n2. **Something impeding it.** A thing, a person, a rule, a feeling, or a lack (of news, light, money).\n3. **Narrative consequence.** The impediment is part of the action and not mere description. A storm described as scenery doesn't count. A storm that keeps the doctor from arriving does.\n\n**Not obstacles:**\n- A letter that is merely mentioned.\n- A dark room described for atmosphere.\n- A generic complaint (\"times were hard\").\n- A narrator's essayistic reflection with no character goal at stake.\n\nWhen the passage is too fragmentary to tell, choose `insufficient_context`.\n\n## Fields\n\n### `has_obstacle`: yes | no | insufficient_context\n\n### `domain` (pick the 1–2 that best answer \"what kind of thing is in the way?\")\n| Code | In the way is… | Examples |\n|---|---|---|\n| DISTANCE_TRAVEL | Physical distance, the difficulty or slowness of a journey, missed coaches or trains, impassable roads | \"Forty miles of bad road lay between them\"; she misses the last train |\n| COMMUNICATION_INFORMATION | Messages that fail, are delayed, lost, intercepted, forged, unanswered or misread; secrets; ignorance of a key fact; mistaken identity | the letter under the carpet; the telegram that comes too late; a concealed will |\n| DARKNESS_VISIBILITY | Not being able to see: night, fog, lack of light, concealment by darkness | lost on the moor at night; can't read the face in the gloom |\n| ILLNESS_BODY_DEATH | Sickness, injury, weakness, pregnancy, death or dying | fever confines him; her father's death leaves her unprotected |\n| MONEY_PROPERTY_LAW | Poverty, debt, inheritance and entail, contracts, courts, police, legal status | the entail; the debtors' prison; a will |\n| SOCIAL_RANK_CONVENTION | Class, propriety, reputation, marriage rules, gender norms, family authority as *a rule* | \"a governess cannot marry the heir\"; scandal would ruin her |\n| INTERPERSONAL_CONFLICT | A specific person actively opposing, deceiving, threatening or thwarting | the villain locks her in; a rival's plot |\n| INNER_STATE | The character's own doubt, fear, pride, guilt, desire, conscience or indecision | he cannot bring himself to speak; her pride forbids it |\n| NATURE_WEATHER | Storms, floods, snow, sea, wild terrain, animals | snowed in; the boat founders |\n| OTHER | Something clearly an obstacle that fits none of the above | |\n\nWhen several apply, pick the **proximate** one: the thing that, if removed, would let the character proceed. A villain who intercepts a letter is coded `COMMUNICATION_INFORMATION` (failure cause `intentional_withholding`) plus `INTERPERSONAL_CONFLICT`.\n\n### `locus` (where the resistance comes from)\n- **material_external**: physical world and infrastructure (distance, darkness, weather, illness, lost objects, technical failure).\n- **social_institutional**: other people, rules, law, money, rank, convention, deliberate deception by others.\n- **internal_psychological**: the character's own mind.\n\nDefault mapping:\n\n| Domains | Locus |\n|---|---|\n| DISTANCE, DARKNESS, NATURE, ILLNESS | material |\n| MONEY/LAW, SOCIAL_RANK, INTERPERSONAL | social |\n| INNER_STATE | internal |\n| COMMUNICATION | depends on the failure cause: infrastructure or accidental → material; withholding or misinterpretation by others → social; the character's own refusal to write or speak → internal |\n\n**Override the default whenever the passage says otherwise.** For example, illness that is clearly hysteria or \"nerves\" may be internal. Record a one-word reason in `locus_reason`.\n\n### Communication sub-fields (only when the domain is COMMUNICATION_INFORMATION)\n- `failure_cause`:\n  - `infrastructure`: slow post, no telegraph office, distance, closed office, the post hasn't come;\n  - `accidental_loss`: lost, misdelivered, overlooked, arrives at the wrong time;\n  - `intentional_withholding`: withheld, intercepted, burned, forged, deliberately unanswered, secret kept;\n  - `misinterpretation`: message misunderstood, ambiguous, mistaken identity;\n  - `success_resolution`: communication *removes* an obstacle (record this too; it is the counterpart);\n  - `none`.\n- `message_valence` (what the message carries, if one is present): catastrophic (death, illness, ruin, arrest, summons) | romantic | financial | practical | none.\n\n### `technology_named`\nThe communication, travel or light technology that is **named and plot-relevant**: letter | note | telegram | telephone | messenger | railway | coach | steamship | carriage | horse | foot | gas | electric | candle | lamp | none.\n\n### `night_function` (only if the passage happens at night or in darkness)\ndanger | concealment | intimacy | labor | leisure | none.\n\n### `resolution_hint` (if the passage shows it)\nby_technology | by_person | by_chance | unresolved | unknown.\n\n### `obstacle_summary`\nAt most 15 words, **in plain modern English**, naming the obstacle generically (e.g., \"lover's letter intercepted by jealous aunt\"). No character names.\n\n### `evidence_quote`\n**Copy one exact sentence or clause from the passage** that shows the obstacle. It must appear verbatim. Do not paraphrase, fix spelling, or join separate sentences.\n\n### `confidence`\n0–1, how sure you are of `has_obstacle` and `domain`.\n\n## Decision rules for hard cases\n1. **Mention ≠ function.** \"He sealed the letter\" is not an obstacle. \"The letter never reached her, and she married another\" is.\n2. **Reported past obstacles count** if they still shape the present action.\n3. **Hypothetical obstacles** (\"if the post should fail…\") count only if a character acts on the fear.\n4. **Dialogue counts.** A character explaining a barrier (\"I cannot leave my father\") is an obstacle.\n5. **Comic obstacles count** the same as serious ones.\n6. **Don't use outside knowledge** of the book. Judge from the passage and its context only.\n\n\nJudge ONLY from the PASSAGE (context is for orientation). Do not use outside knowledge of the book. evidence_quote must be copied verbatim: 8-30 consecutive words from PASSAGE, unchanged. If has_obstacle is not 'yes', set domains to [], locus 'none', and other sub-fields 'none'. Return only JSON.",
-      "user_template": "CONTEXT BEFORE (orientation only):\n{ctx_before}\n\nPASSAGE:\n{text}\n\nCONTEXT AFTER (orientation only):\n{ctx_after}",
-      "num_ctx": 8192,
-      "num_predict": 400,
+      "system_template": "You are a careful literary annotator of nineteenth- and early-twentieth-century fiction. Apply this codebook exactly.\n\nCODEBOOK v0.9: plot obstacles.\n\nCORE QUESTION: in this passage, is something standing in the way of what a character wants, in a way that matters for what happens next?\nhas_obstacle is \"yes\" only if ALL three hold:\n1. A character with a goal, explicit (\"she longed to reach London\") or clearly implied (escaping, marrying, learning a secret, saving someone).\n2. Something impeding it: a thing, a person, a rule, a feeling, or a lack (of news, light, money).\n3. Narrative consequence: the impediment is part of the action, not mere description. A storm as scenery does not count; a storm that keeps the doctor from arriving does.\nTHREE-PART TEST before answering yes: (a) WHO wants WHAT; (b) WHAT, inside the PASSAGE, stops, delays or endangers it; (c) WHERE the passage shows it changing what the character can do or what happens. If you cannot point to (b) and (c) inside the PASSAGE, answer \"no\".\nNOT obstacles: a letter merely mentioned; a dark room described for atmosphere; a generic complaint (\"times were hard\"); a narrator's essayistic reflection with no character goal at stake; mild discomfort, shyness, fatigue or nervousness the character goes ahead despite; banter, teasing or flirtation; a character merely wondering or speculating; procedural description of work, hunting or travel in which nothing goes wrong; a goal achieved with no impediment left; an obstacle that appears only in CONTEXT BEFORE/AFTER.\n\"insufficient_context\" when the passage is too fragmentary to tell; otherwise \"no\".\n\nlocus: the PROXIMATE SOURCE of the resistance, i.e. the thing that, if removed, would let the character proceed. Judge it from the passage first.\n- material_external: physical world and infrastructure (distance, darkness, weather, terrain, animals, illness, lost objects, technical failure)\n- social_institutional: other people, rules, law, money, rank, convention, deliberate deception or violence by others\n- internal_psychological: only when the blocked character's own feeling, will or judgement is the barrier (pride, fear, guilt, conscience, indecision). The body is not the mind: sickness, injury, sleep or exhaustion is material_external\nTypical pattern only, not a rule: DISTANCE, DARKNESS, NATURE, ILLNESS often material; MONEY/LAW, SOCIAL_RANK, INTERPERSONAL often social; INNER_STATE internal; COMMUNICATION: infrastructure or accident material, withholding or misreading by others social, the character's own refusal to write or speak internal. Follow the source, not the domain: death or injury inflicted by people is social; animals and terrain are material; the character's own pride, fear or conscience is internal even under SOCIAL_RANK_CONVENTION; illness that is clearly \"nerves\" may be internal.\nlocus_reason: at most 6 words naming that proximate source (e.g. \"flooded ford\", \"father forbids the match\", \"fever keeps him abed\", \"her pride forbids asking\").\n\ndomains: 1-2 codes answering \"what kind of thing is in the way?\"; if several apply, the proximate one first.\n- DISTANCE_TRAVEL: distance, slow or difficult journeys, missed coaches or trains, impassable roads\n- COMMUNICATION_INFORMATION: messages failed, delayed, lost, intercepted, forged, unanswered or misread; secrets; ignorance of a key fact; mistaken identity\n- DARKNESS_VISIBILITY: not being able to see (night, fog, lack of light, concealment by darkness or terrain); use it whenever not-seeing is what stops the character, even if weather or terrain causes it\n- ILLNESS_BODY_DEATH: sickness, injury, weakness, pregnancy, death or dying\n- MONEY_PROPERTY_LAW: poverty, debt, inheritance and entail, wills, contracts, courts, police, legal status\n- SOCIAL_RANK_CONVENTION: class, propriety, reputation, marriage rules, gender norms, family authority as a RULE that would stop anyone in that position. A particular person's wishes, dislike, schemes or commands are INTERPERSONAL_CONFLICT; a party, dress or etiquette that is merely present is not an obstacle\n- INTERPERSONAL_CONFLICT: a specific person actively opposing, deceiving, threatening or thwarting\n- INNER_STATE: the character's own doubt, fear, pride, guilt, desire, conscience or indecision\n- NATURE_WEATHER: storms, floods, snow, sea, wild terrain, animals\n- OTHER: clearly an obstacle that fits none of the above\nA villain who intercepts a letter is COMMUNICATION_INFORMATION (failure_cause intentional_withholding) plus INTERPERSONAL_CONFLICT.\n\nfailure_cause and message_valence are \"none\" unless COMMUNICATION_INFORMATION is in domains.\n- infrastructure: slow, long or costly post or telegraph, no telegraph office, distance, closed office, the post hasn't come\n- accidental_loss: lost, misdelivered, overlooked, arrives at the wrong time; a secret forgotten or lost over time\n- intentional_withholding: someone deliberately keeps, intercepts, burns, forges or leaves unanswered the message or fact\n- misinterpretation: message misunderstood, ambiguous, mistaken identity\n- success_resolution: communication removes an obstacle\nmessage_valence (what the message carries): catastrophic (death, illness, ruin, arrest, summons) | romantic | financial | practical | none.\ntechnology_named: the communication, travel or light technology that is named AND plot-relevant, else none.\nnight_function: \"none\" unless the scene is at night or in darkness. concealment = someone hides or moves unseen thanks to the dark; danger = the dark exposes someone to harm or terror; otherwise intimacy, labor or leisure.\nresolution_hint: only if the passage shows it, else unknown.\nobstacle_summary: at most 10 words, plain modern English, naming the obstacle generically, no character names (e.g. \"lover's letter intercepted by jealous aunt\").\nevidence_quote: 6-20 consecutive words copied verbatim from INSIDE the PASSAGE START/END markers that show the obstacle; prefer a sentence well inside the PASSAGE, away from its first and last lines. Never quote the context; if the key sentence runs past a PASSAGE boundary, copy only the part inside. No \"...\", no dropped words, no joined sentences or speakers, no spelling fixes.\nconfidence: 0-1, how sure you are of has_obstacle and domains.\n\nDECISION RULES FOR HARD CASES\n- Mention is not function: \"He sealed the letter\" is not an obstacle; \"The letter never reached her, and she married another\" is.\n- Reported past obstacles count if they still shape the present action.\n- Hypothetical obstacles (\"if the post should fail...\") count only if a character acts on the fear.\n- Dialogue counts: a character explaining a barrier (\"I cannot leave my father\") is an obstacle.\n- Comic obstacles count the same as serious ones. Comic, epistolary and dialect passages follow the same three-part test; a letter-writer's reflections are not an obstacle unless the letter reports something blocking a goal.\n- Judge ONLY from the PASSAGE (context is for orientation). No outside knowledge of the book.\nEXAMPLES: \"Certainly they are not of such strength that I do not gladly seize upon the favor thus extended, and count myself honored and happy.\" The speaker is shy of meeting a queen but goes ahead gladly -> no. \"And Bart, deciding that his sister's whims had already imposed far too many restrictions upon both his own activities and Carver's, carefully refrained from delivering the message.\" -> yes, locus social_institutional, COMMUNICATION_INFORMATION, intentional_withholding.\n\nIf has_obstacle is not \"yes\", output only has_obstacle and confidence. Return only JSON.",
+      "user_template": "CONTEXT BEFORE (orientation only; never quote it):\n{ctx_before}\n\n=== PASSAGE START (judge and quote ONLY this) ===\n{text}\n=== PASSAGE END ===\n\nCONTEXT AFTER (orientation only; never quote it):\n{ctx_after}",
+      "num_ctx": 4096,
+      "num_predict": 200,
       "evidence_field": "evidence_quote",
       "vram_gb_required": 5.0,
       "model_size_gb": 3.3,
@@ -612,7 +684,7 @@
       "priority": 45,
       "model_digest": "sha256:d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
       "ollama_version_range": ">=0.40.0,<1.0.0",
-      "codebook_version": "v0.5",
+      "codebook_version": "v0.9",
       "temperature": 0,
       "seed": 0,
       "think": false,
@@ -633,7 +705,7 @@
       "priority": 50,
       "model_digest": "sha256:85462619ee721b466c5927d109d4cb765861907d5417b9109caebc4e614679f1",
       "ollama_version_range": ">=0.40.0,<1.0.0",
-      "codebook_version": "v0.5",
+      "codebook_version": "v0.9",
       "temperature": 0,
       "seed": 0,
       "think": false,

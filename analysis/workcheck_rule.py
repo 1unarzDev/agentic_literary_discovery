@@ -151,7 +151,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--eval", default=None, help="reference CSV (work_id, keep_ref yes/no/borderline)")
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--catalog-fallback", action="store_true",
+    ap.add_argument("--catalog-fallback", action=argparse.BooleanOptionalAction, default=True,
                     help="works with no workcheck result: exclude on clear catalog non-fiction/verse/translation "
                          "(default: keep=None, unknown)")
     a = ap.parse_args()
