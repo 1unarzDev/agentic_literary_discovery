@@ -100,7 +100,7 @@ import duckdb  # noqa: E402
 PCOLS = "passage_id, work_id, decade, stratum, text, ctx_before, ctx_after, text_sha256, split"
 LABEL_WAVES = [  # (wave, split, predicate on ranked passages, priority)
     ("w01_disc_rand_a", "discovery", "stratum='random' AND k < 12", 20),
-    ("w02_conf_rand_a", "confirmation", "stratum='random' AND k < 12", 21),
+    ("w02_conf_rand_a", "confirmation", "stratum='random' AND k < 12", 20),  # equal to w01: audit draw (Nov 5) needs conf labels
     ("w03_disc_enrich", "discovery", "stratum<>'random'", 22),
     ("w04_conf_enrich", "confirmation", "stratum<>'random'", 23),
     ("w05_disc_rand_b", "discovery", "stratum='random' AND k >= 12", 24),
@@ -118,7 +118,11 @@ def ranked_view(con, exclude_works: set[str]) -> None:
         con.executemany("INSERT INTO excluded VALUES (?)", [(w,) for w in exclude_works])
 
 
+WAVE_PREFIX = ""  # e.g. "v09_" so re-pushed waves under a new pin get fresh job ids
+
+
 def write_shards(wave: str, stage: str, priority: int, rows_iter, split: str) -> list[dict]:
+    wave = WAVE_PREFIX + wave
     rng = np.random.default_rng(int(hashlib.sha256(f"{SEED}:{wave}:{split}".encode()).hexdigest()[:12], 16))
     size = SHARD_SIZE[stage]
     jobs, chunk, n = [], [], 0
@@ -201,8 +205,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["plan", "push"])
     ap.add_argument("--waves", default="")
+    ap.add_argument("--prefix", default="", help="wave/job id prefix for re-pushes under a new pin")
     ap.add_argument("--exclude-from-workcheck", default="", help="parquet with work_id, keep")
     a = ap.parse_args()
+    global WAVE_PREFIX
+    WAVE_PREFIX = a.prefix
     works = pd.read_parquet(WORK / "works.parquet")
     works = works[works.decade.between(1800, 1920)]
     sel = set(a.waves.split(",")) if a.waves else None
