@@ -43,6 +43,7 @@ REGISTRY_SCHEMA: dict[str, Any] = {
                         {"type": "array", "items": {"type": "string"}},
                         {"type": "object", "properties": {
                             "min_vram_gb": {"type": "number", "minimum": 0},
+                            "num_parallel_hint": {"type": "integer", "minimum": 1},
                             "stages": {"type": "array", "items": {"type": "string"}},
                             "allowed_stages": {"type": "array", "items": {"type": "string"}},
                         }},
@@ -55,15 +56,17 @@ REGISTRY_SCHEMA: dict[str, Any] = {
             ],
         },
         "active_pins": {"type": "array", "items": {"type": "string"}},
+        "unload_others": {"type": "boolean"},
         "stages": {
             "type": "object",
             "additionalProperties": {
                 "type": "object",
-                "required": [
-                    "model_ref", "model_digest", "ollama_version_range", "codebook_version",
-                    "num_ctx", "num_predict", "system_template", "user_template", "schema",
-                ],
+                # Kind-specific requirements are checked in validate_registry().
+                "required": ["model_ref", "model_digest", "ollama_version_range"],
                 "properties": {
+                    "kind": {"enum": ["chat", "embed"]},
+                    "api": {"enum": ["chat", "embed"]},
+                    "evidence_field": {"type": ["string", "null"]},
                     "model_ref": {"type": "string", "minLength": 1},
                     "model_digest": {"type": "string", "minLength": 1},
                     "model_size_gb": {"type": "number", "minimum": 0},
@@ -71,7 +74,7 @@ REGISTRY_SCHEMA: dict[str, Any] = {
                     "kv_gb_per_slot": {"type": "number", "minimum": 0},
                     "ollama_version_range": {"type": "string"},
                     "codebook_version": {"type": "string"},
-                    "num_ctx": {"type": "integer", "minimum": 256},
+                    "num_ctx": {"type": "integer", "minimum": 128},
                     "num_predict": {"type": "integer", "minimum": 1},
                     "temperature": {"type": "number"},
                     "seed": {"type": "integer"},
@@ -124,6 +127,11 @@ class Stage:
     raw: dict[str, Any]
 
     @property
+    def kind(self) -> str:
+        """``chat`` (templates + JSON schema via /api/chat) or ``embed`` (/api/embed)."""
+        return self.raw.get("kind") or self.raw.get("api") or "chat"
+
+    @property
     def model_ref(self) -> str:
         return self.raw["model_ref"]
 
@@ -133,11 +141,11 @@ class Stage:
 
     @property
     def num_ctx(self) -> int:
-        return int(self.raw["num_ctx"])
+        return int(self.raw.get("num_ctx", 2048))
 
     @property
     def num_predict(self) -> int:
-        return int(self.raw["num_predict"])
+        return int(self.raw.get("num_predict", 0 if self.kind == "embed" else 512))
 
     @property
     def think(self) -> bool | None:
@@ -145,23 +153,23 @@ class Stage:
 
     @property
     def schema(self) -> dict[str, Any]:
-        return self.raw["schema"]
+        return self.raw.get("schema") or {}
 
     @property
     def system_template(self) -> str:
-        return self.raw["system_template"]
+        return self.raw.get("system_template", "")
 
     @property
     def user_template(self) -> str:
-        return self.raw["user_template"]
+        return self.raw.get("user_template", "{{text}}")
 
     @property
     def retry_template(self) -> str:
-        return self.raw.get("retry_template", DEFAULT_RETRY_TEMPLATE)
+        return self.raw.get("retry_template", DEFAULT_RETRY_TEMPLATE if self.kind == "chat" else "")
 
     @property
     def codebook_version(self) -> str:
-        return self.raw["codebook_version"]
+        return str(self.raw.get("codebook_version", ""))
 
     @property
     def version_range(self) -> str:
@@ -181,6 +189,13 @@ class Stage:
 
     @property
     def evidence_keys(self) -> list[str]:
+        """Fields whose quotes are verified. ``evidence_field: null`` (or an
+        embed stage) disables verification."""
+        if self.kind == "embed":
+            return []
+        if "evidence_field" in self.raw:
+            f = self.raw["evidence_field"]
+            return [] if f is None else ([f] if isinstance(f, str) else list(f))
         return list(self.raw.get("evidence_keys", ["evidence_quote"]))
 
     def options(self) -> dict[str, Any]:
@@ -202,12 +217,15 @@ class Stage:
         return {"system": self.system_template, "user": self.user_template, "retry": self.retry_template}
 
     def prompt_hash(self) -> str:
-        return sha256_hex(canonical_json({
+        doc: dict[str, Any] = {
             "template": self.template(),
             "codebook_version": self.codebook_version,
             "schema": self.schema,
             "options": self.options(),
-        }))
+        }
+        if self.kind != "chat":
+            doc["kind"] = self.kind  # chat hashes stay identical to the original definition
+        return sha256_hex(canonical_json(doc))
 
     def schema_hash(self) -> str:
         return sha256_hex(canonical_json(self.schema))
@@ -297,6 +315,14 @@ class Registry:
             return []
         return [s for s in t["allowed_stages"] if s in self.stages]
 
+    @property
+    def unload_others(self) -> bool:
+        return bool(self.raw.get("unload_others", True))
+
+    def num_parallel_hint(self, tier_name: str) -> int | None:
+        t = self.tier(tier_name)
+        return int(t["num_parallel_hint"]) if t and t.get("num_parallel_hint") else None
+
     def pin_is_active(self, pin_hash: str) -> bool:
         """If the registry carries ``active_pins`` (the coordinator uses it to
         deactivate pins), a pin outside it is stale and must not run."""
@@ -313,14 +339,16 @@ def normalize_tiers(tiers: Any) -> list[dict[str, Any]]:
     if isinstance(tiers, dict):
         for name, v in tiers.items():
             if isinstance(v, list):
-                out.append({"name": name, "min_vram_gb": 0.0, "allowed_stages": list(v)})
+                out.append({"name": name, "min_vram_gb": 0.0, "allowed_stages": list(v), "num_parallel_hint": None})
             else:
                 out.append({"name": name, "min_vram_gb": float(v.get("min_vram_gb", 0.0)),
-                            "allowed_stages": list(v.get("stages", v.get("allowed_stages", [])))})
+                            "allowed_stages": list(v.get("stages", v.get("allowed_stages", []))),
+                            "num_parallel_hint": v.get("num_parallel_hint")})
     else:
         for t in tiers:
             out.append({"name": t["name"], "min_vram_gb": float(t["min_vram_gb"]),
-                        "allowed_stages": list(t.get("allowed_stages", t.get("stages", [])))})
+                        "allowed_stages": list(t.get("allowed_stages", t.get("stages", []))),
+                        "num_parallel_hint": t.get("num_parallel_hint")})
     return out
 
 
@@ -333,10 +361,17 @@ def validate_registry(raw: dict[str, Any]) -> None:
     if len(set(names)) != len(names):
         raise RegistryError("duplicate tier names")
     for name, st in raw["stages"].items():
-        try:
-            jsonschema.Draft202012Validator.check_schema(st["schema"])
-        except jsonschema.SchemaError as e:
-            raise RegistryError(f"stage {name}: output schema invalid: {e.message}") from e
+        kind = st.get("kind") or st.get("api") or "chat"
+        if kind == "chat":
+            missing = [k for k in ("codebook_version", "num_ctx", "num_predict", "system_template",
+                                   "user_template", "schema") if k not in st]
+            if missing:
+                raise RegistryError(f"stage {name}: chat stage missing {missing}")
+        if "schema" in st:
+            try:
+                jsonschema.Draft202012Validator.check_schema(st["schema"])
+            except jsonschema.SchemaError as e:
+                raise RegistryError(f"stage {name}: output schema invalid: {e.message}") from e
         parse_version_range(st["ollama_version_range"])
 
 

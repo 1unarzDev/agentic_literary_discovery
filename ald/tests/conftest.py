@@ -29,21 +29,50 @@ from ald.worker import Worker
 
 DU = namedtuple("DU", "total used free")
 
-SCREEN_MODEL = "fake-screen:8b"
-LABEL_MODEL = "fake-label:14b"
-SCREEN_DIGEST = "a" * 64
+WC_MODEL = "fake-wc:4b"
+LABEL_MODEL = "fake-label:12b"
+ALT_MODEL = "fake-alt:9b"
+BIG_MODEL = "fake-big:27b"
+EMBED_MODEL = "fake-embed:300m"
+WC_DIGEST = "a" * 64
 LABEL_DIGEST = "b" * 64
+ALT_DIGEST = "c" * 64
+BIG_DIGEST = "d" * 64
+EMBED_DIGEST = "e" * 64
+MODELS = {WC_MODEL: WC_DIGEST, LABEL_MODEL: LABEL_DIGEST, ALT_MODEL: ALT_DIGEST, BIG_MODEL: BIG_DIGEST,
+          EMBED_MODEL: EMBED_DIGEST}
+STAGE_MODELS = {"workcheck": WC_MODEL, "label": LABEL_MODEL, "alt_label": ALT_MODEL, "cloze": LABEL_MODEL,
+                "adjudicate": BIG_MODEL, "embed": EMBED_MODEL}
 
 
 def example_registry_raw() -> dict[str, Any]:
     text = resources.files("ald.data").joinpath("models.v1.example.json").read_text(encoding="utf-8")
     raw = json.loads(text)
-    raw["stages"]["screen"]["model_ref"] = SCREEN_MODEL
-    raw["stages"]["screen"]["model_digest"] = "sha256:" + SCREEN_DIGEST
-    raw["stages"]["label"]["model_ref"] = LABEL_MODEL
-    raw["stages"]["label"]["model_digest"] = "sha256:" + LABEL_DIGEST
+    for stage, model in STAGE_MODELS.items():
+        raw["stages"][stage]["model_ref"] = model
+        raw["stages"][stage]["model_digest"] = "sha256:" + MODELS[model]
     raw["registry_version"] = "test.1"
     return raw
+
+
+QUOTE = "The letter-which should have come by the evening post-was lost"
+
+
+def instance(schema: dict[str, Any], key: str = "") -> Any:
+    """A deterministic instance of a (simple) JSON schema, as a model would emit."""
+    t = schema.get("type")
+    if "enum" in schema:
+        return schema["enum"][0]
+    if t == "object":
+        return {k: instance(v, k) for k, v in schema.get("properties", {}).items()}
+    if t == "array":
+        return [instance(schema["items"])][: schema.get("maxItems", 1)]
+    if t in ("number", "integer"):
+        return 0.8
+    if t == "string":
+        # Quote with '-' where the source has em-dashes: verifies as "normalized".
+        return QUOTE if key == "evidence_quote" else ("Elizabeth" if key == "name" else "a short summary")
+    return None
 
 
 @pytest.fixture
@@ -90,7 +119,7 @@ def make_passages(prefix: str, n: int) -> list[dict[str, Any]]:
 
 class FakeOllama:
     def __init__(self, models: dict[str, str] | None = None, version: str = "0.12.5"):
-        self.models = dict(models if models is not None else {SCREEN_MODEL: SCREEN_DIGEST, LABEL_MODEL: LABEL_DIGEST})
+        self.models = dict(models if models is not None else MODELS)
         self.version = version
         self.chats: list[dict[str, Any]] = []
         self.on_chat: Callable[[dict[str, Any], int], None] | None = None
@@ -110,6 +139,17 @@ class FakeOllama:
         if p == "/api/tags":
             return httpx.Response(200, json={"models": [
                 {"name": n, "model": n, "digest": d, "size": 1} for n, d in self.models.items()]})
+        if p == "/api/embed":
+            body = json.loads(req.content)
+            with self.lock:
+                self.chats.append(body)
+                n = len(self.chats)
+                self.loaded.setdefault(body["model"], 600_000_000)
+            if self.on_chat:
+                self.on_chat(body, n)
+            vec = [round(((len(body["input"]) + i) % 7) / 7 - 0.5, 4) for i in range(8)]
+            return httpx.Response(200, json={"model": body["model"], "embeddings": [vec],
+                                             "prompt_eval_count": 42, "total_duration": 10_000_000})
         if p == "/api/ps":
             return httpx.Response(200, json={"models": [
                 {"name": n, "model": n, "size": sz, "size_vram": sz // 2 if n in self.split else sz}
@@ -136,24 +176,13 @@ class FakeOllama:
             if self.on_chat:
                 self.on_chat(body, n)
             user = body["messages"][1]["content"]
-            text = user.split("PASSAGE (label this):\n", 1)[1]
+            text = user.split(":\n")[-1]  # passage is LAST in every user template
             retry = len(body["messages"]) > 2
-            props = body["format"]["properties"]
             key = text.split(".", 1)[0]  # "Passage <i> of <prefix>"
             if key in self.invalid_for and (not retry or key in self.always_invalid):
-                content = '{"has_obstacle": "maybe"'
-            elif "coarse_domain" in props:
-                content = json.dumps({"has_obstacle": "yes", "coarse_domain": "COMMUNICATION_INFORMATION",
-                                      "confidence": 0.8})
+                content = '{"is_fiction": "maybe"'
             else:
-                # Quote with straight quotes/hyphen vs the source's em-dash: "normalized".
-                quote = "The letter-which should have come by the evening post-was lost"
-                content = json.dumps({"has_obstacle": "yes", "obstacles": [{
-                    "domain": "COMMUNICATION_INFORMATION", "locus": "material_external",
-                    "failure_cause": "accidental_loss", "technology_named": "letter",
-                    "message_valence": "romantic", "night_function": "none", "resolution_hint": "unresolved",
-                    "obstacle_summary": "lost letter keeps lovers apart", "evidence_quote": quote,
-                    "confidence": 0.8}], "confidence": 0.8})
+                content = json.dumps(instance(body["format"]))
             return httpx.Response(200, json={
                 "message": {"role": "assistant", "content": content}, "done": True,
                 "prompt_eval_count": 900, "eval_count": 40, "eval_duration": 200_000_000,

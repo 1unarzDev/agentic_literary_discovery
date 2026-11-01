@@ -163,6 +163,21 @@ class OllamaBackend:
         return f"{v}+{accel}" if accel else v
 
     # -- inference ----------------------------------------------------------
+    def embed(self, model: str, text: str, *, options: dict[str, Any] | None = None) -> ChatResult:
+        """/api/embed for one input. ``content`` holds the JSON list of floats."""
+        body: dict[str, Any] = {"model": model, "input": text, "keep_alive": -1, "truncate": True}
+        if options:
+            body["options"] = options
+        data = self._req("POST", "/api/embed", json=body).json()
+        if data.get("error"):
+            raise _classify(500, str(data["error"]))
+        embs = data.get("embeddings") or []
+        if not embs:
+            raise BackendError("Ollama /api/embed returned no embeddings")
+        return ChatResult(content=json.dumps(embs[0]), prompt_tokens=int(data.get("prompt_eval_count", 0) or 0),
+                          gen_tokens=0, eval_s=(data.get("total_duration", 0) or 0) / 1e9,
+                          total_s=(data.get("total_duration", 0) or 0) / 1e9, raw=data)
+
     def chat(self, model: str, messages: list[dict[str, str]], *, schema: dict[str, Any] | None,
              options: dict[str, Any], think: bool | None) -> ChatResult:
         body: dict[str, Any] = {

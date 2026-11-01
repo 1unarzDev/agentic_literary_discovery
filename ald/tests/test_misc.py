@@ -125,7 +125,7 @@ def test_cli_version_and_pins(cli_home):
     r = CliRunner().invoke(app, ["pins"])
     assert r.exit_code == 0
     pins = json.loads(r.stdout)
-    assert {p["stage"] for p in pins} == {"screen", "label", "adjudicate"}
+    assert {p["stage"] for p in pins} == {"workcheck", "label", "alt_label", "cloze", "adjudicate", "embed"}
 
 
 def test_cli_status_local(cli_home):

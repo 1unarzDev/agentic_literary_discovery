@@ -11,7 +11,7 @@ import pytest
 from ald.registry import Registry
 from ald.results import Outbox
 from ald.scheduler import GB
-from conftest import LABEL_MODEL, make_passages
+from conftest import LABEL_MODEL, WC_MODEL, make_passages
 
 
 class Killed(BaseException):
@@ -22,8 +22,8 @@ def label_pin(env):
     return env.registry.stages["label"].pin_hash()
 
 
-def screen_pin(env):
-    return env.registry.stages["screen"].pin_hash()
+def wc_pin(env):
+    return env.registry.stages["workcheck"].pin_hash()
 
 
 def finals(coord, job_id=None):
@@ -38,7 +38,7 @@ def partials(coord, job_id=None):
 
 def test_lease_to_result_put(env):
     env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 6))
-    env.coord.add_job("job-2", "screen", screen_pin(env), make_passages("w2", 4))
+    env.coord.add_job("job-2", "workcheck", wc_pin(env), make_passages("w2", 4))
     w = env.make_worker(max_concurrency=2)
     w.run()
 
@@ -76,7 +76,7 @@ def test_lease_to_result_put(env):
 
 def test_pin_mismatch_refused_and_released(env):
     env.coord.add_job("bad", "label", "f" * 64, make_passages("w1", 3))
-    env.coord.add_job("good", "screen", screen_pin(env), make_passages("w2", 2))
+    env.coord.add_job("good", "workcheck", wc_pin(env), make_passages("w2", 2))
     w = env.make_worker()
     w.run()
     assert ["bad"] in env.coord.releases
@@ -98,7 +98,7 @@ def test_wrong_local_digest_excludes_stage(env):
 def test_schema_invalid_retry_once_then_flag(env):
     env.ollama.invalid_for = {"Passage 0 of w1", "Passage 1 of w1"}
     env.ollama.always_invalid = {"Passage 1 of w1"}
-    env.coord.add_job("j", "screen", screen_pin(env), make_passages("w1", 3))
+    env.coord.add_job("j", "workcheck", wc_pin(env), make_passages("w1", 3))
     env.make_worker().run()
     lines = {l["passage_id"]: l for l in finals(env.coord)[0]["lines"]}
     assert lines["w1_p0000"]["valid_schema"] is True and "retried" in lines["w1_p0000"]["flags"]
@@ -166,7 +166,7 @@ def test_graceful_stop_uploads_partial_and_releases(env):
 
 
 def test_offline_upload_stays_in_outbox_then_flushes_on_restart(env):
-    env.coord.add_job("job-o", "screen", screen_pin(env), make_passages("w1", 3))
+    env.coord.add_job("job-o", "workcheck", wc_pin(env), make_passages("w1", 3))
     env.coord.down = {"/v1/result"}
     w = env.make_worker()
     w.run()
@@ -183,7 +183,7 @@ def test_offline_upload_stays_in_outbox_then_flushes_on_restart(env):
 
 
 def test_background_flush_when_network_returns(env):
-    env.coord.add_job("job-b", "screen", screen_pin(env), make_passages("w1", 2))
+    env.coord.add_job("job-b", "workcheck", wc_pin(env), make_passages("w1", 2))
     env.coord.down = {"/v1/result"}
     w = env.make_worker()
     w.startup()
@@ -215,7 +215,7 @@ def test_revoked_job_abandoned(env):
 
 
 def test_heartbeat_extends_and_reports(env):
-    env.coord.add_job("job-h", "screen", screen_pin(env), make_passages("w1", 2))
+    env.coord.add_job("job-h", "workcheck", wc_pin(env), make_passages("w1", 2))
     w = env.make_worker()
     w.startup()
     [hj] = w.lease_jobs()
@@ -272,18 +272,18 @@ def test_registry_poll_uses_etag(env):
 def test_new_model_pulled_automatically(env, registry_raw):
     raw2 = copy.deepcopy(registry_raw)
     raw2["registry_version"] = "test.3"
-    raw2["stages"]["screen"]["model_ref"] = "fake-screen-v2:8b"
-    raw2["stages"]["screen"]["model_digest"] = "d" * 64
-    env.ollama.pull_digests["fake-screen-v2:8b"] = "d" * 64
+    raw2["stages"]["workcheck"]["model_ref"] = "fake-wc-v2:4b"
+    raw2["stages"]["workcheck"]["model_digest"] = "9" * 64
+    env.ollama.pull_digests["fake-wc-v2:4b"] = "9" * 64
     env.coord.set_registry(raw2, '"r3"')
     w = env.make_worker()
     w.startup()
-    assert env.ollama.pulls == ["fake-screen-v2:8b"]
-    assert "screen" in w.stages
+    assert env.ollama.pulls == ["fake-wc-v2:4b"]
+    assert "workcheck" in w.stages
 
 
 def test_low_disk_pauses_leasing_then_resumes(env):
-    env.coord.add_job("job-d", "screen", screen_pin(env), make_passages("w1", 2))
+    env.coord.add_job("job-d", "workcheck", wc_pin(env), make_passages("w1", 2))
     env.free[0] = 20 * GB + 1024  # below one job's projected bytes above the reserve
     w = env.make_worker()
     w.run()
@@ -297,7 +297,7 @@ def test_low_disk_pauses_leasing_then_resumes(env):
 def test_oom_at_concurrency_one_demotes_stage(env):
     from ald.backend.ollama import BackendOOM
     env.coord.add_job("job-big", "label", label_pin(env), make_passages("w1", 5))
-    env.coord.add_job("job-small", "screen", screen_pin(env), make_passages("w2", 2))
+    env.coord.add_job("job-small", "workcheck", wc_pin(env), make_passages("w2", 2))
 
     def oom(body, n):
         if "obstacles" in body["format"]["properties"]:
@@ -360,7 +360,7 @@ def test_dup_final_supersedes_unacked_partial(env):
 def test_update_available_installs_and_reexecs(env):
     env.coord.ping_resp = {"ok": True, "min_client_version": "0.0.1", "latest_client_version": "9.9.9",
                            "wheel_url": "https://coord.test/ald-9.9.9-py3-none-any.whl"}
-    env.coord.add_job("job-u", "screen", screen_pin(env), make_passages("w1", 2))
+    env.coord.add_job("job-u", "workcheck", wc_pin(env), make_passages("w1", 2))
     w = env.make_worker(auto_update=True, argv=["work", "--keep-awake"])
     w.run()
     assert env.run.calls == [["/usr/bin/uv", "tool", "install", "--force", "--python", "3.12",
@@ -380,7 +380,7 @@ def test_failed_optional_update_keeps_working(env):
     env.run.rc = 1
     env.coord.ping_resp = {"ok": True, "min_client_version": "0.0.1", "latest_client_version": "9.9.9",
                            "wheel_url": None}
-    env.coord.add_job("job-f", "screen", screen_pin(env), make_passages("w1", 2))
+    env.coord.add_job("job-f", "workcheck", wc_pin(env), make_passages("w1", 2))
     w = env.make_worker(auto_update=True)
     w.run()
     assert env.run.calls == [["/usr/bin/uv", "tool", "upgrade", "ald"]]
@@ -393,7 +393,7 @@ def test_required_update_blocks_leasing_when_it_fails(env):
     env.coord.lease_status = 426
     env.coord.ping_resp = {"ok": True, "min_client_version": "9.0.0", "latest_client_version": "9.0.0",
                            "wheel_url": None}
-    env.coord.add_job("job-q", "screen", screen_pin(env), make_passages("w1", 2))
+    env.coord.add_job("job-q", "workcheck", wc_pin(env), make_passages("w1", 2))
     holder = {"n": 0}
     w = env.make_worker(auto_update=True, exit_when_idle=False)
 
@@ -413,7 +413,7 @@ def test_required_update_blocks_leasing_when_it_fails(env):
 
 def test_no_auto_update_opt_out(env):
     env.coord.ping_resp = {"ok": True, "min_client_version": "0.0.1", "latest_client_version": "9.9.9"}
-    env.coord.add_job("job-n", "screen", screen_pin(env), make_passages("w1", 1))
+    env.coord.add_job("job-n", "workcheck", wc_pin(env), make_passages("w1", 1))
     env.make_worker(auto_update=False).run()
     assert env.run.calls == [] and env.coord.state["job-n"] == "done"
 
@@ -421,7 +421,7 @@ def test_no_auto_update_opt_out(env):
 def test_shard_text_sha_mismatch_flagged(env):
     ps = make_passages("w1", 2)
     ps[1]["text_sha256"] = "0" * 64
-    env.coord.add_job("job-t", "screen", screen_pin(env), ps)
+    env.coord.add_job("job-t", "workcheck", wc_pin(env), ps)
     env.make_worker().run()
     lines = finals(env.coord)[0]["lines"]
     assert "text_sha256_mismatch" in lines[1]["flags"]
@@ -431,7 +431,7 @@ def test_shard_text_sha_mismatch_flagged(env):
 
 def test_stray_models_unloaded_before_work(env):
     env.ollama.loaded = {"someone-elses-model:70b": 40_000_000_000}
-    env.coord.add_job("job-g", "screen", screen_pin(env), make_passages("w1", 2))
+    env.coord.add_job("job-g", "workcheck", wc_pin(env), make_passages("w1", 2))
     env.make_worker().run()
     assert "someone-elses-model:70b" in env.ollama.unloads
     assert any("unloaded resident model" in m for m in env.logs)
@@ -439,17 +439,17 @@ def test_stray_models_unloaded_before_work(env):
 
 
 def test_other_stage_model_unloaded_between_jobs(env):
-    env.coord.add_job("job-a", "screen", screen_pin(env), make_passages("w1", 2))
+    env.coord.add_job("job-a", "workcheck", wc_pin(env), make_passages("w1", 2))
     env.coord.add_job("job-b", "label", label_pin(env), make_passages("w2", 2))
     env.make_worker().run()
     # When the label job starts, the screen model is evicted first.
-    assert "fake-screen:8b" in env.ollama.unloads
+    assert WC_MODEL in env.ollama.unloads
 
 
 def test_split_model_reloaded_then_demoted(env):
     env.ollama.split = {LABEL_MODEL}
     env.coord.add_job("job-split", "label", label_pin(env), make_passages("w1", 6))
-    env.coord.add_job("job-ok", "screen", screen_pin(env), make_passages("w2", 2))
+    env.coord.add_job("job-ok", "workcheck", wc_pin(env), make_passages("w2", 2))
     w = env.make_worker(idle_polls_before_exit=2)
     w.run()
     assert any("only 50% on GPU" in m for m in env.logs)
@@ -464,27 +464,27 @@ def test_cpu_only_machine_skips_residency(env):
     hw = HardwareInfo(os="linux", arch="x86_64", os_release="t", cpu_model="t", cpu_cores_physical=8,
                       cpu_cores_logical=8, ram_gb=64, usable_vram_gb=20.0, accel="cpu")
     env.ollama.loaded = {"other:1b": 1}
-    env.coord.add_job("job-c", "screen", screen_pin(env), make_passages("w1", 1))
+    env.coord.add_job("job-c", "workcheck", wc_pin(env), make_passages("w1", 1))
     env.make_worker(hw=hw).run()
     assert env.ollama.unloads == []
 
 
 def test_stale_pin_not_in_active_pins_is_not_run(env, registry_raw):
     raw = copy.deepcopy(registry_raw)
-    raw["active_pins"] = [screen_pin(env)]
+    raw["active_pins"] = [wc_pin(env)]
     env.coord.set_registry(raw, '"r-ap"')
     env.coord.add_job("job-l", "label", label_pin(env), make_passages("w1", 1))
     w = env.make_worker()
     w.run()
     assert "stale" in w.excluded["label"]
-    assert all(l["stages"] == ["screen"] for l in env.coord.leases)
+    assert all("label" not in l["stages"] for l in env.coord.leases)
 
 
 def test_426_body_drives_update(env):
     env.coord.lease_status = 426
     env.coord.ping_resp = {"ok": True, "min_client_version": "0.0.1", "latest_client_version": "0.1.0",
                            "wheel_url": None}
-    env.coord.add_job("job-z", "screen", screen_pin(env), make_passages("w1", 1))
+    env.coord.add_job("job-z", "workcheck", wc_pin(env), make_passages("w1", 1))
     w = env.make_worker(auto_update=True, idle_polls_before_exit=1)
     w.startup()
     w.lease_jobs()
@@ -494,3 +494,47 @@ def test_426_body_drives_update(env):
     from ald.updater import decide
     d = decide({"min_client_version": "9.0.0", "latest_client_version": "9.1.0", "wheel_url": "http://x/w.whl"})
     assert d.required and d.update_available and d.wheel_url == "http://x/w.whl"
+
+
+# --- generic stages ---------------------------------------------------------------
+
+def test_embed_stage_generic(env):
+    from ald.inference import decode_f16
+    from ald.hw import HardwareInfo
+    hw = HardwareInfo(os="linux", arch="x86_64", os_release="t", cpu_model="t", cpu_cores_physical=8,
+                      cpu_cores_logical=8, ram_gb=16, usable_vram_gb=0.0, accel="cpu")
+    pin = env.registry.stages["embed"].pin_hash()
+    env.coord.add_job("job-e", "embed", pin, make_passages("w1", 3))
+    w = env.make_worker(hw=hw)
+    w.cfg.tier = None
+    w.tier = None
+    w.run()
+    assert w.tier == "cpu" and w.stages == ["embed"]
+    put = finals(env.coord, "job-e")[0]
+    l = put["lines"][0]
+    assert l["evidence"] == [] and l["valid_schema"] is True
+    vec = decode_f16(l["output"]["embedding_f16_b64"])
+    assert len(vec) == l["output"]["dim"] == 8
+    assert env.ollama.chats[0]["model"] == "fake-embed:300m" and "input" in env.ollama.chats[0]
+
+
+def test_null_evidence_field_skips_verification(env):
+    env.coord.add_job("job-c", "cloze", env.registry.stages["cloze"].pin_hash(), make_passages("w1", 2))
+    env.make_worker().run()
+    l = finals(env.coord, "job-c")[0]["lines"][0]
+    assert l["output"] == {"name": "Elizabeth"} and l["evidence"] == [] and "flags" not in l
+
+
+def test_worker_requests_all_allowed_stages(env):
+    w = env.make_worker()
+    w.run()
+    assert env.coord.leases[0]["stages"] == ["label", "alt_label", "cloze", "workcheck"]
+    assert w.tuners["label"].current == 1  # max_concurrency=1 in tests caps the tier hint (4)
+
+
+def test_shared_model_not_unloaded_between_stages(env):
+    # label and cloze share one model: switching between them must not evict it.
+    env.coord.add_job("job-l", "label", label_pin(env), make_passages("w1", 1))
+    env.coord.add_job("job-c", "cloze", env.registry.stages["cloze"].pin_hash(), make_passages("w2", 1))
+    env.make_worker().run()
+    assert LABEL_MODEL not in env.ollama.unloads

@@ -168,7 +168,8 @@ def doctor(
     reg, reg_src = load_registry(cfg, registry_path, coordinator, quiet=as_json)
     tier = reg.select_tier(hw.usable_vram_gb)
     report: dict[str, Any] = {"client_version": CLIENT_VERSION, "hardware": hw.to_json(), "tier": tier["name"],
-                              "allowed_stages": reg.allowed_stages(tier["name"]), "registry": reg_src}
+                              "allowed_stages": reg.allowed_stages(tier["name"]), "registry": reg_src,
+                              "num_parallel_hint": reg.num_parallel_hint(tier["name"])}
 
     url = coordinator or cfg.coordinator_url
     client = CoordinatorClient(url, cfg.token) if url else None
@@ -242,6 +243,9 @@ def _print_doctor(r: dict[str, Any]) -> None:
     t.add_row("Ollama", r.get("ollama_version") or "[red]not running / not installed[/red]")
     t.add_row("Registry", r["registry"])
     t.add_row("Tier", f"[bold green]{r['tier']}[/bold green]  stages: {', '.join(r['allowed_stages']) or '-'}")
+    if r.get("num_parallel_hint"):
+        t.add_row("Ollama parallel", f"registry suggests OLLAMA_NUM_PARALLEL={r['num_parallel_hint']} "
+                                     f"(set it in the Ollama server's environment, then restart Ollama)")
     if "ping" in r:
         t.add_row("Coordinator", json.dumps(r["ping"]))
     bw = r.get("bandwidth")
@@ -326,6 +330,9 @@ def setup(
     if sel:
         wanted = [s for s in wanted if s in sel]
     console.print(f"Ollama {ver}; registry {reg.version} ({src}); tier {tier}; stages {', '.join(wanted) or '-'}")
+    hint = reg.num_parallel_hint(tier)
+    if hint and os.environ.get("OLLAMA_NUM_PARALLEL") != str(hint):
+        console.print(f"Tip: run the Ollama server with OLLAMA_NUM_PARALLEL={hint} for this tier.")
     ok = True
     pulled: set[str] = set()
     for s in wanted:

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
+import struct
 import time
 from typing import Any
 
@@ -47,6 +49,40 @@ def _validator(stage: Stage) -> Any:
     return v
 
 
+def encode_f16(vec: list[float]) -> str:
+    """Little-endian IEEE float16, base64."""
+    return base64.b64encode(struct.pack(f"<{len(vec)}e", *vec)).decode("ascii")
+
+
+def decode_f16(b64: str) -> list[float]:
+    raw = base64.b64decode(b64)
+    return list(struct.unpack(f"<{len(raw) // 2}e", raw))
+
+
+def run_embed(backend: OllamaBackend, stage: Stage, passage: dict[str, Any], *, pin_hash: str,
+              model_digest: str, backend_version: str) -> dict[str, Any]:
+    t0 = time.perf_counter()
+    opts = {k: v for k, v in stage.ollama_options().items() if k in ("num_ctx", "seed", "temperature")}
+    res = backend.embed(stage.model_ref, stage.render_user(passage), options=opts)
+    vec = json.loads(res.content)
+    flags: list[str] = []
+    text = passage.get("text", "") or ""
+    tsha = passage.get("text_sha256")
+    if tsha and hashlib.sha256(text.encode("utf-8")).hexdigest() != tsha:
+        flags.append("text_sha256_mismatch")
+    line: dict[str, Any] = {
+        "passage_id": passage["passage_id"], "stage": stage.name, "pin_hash": pin_hash,
+        "model_digest": model_digest, "backend_version": backend_version,
+        "output": {"embedding_f16_b64": encode_f16(vec), "dim": len(vec), "dtype": "float16_le"},
+        "valid_schema": True, "evidence": [],
+        "latency_ms": int(round((time.perf_counter() - t0) * 1000)),
+        "prompt_tokens": res.prompt_tokens, "gen_tokens": 0,
+    }
+    if flags:
+        line["flags"] = flags
+    return line
+
+
 def run_passage(
     backend: OllamaBackend,
     stage: Stage,
@@ -58,6 +94,9 @@ def run_passage(
 ) -> dict[str, Any]:
     """Run inference (retry once on invalid output), verify evidence and
     return a result line per the contract. Backend errors propagate."""
+    if stage.kind == "embed":
+        return run_embed(backend, stage, passage, pin_hash=pin_hash, model_digest=model_digest,
+                         backend_version=backend_version)
     validator = _validator(stage)
     messages = build_messages(stage, passage)
     t0 = time.perf_counter()

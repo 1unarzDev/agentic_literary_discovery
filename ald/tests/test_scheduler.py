@@ -91,15 +91,16 @@ def test_report_shape(tmp_path):
 def test_fit_and_concurrency(registry_raw):
     reg = Registry.from_dict(registry_raw)
     hf = HardwareFit(usable_vram_gb=15.99, ram_gb=32, accel="cuda")
-    label = reg.stages["label"]  # 11.5 GB + 0.4/slot
+    label = reg.stages["label"]  # 10 GB + 0.5/slot
     assert hf.fits(label, 1)
-    assert hf.max_concurrency(label, 8) == 8  # 11.5 + 7*0.4 + 0.5 = 14.8
+    assert hf.max_concurrency(label, 8) == 8  # 10 + 7*0.5 + 0.5 = 14.0
+    assert hf.max_concurrency(label, 12) == 11  # 10 + 10*0.5 + 0.5 = 15.5 <= 15.99
     assert not hf.fits(reg.stages["adjudicate"], 1)
     hf8 = HardwareFit(usable_vram_gb=8.0, ram_gb=16, accel="cuda")
-    assert hf8.fits(reg.stages["screen"], 1)
+    assert hf8.fits(reg.stages["workcheck"], 1)
     assert not hf8.fits(label, 1)
-    ok, why = hf8.filter_stages([reg.stages["screen"], label])
-    assert ok == ["screen"] and "needs" in why["label"]
+    ok, why = hf8.filter_stages([reg.stages["workcheck"], label])
+    assert ok == ["workcheck"] and "needs" in why["label"]
 
 
 def test_demote_never_swaps_model(registry_raw):
@@ -109,7 +110,7 @@ def test_demote_never_swaps_model(registry_raw):
     hf.demote("label")
     ok, why = hf.filter_stages(reg.stages.values())
     assert "label" not in ok and why["label"].startswith("demoted")
-    assert "screen" in ok
+    assert "workcheck" in ok
     assert reg.stages["label"].model_ref == before
 
 

@@ -1,51 +1,132 @@
 {
-  "$comment": "EXAMPLE ONLY. Model tags and digests are placeholders until the Day-1 model freeze. min_vram_gb thresholds sit ~0.5 GB under the nominal card size because drivers report slightly less (a 16 GB card shows 15.99 GiB).",
-  "registry_version": "2026-10-31.example.1",
+  "$comment": "EXAMPLE ONLY: digests are placeholders (all-same-hex); the real registry/models.v1.json is generated at freeze time. min_vram_gb thresholds sit ~0.5 GB under the nominal card size because drivers report slightly less (a 16 GB card shows 15.99 GiB).",
+  "registry_version": "2026-10-31.example.2",
+  "unload_others": true,
   "tiers": {
     "cpu": {
       "min_vram_gb": 0,
+      "num_parallel_hint": 1,
       "stages": [
-        "embed",
-        "cloze"
+        "embed"
       ]
     },
     "t8": {
       "min_vram_gb": 7.5,
+      "num_parallel_hint": 2,
       "stages": [
-        "screen"
+        "workcheck"
       ]
     },
     "t16": {
       "min_vram_gb": 15.5,
+      "num_parallel_hint": 4,
       "stages": [
-        "screen",
-        "label"
+        "label",
+        "alt_label",
+        "cloze",
+        "workcheck"
       ]
     },
     "t24": {
       "min_vram_gb": 23.5,
+      "num_parallel_hint": 4,
       "stages": [
-        "screen",
+        "adjudicate",
         "label",
-        "adjudicate"
+        "alt_label",
+        "cloze",
+        "workcheck",
+        "embed"
       ]
     }
   },
   "stages": {
-    "screen": {
-      "model_ref": "PLACEHOLDER-screen-8b:q4_K_M",
-      "model_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "model_size_gb": 5.2,
-      "vram_gb_required": 6.5,
-      "kv_gb_per_slot": 0.15,
+    "workcheck": {
+      "kind": "chat",
+      "model_ref": "qwen3.5:4b-q4_K_M",
+      "model_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "model_size_gb": 3.2,
+      "vram_gb_required": 4.5,
+      "kv_gb_per_slot": 0.25,
       "ollama_version_range": ">=0.12.0,<1.0.0",
-      "codebook_version": "0.9-draft",
+      "codebook_version": "workcheck-0.1",
       "num_ctx": 4096,
-      "num_predict": 64,
+      "num_predict": 96,
       "temperature": 0,
       "seed": 0,
       "think": false,
-      "system_template": "CODEBOOK v0.9-draft — PLOT OBSTACLES IN NINETEENTH-CENTURY FICTION\n\nA PLOT OBSTACLE is something in the passage that blocks, delays or endangers a character's goal AND plausibly affects what happens next. Atmosphere, description or a mere mention does not count. Judge only from the passage (context before/after is for orientation; the evidence must come from the PASSAGE).\n\nhas_obstacle:\n- yes: at least one obstacle as defined above is present in the passage.\n- no: no character goal is blocked, delayed or endangered.\n- insufficient_context: the passage is too fragmentary (front matter, a list, verse without narrative) to judge.\n\nDOMAINS (pick the mechanism that does the blocking, not the topic of the scene):\n- DISTANCE_TRAVEL: distance, journeys, missed or slow transport, impassable roads.\n- COMMUNICATION_INFORMATION: letters, messages, news, secrets, identity, misunderstandings of information.\n- DARKNESS_VISIBILITY: night, darkness, fog, lack of light, inability to see or be seen.\n- ILLNESS_BODY_DEATH: illness, injury, physical weakness, death.\n- MONEY_PROPERTY_LAW: money, debt, inheritance, property, contracts, courts, police.\n- SOCIAL_RANK_CONVENTION: class, propriety, reputation, marriage and gender norms.\n- INTERPERSONAL_CONFLICT: a person actively opposes, threatens or thwarts another.\n- INNER_STATE: doubt, fear, desire, conscience, pride, shame inside the character.\n- NATURE_WEATHER: storms, floods, snow, terrain, animals.\n- OTHER: a real obstacle that fits none of the above.\n\nLOCUS (where the obstacle lives): material_external (things, distance, bodies, weather, darkness), social_institutional (law, money systems, rank, convention), internal_psychological (the character's own mind).\n\nTASK (SCREEN): decide has_obstacle and give the single most likely coarse_domain (NONE if has_obstacle is not yes). Reply with a single JSON object that matches the schema and nothing else.\n\nEXAMPLES\n\nPASSAGE: The letter which should have told her of his return lay three days in the wrong office at Bath, and when at last it came the coach had gone without her.\nOUTPUT: {\"has_obstacle\":\"yes\",\"coarse_domain\":\"COMMUNICATION_INFORMATION\",\"confidence\":0.85}\n\nPASSAGE: The drawing-room was hung with yellow silk, and the evening passed in cards and music until the candles burned low.\nOUTPUT: {\"has_obstacle\":\"no\",\"coarse_domain\":\"NONE\",\"confidence\":0.9}",
+      "system_template": "WORK CHECK. You see the opening (~1,500 words) of a Project Gutenberg text. Decide:\n- is_fiction: yes if it is a novel, novella or short-story collection; no for history, essays, sermons, travel, drama, verse collections, periodicals; unsure if you cannot tell.\n- is_translation: yes if the text says it is translated, or names a translator, or is plainly a foreign work in English dress.\n- is_juvenile: yes if it is written for children (school stories, fairy tales, primers, boys'/girls' adventure series).\n- setting_period: contemporary (set at about the time it was written), historical (set at least ~30 years before it was written), future, mixed, or unclear.\n- confidence: 0-1.\nIgnore the Project Gutenberg licence header. Reply with a single JSON object matching the schema and nothing else.",
+      "user_template": "OPENING OF THE TEXT:\n{{text}}",
+      "retry_template": "Your previous reply was not valid for the required schema ({error}). Reply again with ONLY one JSON object that matches the schema.",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "is_fiction": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no",
+              "unsure"
+            ]
+          },
+          "is_translation": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no",
+              "unsure"
+            ]
+          },
+          "is_juvenile": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no",
+              "unsure"
+            ]
+          },
+          "setting_period": {
+            "type": "string",
+            "enum": [
+              "contemporary",
+              "historical",
+              "future",
+              "mixed",
+              "unclear"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "is_fiction",
+          "is_translation",
+          "is_juvenile",
+          "setting_period",
+          "confidence"
+        ],
+        "additionalProperties": false
+      },
+      "evidence_field": null
+    },
+    "label": {
+      "kind": "chat",
+      "model_ref": "gemma4:12b-it-q4_K_M",
+      "model_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "model_size_gb": 7.6,
+      "vram_gb_required": 10.0,
+      "kv_gb_per_slot": 0.5,
+      "ollama_version_range": ">=0.12.0,<1.0.0",
+      "codebook_version": "0.9-draft",
+      "num_ctx": 6144,
+      "num_predict": 512,
+      "temperature": 0,
+      "seed": 0,
+      "think": false,
+      "system_template": "CODEBOOK v0.9-draft — PLOT OBSTACLES IN NINETEENTH-CENTURY FICTION\n\nA PLOT OBSTACLE is something in the passage that blocks, delays or endangers a character's goal AND plausibly affects what happens next. Atmosphere, description or a mere mention does not count. Judge only from the passage (context before/after is for orientation; the evidence must come from the PASSAGE).\n\nhas_obstacle:\n- yes: at least one obstacle as defined above is present in the passage.\n- no: no character goal is blocked, delayed or endangered.\n- insufficient_context: the passage is too fragmentary (front matter, a list, verse without narrative) to judge.\n\nDOMAINS (pick the mechanism that does the blocking, not the topic of the scene):\n- DISTANCE_TRAVEL: distance, journeys, missed or slow transport, impassable roads.\n- COMMUNICATION_INFORMATION: letters, messages, news, secrets, identity, misunderstandings of information.\n- DARKNESS_VISIBILITY: night, darkness, fog, lack of light, inability to see or be seen.\n- ILLNESS_BODY_DEATH: illness, injury, physical weakness, death.\n- MONEY_PROPERTY_LAW: money, debt, inheritance, property, contracts, courts, police.\n- SOCIAL_RANK_CONVENTION: class, propriety, reputation, marriage and gender norms.\n- INTERPERSONAL_CONFLICT: a person actively opposes, threatens or thwarts another.\n- INNER_STATE: doubt, fear, desire, conscience, pride, shame inside the character.\n- NATURE_WEATHER: storms, floods, snow, terrain, animals.\n- OTHER: a real obstacle that fits none of the above.\n\nLOCUS (where the obstacle lives): material_external (things, distance, bodies, weather, darkness), social_institutional (law, money systems, rank, convention), internal_psychological (the character's own mind).\n\nSUB-FIELDS (use not_applicable / none when the domain does not call for them):\n- failure_cause (COMMUNICATION_INFORMATION only): infrastructure (the post/wire/system fails), accidental_loss (a letter lost or misdelivered), intentional_withholding (someone hides or suppresses information), misinterpretation (the message arrives but is misread), success_as_resolution (communication succeeds and removes the obstacle).\n- technology_named: the single most relevant technology named in the passage, else none.\n- message_valence (communication only): catastrophic, practical, romantic, financial.\n- night_function (DARKNESS_VISIBILITY, or any obstacle set at night): danger, concealment, intimacy, labor, leisure, else none.\n- resolution_hint: overcome_by_technology, by_person, by_chance, unresolved (default when the passage does not say).\n- obstacle_summary: at most 15 words, plain words, no names.\n- evidence_quote: copy a short span (5-40 words) EXACTLY from the PASSAGE, character for character, including its punctuation. Do not paraphrase, do not join distant sentences, do not add ellipses.\n- confidence: 0-1, your probability that the label is right.\n\nAt most 2 obstacles per passage, the most plot-relevant first. If has_obstacle is no or insufficient_context, return an empty obstacles list.\nReply with a single JSON object that matches the schema and nothing else.\n\nEXAMPLES\n\nPASSAGE: The letter which should have told her of his return lay three days in the wrong office at Bath, and when at last it came the coach had gone without her.\nOUTPUT: {\"has_obstacle\":\"yes\",\"obstacles\":[{\"domain\":\"COMMUNICATION_INFORMATION\",\"locus\":\"material_external\",\"failure_cause\":\"accidental_loss\",\"technology_named\":\"letter\",\"message_valence\":\"romantic\",\"night_function\":\"none\",\"resolution_hint\":\"unresolved\",\"obstacle_summary\":\"misdirected letter delays news of a lover's return\",\"evidence_quote\":\"lay three days in the wrong office at Bath\",\"confidence\":0.86}],\"confidence\":0.86}\n\nPASSAGE: The drawing-room was hung with yellow silk, and the evening passed in cards and music until the candles burned low.\nOUTPUT: {\"has_obstacle\":\"no\",\"obstacles\":[],\"confidence\":0.9}\n\nPASSAGE: He had the money in his pocket and the door before him; only his own pride, which would not let him knock, kept him in the street.\nOUTPUT: {\"has_obstacle\":\"yes\",\"obstacles\":[{\"domain\":\"INNER_STATE\",\"locus\":\"internal_psychological\",\"failure_cause\":\"not_applicable\",\"technology_named\":\"none\",\"message_valence\":\"not_applicable\",\"night_function\":\"none\",\"resolution_hint\":\"unresolved\",\"obstacle_summary\":\"pride stops a man from asking for help\",\"evidence_quote\":\"only his own pride, which would not let him knock, kept him in the street\",\"confidence\":0.8}],\"confidence\":0.8}",
       "user_template": "CONTEXT BEFORE (orientation only):\n{{ctx_before}}\n\nCONTEXT AFTER (orientation only):\n{{ctx_after}}\n\nPASSAGE (label this):\n{{text}}",
       "retry_template": "Your previous reply was not valid for the required schema ({error}). Reply again with ONLY one JSON object that matches the schema.",
       "schema": {
@@ -59,21 +140,119 @@
               "insufficient_context"
             ]
           },
-          "coarse_domain": {
-            "type": "string",
-            "enum": [
-              "DISTANCE_TRAVEL",
-              "COMMUNICATION_INFORMATION",
-              "DARKNESS_VISIBILITY",
-              "ILLNESS_BODY_DEATH",
-              "MONEY_PROPERTY_LAW",
-              "SOCIAL_RANK_CONVENTION",
-              "INTERPERSONAL_CONFLICT",
-              "INNER_STATE",
-              "NATURE_WEATHER",
-              "OTHER",
-              "NONE"
-            ]
+          "obstacles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "domain": {
+                  "type": "string",
+                  "enum": [
+                    "DISTANCE_TRAVEL",
+                    "COMMUNICATION_INFORMATION",
+                    "DARKNESS_VISIBILITY",
+                    "ILLNESS_BODY_DEATH",
+                    "MONEY_PROPERTY_LAW",
+                    "SOCIAL_RANK_CONVENTION",
+                    "INTERPERSONAL_CONFLICT",
+                    "INNER_STATE",
+                    "NATURE_WEATHER",
+                    "OTHER"
+                  ]
+                },
+                "locus": {
+                  "type": "string",
+                  "enum": [
+                    "material_external",
+                    "social_institutional",
+                    "internal_psychological"
+                  ]
+                },
+                "failure_cause": {
+                  "type": "string",
+                  "enum": [
+                    "infrastructure",
+                    "accidental_loss",
+                    "intentional_withholding",
+                    "misinterpretation",
+                    "success_as_resolution",
+                    "not_applicable"
+                  ]
+                },
+                "technology_named": {
+                  "type": "string",
+                  "enum": [
+                    "letter",
+                    "telegram",
+                    "telephone",
+                    "railway",
+                    "coach",
+                    "steamship",
+                    "gas",
+                    "electric",
+                    "candle",
+                    "none"
+                  ]
+                },
+                "message_valence": {
+                  "type": "string",
+                  "enum": [
+                    "catastrophic",
+                    "practical",
+                    "romantic",
+                    "financial",
+                    "not_applicable"
+                  ]
+                },
+                "night_function": {
+                  "type": "string",
+                  "enum": [
+                    "danger",
+                    "concealment",
+                    "intimacy",
+                    "labor",
+                    "leisure",
+                    "none"
+                  ]
+                },
+                "resolution_hint": {
+                  "type": "string",
+                  "enum": [
+                    "overcome_by_technology",
+                    "by_person",
+                    "by_chance",
+                    "unresolved"
+                  ]
+                },
+                "obstacle_summary": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "evidence_quote": {
+                  "type": "string",
+                  "maxLength": 400
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "domain",
+                "locus",
+                "failure_cause",
+                "technology_named",
+                "message_valence",
+                "night_function",
+                "resolution_hint",
+                "obstacle_summary",
+                "evidence_quote",
+                "confidence"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 2
           },
           "confidence": {
             "type": "number",
@@ -83,20 +262,19 @@
         },
         "required": [
           "has_obstacle",
-          "coarse_domain",
+          "obstacles",
           "confidence"
         ],
         "additionalProperties": false
       },
-      "evidence_keys": [
-        "evidence_quote"
-      ]
+      "evidence_field": "evidence_quote"
     },
-    "label": {
-      "model_ref": "PLACEHOLDER-label-14b:q4_K_M",
-      "model_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-      "model_size_gb": 9.0,
-      "vram_gb_required": 11.5,
+    "alt_label": {
+      "kind": "chat",
+      "model_ref": "qwen3.5:9b-q4_K_M",
+      "model_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "model_size_gb": 6.2,
+      "vram_gb_required": 8.5,
       "kv_gb_per_slot": 0.4,
       "ollama_version_range": ">=0.12.0,<1.0.0",
       "codebook_version": "0.9-draft",
@@ -246,15 +424,46 @@
         ],
         "additionalProperties": false
       },
-      "evidence_keys": [
-        "evidence_quote"
-      ]
+      "evidence_field": "evidence_quote"
+    },
+    "cloze": {
+      "kind": "chat",
+      "model_ref": "gemma4:12b-it-q4_K_M",
+      "model_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "model_size_gb": 7.6,
+      "vram_gb_required": 10.0,
+      "kv_gb_per_slot": 0.3,
+      "ollama_version_range": ">=0.12.0,<1.0.0",
+      "codebook_version": "cloze-0.1",
+      "num_ctx": 2048,
+      "num_predict": 24,
+      "temperature": 0,
+      "seed": 0,
+      "think": false,
+      "system_template": "NAME CLOZE. The passage comes from a published novel. One character's proper name has been replaced by [MASK]. Reply with the single most likely name, as a JSON object {\"name\": \"...\"}. Reply with one name even if you are unsure.",
+      "user_template": "PASSAGE:\n{{text}}",
+      "retry_template": "Your previous reply was not valid for the required schema ({error}). Reply again with ONLY one JSON object that matches the schema.",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "evidence_field": null
     },
     "adjudicate": {
-      "model_ref": "PLACEHOLDER-adjudicate-32b:q4_K_M",
-      "model_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-      "model_size_gb": 19.8,
-      "vram_gb_required": 22.0,
+      "kind": "chat",
+      "model_ref": "qwen3.8:27b-q4_K_M",
+      "model_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "model_size_gb": 17.0,
+      "vram_gb_required": 21.0,
       "kv_gb_per_slot": 0.8,
       "ollama_version_range": ">=0.12.0,<1.0.0",
       "codebook_version": "0.9-draft",
@@ -409,9 +618,20 @@
         ],
         "additionalProperties": false
       },
-      "evidence_keys": [
-        "evidence_quote"
-      ]
+      "evidence_field": "evidence_quote"
+    },
+    "embed": {
+      "kind": "embed",
+      "model_ref": "embeddinggemma:300m-bf16",
+      "model_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "model_size_gb": 0.6,
+      "vram_gb_required": 1.0,
+      "kv_gb_per_slot": 0.05,
+      "ollama_version_range": ">=0.12.0,<1.0.0",
+      "codebook_version": "embed-0.1",
+      "num_ctx": 2048,
+      "user_template": "{{text}}",
+      "evidence_field": null
     }
   }
 }

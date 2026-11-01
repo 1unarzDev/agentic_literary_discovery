@@ -6,7 +6,6 @@ from pathlib import Path
 DOMAINS = ["DISTANCE_TRAVEL", "COMMUNICATION_INFORMATION", "DARKNESS_VISIBILITY", "ILLNESS_BODY_DEATH",
            "MONEY_PROPERTY_LAW", "SOCIAL_RANK_CONVENTION", "INTERPERSONAL_CONFLICT", "INNER_STATE",
            "NATURE_WEATHER", "OTHER"]
-COARSE = DOMAINS + ["NONE"]
 LOCUS = ["material_external", "social_institutional", "internal_psychological"]
 FAILURE = ["infrastructure", "accidental_loss", "intentional_withholding", "misinterpretation",
            "success_as_resolution", "not_applicable"]
@@ -17,17 +16,6 @@ RESOLUTION = ["overcome_by_technology", "by_person", "by_chance", "unresolved"]
 HAS = ["yes", "no", "insufficient_context"]
 
 conf = {"type": "number", "minimum": 0, "maximum": 1}
-
-screen_schema = {
-    "type": "object",
-    "properties": {
-        "has_obstacle": {"type": "string", "enum": HAS},
-        "coarse_domain": {"type": "string", "enum": COARSE},
-        "confidence": conf,
-    },
-    "required": ["has_obstacle", "coarse_domain", "confidence"],
-    "additionalProperties": False,
-}
 
 obstacle = {
     "type": "object",
@@ -110,18 +98,6 @@ OUTPUT: {"has_obstacle":"no","obstacles":[],"confidence":0.9}
 PASSAGE: He had the money in his pocket and the door before him; only his own pride, which would not let him knock, kept him in the street.
 OUTPUT: {"has_obstacle":"yes","obstacles":[{"domain":"INNER_STATE","locus":"internal_psychological","failure_cause":"not_applicable","technology_named":"none","message_valence":"not_applicable","night_function":"none","resolution_hint":"unresolved","obstacle_summary":"pride stops a man from asking for help","evidence_quote":"only his own pride, which would not let him knock, kept him in the street","confidence":0.8}],"confidence":0.8}"""
 
-FEW_SHOT_SCREEN = """EXAMPLES
-
-PASSAGE: The letter which should have told her of his return lay three days in the wrong office at Bath, and when at last it came the coach had gone without her.
-OUTPUT: {"has_obstacle":"yes","coarse_domain":"COMMUNICATION_INFORMATION","confidence":0.85}
-
-PASSAGE: The drawing-room was hung with yellow silk, and the evening passed in cards and music until the candles burned low.
-OUTPUT: {"has_obstacle":"no","coarse_domain":"NONE","confidence":0.9}"""
-
-SCREEN_SYSTEM = (CODEBOOK.split("SUB-FIELDS")[0].rstrip()
-                 + "\n\nTASK (SCREEN): decide has_obstacle and give the single most likely coarse_domain "
-                   "(NONE if has_obstacle is not yes). Reply with a single JSON object that matches the schema "
-                   "and nothing else.\n\n" + FEW_SHOT_SCREEN)
 LABEL_SYSTEM = CODEBOOK + "\n\n" + FEW_SHOT_LABEL
 ADJ_SYSTEM = (CODEBOOK + "\n\nTASK (ADJUDICATE): you are the senior annotator. Label the passage from scratch "
               "with the full schema and add a rationale (at most 80 words) that cites the passage.\n\n" + FEW_SHOT_LABEL)
@@ -132,10 +108,44 @@ USER = ("CONTEXT BEFORE (orientation only):\n{{ctx_before}}\n\nCONTEXT AFTER (or
 RETRY = ("Your previous reply was not valid for the required schema ({error}). Reply again with ONLY one JSON "
          "object that matches the schema.")
 
-def stage(model_ref, digest, size, vram, kv, num_ctx, num_predict, system, schema, codebook_version):
+WORKCHECK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "is_fiction": {"type": "string", "enum": ["yes", "no", "unsure"]},
+        "is_translation": {"type": "string", "enum": ["yes", "no", "unsure"]},
+        "is_juvenile": {"type": "string", "enum": ["yes", "no", "unsure"]},
+        "setting_period": {"type": "string", "enum": ["contemporary", "historical", "future", "mixed", "unclear"]},
+        "confidence": conf,
+    },
+    "required": ["is_fiction", "is_translation", "is_juvenile", "setting_period", "confidence"],
+    "additionalProperties": False,
+}
+
+WORKCHECK_SYSTEM = """WORK CHECK. You see the opening (~1,500 words) of a Project Gutenberg text. Decide:
+- is_fiction: yes if it is a novel, novella or short-story collection; no for history, essays, sermons, travel, drama, verse collections, periodicals; unsure if you cannot tell.
+- is_translation: yes if the text says it is translated, or names a translator, or is plainly a foreign work in English dress.
+- is_juvenile: yes if it is written for children (school stories, fairy tales, primers, boys'/girls' adventure series).
+- setting_period: contemporary (set at about the time it was written), historical (set at least ~30 years before it was written), future, mixed, or unclear.
+- confidence: 0-1.
+Ignore the Project Gutenberg licence header. Reply with a single JSON object matching the schema and nothing else."""
+
+CLOZE_SCHEMA = {"type": "object", "properties": {"name": {"type": "string", "maxLength": 60}},
+                "required": ["name"], "additionalProperties": False}
+CLOZE_SYSTEM = ("NAME CLOZE. The passage comes from a published novel. One character's proper name has been "
+                "replaced by [MASK]. Reply with the single most likely name, as a JSON object {\"name\": \"...\"}. "
+                "Reply with one name even if you are unsure.")
+
+USER_WORK = "OPENING OF THE TEXT:\n{{text}}"
+USER_CLOZE = "PASSAGE:\n{{text}}"
+
+
+def stage(model_ref, size, vram, kv, num_ctx, num_predict, system, schema, codebook_version, user=USER,
+          evidence_field="evidence_quote", digest_tag="0"):
     return {
+        "kind": "chat",
         "model_ref": model_ref,
-        "model_digest": digest,
+        # Digests are filled in from `ollama show`/`/api/tags` at freeze time; never hard-coded in code.
+        "model_digest": "sha256:" + digest_tag * 64,
         "model_size_gb": size,
         "vram_gb_required": vram,
         "kv_gb_per_slot": kv,
@@ -147,32 +157,51 @@ def stage(model_ref, digest, size, vram, kv, num_ctx, num_predict, system, schem
         "seed": 0,
         "think": False,
         "system_template": system,
-        "user_template": USER,
+        "user_template": user,
         "retry_template": RETRY,
         "schema": schema,
-        "evidence_keys": ["evidence_quote"],
+        "evidence_field": evidence_field,
     }
 
 reg = {
-    "$comment": ("EXAMPLE ONLY. Model tags and digests are placeholders until the Day-1 model freeze. "
-                 "min_vram_gb thresholds sit ~0.5 GB under the nominal card size because drivers report "
-                 "slightly less (a 16 GB card shows 15.99 GiB)."),
-    "registry_version": "2026-10-31.example.1",
+    "$comment": ("EXAMPLE ONLY: digests are placeholders (all-same-hex); the real registry/models.v1.json is "
+                 "generated at freeze time. min_vram_gb thresholds sit ~0.5 GB under the nominal card size "
+                 "because drivers report slightly less (a 16 GB card shows 15.99 GiB)."),
+    "registry_version": "2026-10-31.example.2",
+    "unload_others": True,
     # Coordinator-compatible tier table: the coordinator limits leases to
     # tiers[<tier>].stages; the client picks the tier by min_vram_gb.
     "tiers": {
-        "cpu": {"min_vram_gb": 0, "stages": ["embed", "cloze"]},
-        "t8": {"min_vram_gb": 7.5, "stages": ["screen"]},
-        "t16": {"min_vram_gb": 15.5, "stages": ["screen", "label"]},
-        "t24": {"min_vram_gb": 23.5, "stages": ["screen", "label", "adjudicate"]},
+        "cpu": {"min_vram_gb": 0, "num_parallel_hint": 1, "stages": ["embed"]},
+        "t8": {"min_vram_gb": 7.5, "num_parallel_hint": 2, "stages": ["workcheck"]},
+        "t16": {"min_vram_gb": 15.5, "num_parallel_hint": 4, "stages": ["label", "alt_label", "cloze", "workcheck"]},
+        "t24": {"min_vram_gb": 23.5, "num_parallel_hint": 4,
+                "stages": ["adjudicate", "label", "alt_label", "cloze", "workcheck", "embed"]},
     },
     "stages": {
-        "screen": stage("PLACEHOLDER-screen-8b:q4_K_M", "sha256:" + "0" * 64, 5.2, 6.5, 0.15, 4096, 64,
-                        SCREEN_SYSTEM, screen_schema, "0.9-draft"),
-        "label": stage("PLACEHOLDER-label-14b:q4_K_M", "sha256:" + "1" * 64, 9.0, 11.5, 0.4, 6144, 512,
-                       LABEL_SYSTEM, label_schema, "0.9-draft"),
-        "adjudicate": stage("PLACEHOLDER-adjudicate-32b:q4_K_M", "sha256:" + "2" * 64, 19.8, 22.0, 0.8, 8192, 768,
-                            ADJ_SYSTEM, adjudicate_schema, "0.9-draft"),
+        "workcheck": stage("qwen3.5:4b-q4_K_M", 3.2, 4.5, 0.25, 4096, 96, WORKCHECK_SYSTEM, WORKCHECK_SCHEMA,
+                           "workcheck-0.1", user=USER_WORK, evidence_field=None, digest_tag="1"),
+        "label": stage("gemma4:12b-it-q4_K_M", 7.6, 10.0, 0.5, 6144, 512, LABEL_SYSTEM, label_schema,
+                       "0.9-draft", digest_tag="2"),
+        "alt_label": stage("qwen3.5:9b-q4_K_M", 6.2, 8.5, 0.4, 6144, 512, LABEL_SYSTEM, label_schema,
+                           "0.9-draft", digest_tag="3"),
+        "cloze": stage("gemma4:12b-it-q4_K_M", 7.6, 10.0, 0.3, 2048, 24, CLOZE_SYSTEM, CLOZE_SCHEMA,
+                       "cloze-0.1", user=USER_CLOZE, evidence_field=None, digest_tag="2"),
+        "adjudicate": stage("qwen3.8:27b-q4_K_M", 17.0, 21.0, 0.8, 8192, 768, ADJ_SYSTEM, adjudicate_schema,
+                            "0.9-draft", digest_tag="4"),
+        "embed": {
+            "kind": "embed",
+            "model_ref": "embeddinggemma:300m-bf16",
+            "model_digest": "sha256:" + "5" * 64,
+            "model_size_gb": 0.6,
+            "vram_gb_required": 1.0,
+            "kv_gb_per_slot": 0.05,
+            "ollama_version_range": ">=0.12.0,<1.0.0",
+            "codebook_version": "embed-0.1",
+            "num_ctx": 2048,
+            "user_template": "{{text}}",
+            "evidence_field": None,
+        },
     },
 }
 

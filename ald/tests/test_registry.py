@@ -82,8 +82,15 @@ def test_example_registry_file_validates():
     if not p.exists():
         pytest.skip("repo registry not present")
     reg = Registry.load(p)
-    assert set(reg.stages) == {"screen", "label", "adjudicate"}
-    assert reg.stages["screen"].schema["properties"]["has_obstacle"]["enum"] == ["yes", "no", "insufficient_context"]
+    assert set(reg.stages) == {"workcheck", "label", "alt_label", "cloze", "adjudicate", "embed"}
+    assert reg.stages["label"].schema["properties"]["has_obstacle"]["enum"] == ["yes", "no", "insufficient_context"]
+    assert reg.stages["embed"].kind == "embed" and reg.stages["embed"].evidence_keys == []
+    assert reg.stages["workcheck"].evidence_keys == [] and reg.stages["cloze"].evidence_keys == []
+    assert reg.stages["label"].evidence_keys == ["evidence_quote"]
+    # alt_label differs from label only by model: same prompt hash, different pin.
+    assert reg.stages["alt_label"].prompt_hash() == reg.stages["label"].prompt_hash()
+    assert reg.stages["alt_label"].pin_hash() != reg.stages["label"].pin_hash()
+    assert reg.unload_others is True and reg.num_parallel_hint("t16") == 4
     lab = reg.stages["label"].schema["properties"]["obstacles"]["items"]["properties"]
     for f in ("domain", "locus", "failure_cause", "night_function", "technology_named", "message_valence",
               "resolution_hint", "obstacle_summary", "evidence_quote", "confidence"):
@@ -102,11 +109,15 @@ def test_static_system_prompt_has_no_passage_placeholders(registry_raw):
 
 def test_invalid_registry_rejected(registry_raw):
     bad = copy.deepcopy(registry_raw)
-    del bad["stages"]["screen"]["model_digest"]
+    del bad["stages"]["label"]["model_digest"]
     with pytest.raises(RegistryError):
         Registry.from_dict(bad)
     bad = copy.deepcopy(registry_raw)
-    bad["stages"]["screen"]["schema"] = {"type": "nonsense"}
+    bad["stages"]["label"]["schema"] = {"type": "nonsense"}
+    with pytest.raises(RegistryError):
+        Registry.from_dict(bad)
+    bad = copy.deepcopy(registry_raw)
+    del bad["stages"]["label"]["system_template"]  # chat stages need templates
     with pytest.raises(RegistryError):
         Registry.from_dict(bad)
 
@@ -123,8 +134,10 @@ def test_select_tier(registry_raw, vram, tier):
 
 def test_allowed_stages_only_defined(registry_raw):
     reg = Registry.from_dict(registry_raw)
-    assert reg.allowed_stages("cpu") == []  # embed/cloze are not inference stages here
-    assert reg.allowed_stages("t16") == ["screen", "label"]
+    assert reg.allowed_stages("cpu") == ["embed"]
+    assert reg.allowed_stages("t8") == ["workcheck"]
+    assert reg.allowed_stages("t16") == ["label", "alt_label", "cloze", "workcheck"]
+    assert set(reg.allowed_stages("t24")) == set(reg.stages)
     assert reg.allowed_stages("nope") == []
 
 
@@ -154,16 +167,30 @@ def test_render_template():
 def test_tier_table_shapes():
     from ald.registry import normalize_tiers
     d = normalize_tiers({"t8": {"min_vram_gb": 7.5, "stages": ["screen"]}, "cpu": ["embed"]})
-    assert {"name": "t8", "min_vram_gb": 7.5, "allowed_stages": ["screen"]} in d
-    assert {"name": "cpu", "min_vram_gb": 0.0, "allowed_stages": ["embed"]} in d
-    l = normalize_tiers([{"name": "t16", "min_vram_gb": 15.5, "allowed_stages": ["label"]}])
-    assert l == [{"name": "t16", "min_vram_gb": 15.5, "allowed_stages": ["label"]}]
+    assert {"name": "t8", "min_vram_gb": 7.5, "allowed_stages": ["screen"], "num_parallel_hint": None} in d
+    assert {"name": "cpu", "min_vram_gb": 0.0, "allowed_stages": ["embed"], "num_parallel_hint": None} in d
+    l = normalize_tiers([{"name": "t16", "min_vram_gb": 15.5, "allowed_stages": ["label"], "num_parallel_hint": 3}])
+    assert l == [{"name": "t16", "min_vram_gb": 15.5, "allowed_stages": ["label"], "num_parallel_hint": 3}]
 
 
 def test_active_pins_mark_stale(registry_raw):
     reg = Registry.from_dict(registry_raw)
-    pin = reg.stages["screen"].pin_hash()
+    pin = reg.stages["workcheck"].pin_hash()
     raw = dict(registry_raw, active_pins=[pin])
     reg2 = Registry.from_dict(raw)
     assert reg2.pin_is_active(pin) and not reg2.pin_is_active(reg.stages["label"].pin_hash())
-    assert set(reg2.active_pins().values()) == {"screen"}
+    assert set(reg2.active_pins().values()) == {"workcheck"}
+
+
+def test_embed_stage_minimal_and_hash_includes_kind():
+    raw = {"kind": "embed", "model_ref": "e:1", "model_digest": "ab" * 32, "ollama_version_range": ">=0.12"}
+    st = Stage("embed", raw)
+    chat_like = Stage("embed", dict(raw, kind="chat"))
+    assert st.prompt_hash() != chat_like.prompt_hash()
+    assert st.evidence_keys == [] and st.user_template == "{{text}}"
+
+
+def test_evidence_field_null_disables_verification():
+    assert Stage("x", dict(RAW, evidence_field=None)).evidence_keys == []
+    assert Stage("x", dict(RAW, evidence_field="quote")).evidence_keys == ["quote"]
+    assert Stage("x", RAW).evidence_keys == ["evidence_quote"]

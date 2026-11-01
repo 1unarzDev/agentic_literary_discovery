@@ -298,7 +298,8 @@ class Worker:
         for s in ok:
             st = reg.stages[s]
             cap = max(1, self.fit.max_concurrency(st, self.max_concurrency))
-            start = int((self.cfg.bench or {}).get(s, {}).get("best_concurrency", 2))
+            hint = reg.num_parallel_hint(tier) or 2
+            start = int((self.cfg.bench or {}).get(s, {}).get("best_concurrency", hint))
             if s not in self.tuners:
                 self.tuners[s] = ConcurrencyTuner(start=min(start, cap), max_c=cap, clock=self.clock)
             else:
@@ -849,7 +850,7 @@ class Worker:
     # (~8x slower), so keep only the model being run on the GPU.
     # ------------------------------------------------------------------
     def unload_non_pinned(self, keep: set[str] | None = None) -> list[str]:
-        if self.hw.accel == "cpu":
+        if self.hw.accel == "cpu" or (self._registry is not None and not self._registry.unload_others):
             return []
         if keep is None:
             keep = {self.registry.stages[s].model_ref for s in self.stages}
