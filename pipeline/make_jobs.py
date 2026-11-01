@@ -14,6 +14,7 @@ import hashlib
 import io
 import json
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -45,6 +46,7 @@ def canon(o) -> str:
 def pin_for(stage: str, reg: dict) -> dict:
     """Must match ald.registry hashing: prompt_hash = sha256(canon{template, codebook_version, schema, options})."""
     s = reg["stages"][stage]
+    sys.path.insert(0, str(ROOT / "ald/src"))
     from ald.registry import compute_pin  # single source of truth for hashing
     return compute_pin(stage, s)
 
@@ -92,82 +94,121 @@ def cloze_items(works: pd.DataFrame, per_work: int = 3) -> list[dict]:
     return items
 
 
-# ---------------------------------------------------------------- waves
-def build_waves(works: pd.DataFrame, passages: pd.DataFrame) -> list[dict]:
-    """Return list of wave dicts: {wave, stage, split, priority, items}"""
-    rng = np.random.default_rng(SEED)
-    p = passages.copy()
-    p["r"] = rng.random(len(p))
-    rnd = p[p.stratum == "random"].sort_values("r")
-    rnd["k"] = rnd.groupby("work_id").cumcount()
-    enr = p[p.stratum != "random"]
-    waves = [
-        {"wave": "w00_workcheck", "stage": "workcheck", "items": workcheck_items(works), "priority": 10},
-        {"wave": "w01_disc_rand_a", "stage": "label", "items": rnd[(rnd.split == "discovery") & (rnd.k < 12)], "priority": 20},
-        {"wave": "w02_conf_rand_a", "stage": "label", "items": rnd[(rnd.split == "confirmation") & (rnd.k < 12)], "priority": 21},
-        {"wave": "w03_disc_enrich", "stage": "label", "items": enr[enr.split == "discovery"], "priority": 22},
-        {"wave": "w04_conf_enrich", "stage": "label", "items": enr[enr.split == "confirmation"], "priority": 23},
-        {"wave": "w05_disc_rand_b", "stage": "label", "items": rnd[(rnd.split == "discovery") & (rnd.k >= 12)], "priority": 24},
-        {"wave": "w06_conf_rand_b", "stage": "label", "items": rnd[(rnd.split == "confirmation") & (rnd.k >= 12)], "priority": 25},
-        {"wave": "w07_cloze", "stage": "cloze", "items": cloze_items(works), "priority": 30},
-        {"wave": "w08_alt_label", "stage": "alt_label",
-         "items": rnd[(rnd.split == "discovery") & (rnd.k < 12)].sample(frac=0.10, random_state=SEED), "priority": 40},
-    ]
-    for w in waves:
-        if isinstance(w["items"], pd.DataFrame):
-            cols = ["passage_id", "work_id", "decade", "stratum", "text", "ctx_before", "ctx_after", "text_sha256", "split"]
-            w["items"] = w["items"][cols].to_dict("records")
-    return waves
+# ---------------------------------------------------------------- waves (streamed via DuckDB; never loads all text)
+import duckdb  # noqa: E402
+
+PCOLS = "passage_id, work_id, decade, stratum, text, ctx_before, ctx_after, text_sha256, split"
+LABEL_WAVES = [  # (wave, split, predicate on ranked passages, priority)
+    ("w01_disc_rand_a", "discovery", "stratum='random' AND k < 12", 20),
+    ("w02_conf_rand_a", "confirmation", "stratum='random' AND k < 12", 21),
+    ("w03_disc_enrich", "discovery", "stratum<>'random'", 22),
+    ("w04_conf_enrich", "confirmation", "stratum<>'random'", 23),
+    ("w05_disc_rand_b", "discovery", "stratum='random' AND k >= 12", 24),
+    ("w06_conf_rand_b", "confirmation", "stratum='random' AND k >= 12", 25),
+]
 
 
-def shard_wave(w: dict) -> list[dict]:
-    """Shuffle across decades, cut into shards per split; returns job specs with local shard paths."""
-    rng = np.random.default_rng(int(hashlib.sha256(f"{SEED}:{w['wave']}".encode()).hexdigest()[:12], 16))
-    jobs = []
-    for split in ("discovery", "confirmation"):
-        its = [i for i in w["items"] if i["split"] == split]
-        if not its:
-            continue
-        order = rng.permutation(len(its))
-        size = SHARD_SIZE[w["stage"]]
-        for s in range(0, len(its), size):
-            chunk = [its[i] for i in order[s:s + size]]
-            sid = f"{w['wave']}_{split[:4]}_{s // size:05d}"
-            path = SHARDS / w["wave"] / f"{sid}.jsonl.gz"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            buf = io.BytesIO()
-            with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as g:
-                for it in chunk:
-                    g.write((json.dumps({k: v for k, v in it.items() if k != "split"}, ensure_ascii=False) + "\n").encode())
-            path.write_bytes(buf.getvalue())
-            dup = f"dup_{sid}" if rng.random() < DUP_RATE else None
-            decades = sorted({int(i["decade"]) for i in chunk})
-            base = {"stage": w["stage"], "wave": w["wave"], "shard_key": f"shards/{w['wave']}/{sid}.jsonl.gz",
-                    "n_passages": len(chunk), "split": split, "priority": w["priority"], "dup_group": dup,
-                    "local": str(path), "decades": decades}
-            jobs.append({**base, "job_id": sid})
-            if dup:
-                jobs.append({**base, "job_id": sid + "_dup"})
+def ranked_view(con, exclude_works: set[str]) -> None:
+    con.execute(f"""CREATE OR REPLACE TEMP VIEW ranked AS
+        SELECT *, row_number() OVER (PARTITION BY work_id, stratum='random'
+                                     ORDER BY hash(passage_id || '{SEED}')) - 1 AS k
+        FROM read_parquet('{WORK / "passages.parquet"}')""")
+    con.execute("CREATE OR REPLACE TEMP TABLE excluded(work_id VARCHAR)")
+    if exclude_works:
+        con.executemany("INSERT INTO excluded VALUES (?)", [(w,) for w in exclude_works])
+
+
+def write_shards(wave: str, stage: str, priority: int, rows_iter, split: str) -> list[dict]:
+    rng = np.random.default_rng(int(hashlib.sha256(f"{SEED}:{wave}:{split}".encode()).hexdigest()[:12], 16))
+    size = SHARD_SIZE[stage]
+    jobs, chunk, n = [], [], 0
+    def flush():
+        nonlocal chunk, n
+        if not chunk:
+            return
+        sid = f"{wave}_{split[:4]}_{n:05d}"
+        path = SHARDS / wave / f"{sid}.jsonl.gz"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        buf = io.BytesIO()
+        with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as g:
+            for it in chunk:
+                g.write((json.dumps({k: v for k, v in it.items() if k != "split"}, ensure_ascii=False) + "\n").encode())
+        path.write_bytes(buf.getvalue())
+        dup = f"dup_{sid}" if rng.random() < DUP_RATE else None
+        base = {"stage": stage, "wave": wave, "shard_key": f"shards/{wave}/{sid}.jsonl.gz", "n_passages": len(chunk),
+                "split": split, "priority": priority, "dup_group": dup, "local": str(path),
+                "decades": sorted({int(i["decade"]) for i in chunk})}
+        jobs.append({**base, "job_id": sid})
+        if dup:
+            jobs.append({**base, "job_id": sid + "_dup"})
+        chunk, n = [], n + 1
+    for it in rows_iter:
+        chunk.append(it)
+        if len(chunk) >= size:
+            flush()
+    flush()
     return jobs
+
+
+def iter_query(con, sql: str, batch: int = 2000):
+    cur = con.execute(sql)
+    cols = [d[0] for d in cur.description]
+    while True:
+        rows = cur.fetchmany(batch)
+        if not rows:
+            return
+        for r in rows:
+            d = dict(zip(cols, r))
+            d["decade"] = int(d["decade"])
+            yield d
+
+
+def build_jobs(works: pd.DataFrame, waves: set[str] | None, exclude_works: set[str]) -> list[dict]:
+    con = duckdb.connect()
+    con.execute("SET memory_limit='4GB'; SET threads=8")
+    ranked_view(con, exclude_works)
+    alljobs = []
+    def want(w):
+        return waves is None or w in waves or w[:3] in waves
+    if want("w00_workcheck"):
+        items = workcheck_items(works)
+        for split in ("discovery", "confirmation"):
+            alljobs += write_shards("w00_workcheck", "workcheck", 10, (i for i in items if i["split"] == split), split)
+    for wave, split, pred, prio in LABEL_WAVES:
+        if not want(wave):
+            continue
+        sql = (f"SELECT {PCOLS} FROM ranked WHERE split='{split}' AND ({pred}) "
+               f"AND work_id NOT IN (SELECT work_id FROM excluded) ORDER BY hash(passage_id || '{wave}')")
+        alljobs += write_shards(wave, "label", prio, iter_query(con, sql), split)
+    if want("w07_cloze"):
+        items = cloze_items(works[~works.work_id.isin(exclude_works)])
+        for split in ("discovery", "confirmation"):
+            alljobs += write_shards("w07_cloze", "cloze", 30, (i for i in items if i["split"] == split), split)
+    if want("w08_alt_label"):
+        sql = (f"SELECT {PCOLS} FROM ranked WHERE split='discovery' AND stratum='random' AND k < 12 "
+               f"AND work_id NOT IN (SELECT work_id FROM excluded) AND hash(passage_id || 'alt') % 10 = 0 "
+               f"ORDER BY hash(passage_id || 'w08')")
+        alljobs += write_shards("w08_alt_label", "alt_label", 40, iter_query(con, sql), "discovery")
+    return alljobs
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["plan", "push"])
     ap.add_argument("--waves", default="")
+    ap.add_argument("--exclude-from-workcheck", default="", help="parquet with work_id, keep")
     a = ap.parse_args()
     works = pd.read_parquet(WORK / "works.parquet")
     works = works[works.decade.between(1800, 1920)]
-    passages = pd.read_parquet(WORK / "passages.parquet")
-    waves = build_waves(works, passages)
     sel = set(a.waves.split(",")) if a.waves else None
-    alljobs = []
-    for w in waves:
-        if sel and w["wave"] not in sel and w["wave"][:3] not in sel:
-            continue
-        jobs = shard_wave(w)
-        alljobs += jobs
-        print(f"{w['wave']:18s} stage={w['stage']:9s} items={len(w['items']):7d} jobs={len(jobs):5d}")
+    excl: set[str] = set()
+    if a.exclude_from_workcheck:
+        wc = pd.read_parquet(a.exclude_from_workcheck)  # columns: work_id, keep(bool)
+        excl = set(wc.loc[~wc.keep, "work_id"])
+        print("excluding", len(excl), "works failing workcheck")
+    alljobs = build_jobs(works, sel, excl)
+    for (wave, stage), g in pd.DataFrame(alljobs).groupby(["wave", "stage"]):
+        print(f"{wave:18s} stage={stage:9s} passages={int(g.n_passages.sum()):7d} jobs={len(g):5d}")
     (WORK / "jobs_plan.json").write_text(json.dumps(alljobs), encoding="utf-8")
     if a.cmd == "plan":
         return
