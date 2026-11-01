@@ -208,8 +208,8 @@ def main() -> None:
     sel = set(a.waves.split(",")) if a.waves else None
     excl: set[str] = set()
     if a.exclude_from_workcheck:
-        wc = pd.read_parquet(a.exclude_from_workcheck)  # columns: work_id, keep(bool)
-        excl = set(wc.loc[~wc.keep, "work_id"])
+        wc = pd.read_parquet(a.exclude_from_workcheck)  # columns: work_id, keep (nullable bool; None = unknown)
+        excl = set(wc.loc[wc.keep.astype("boolean").eq(False).fillna(False), "work_id"])
         print("excluding", len(excl), "works failing workcheck")
     alljobs = build_jobs(works, sel, excl)
     for (wave, stage), g in pd.DataFrame(alljobs).groupby(["wave", "stage"]):
