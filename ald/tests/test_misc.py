@@ -276,3 +276,23 @@ def test_ui_ascii_fallback(monkeypatch):
     assert set(ui.sparkline([0, 1, 5, 10])) <= set(ui.SPARK_ASCII)
     t = ui.bar([(1, "green"), (1, "grey37")], 10).plain
     assert t.encode("cp1252") and set(t) <= {"#", "."}
+
+
+def test_config_menu_scripted(cli_home):
+    import io
+    from rich.console import Console
+    from ald import ui
+    from ald.config import Config
+    answers = iter(["3", "22:00-07:00", "4", "0", "4", "3", "8", "no", "s", "n"])  # "0" is rejected, then 3
+    changed = ui.config_menu(Console(file=io.StringIO()), lambda q: next(answers), restart=lambda: [])
+    cfg = Config.load()
+    assert changed and cfg.active_hours == "22:00-07:00" and cfg.max_concurrency == 3 and cfg.keep_awake is False
+
+
+def test_config_set_cli(cli_home):
+    from ald.cli import app
+    from ald.config import Config
+    r = CliRunner().invoke(app, ["config", "set", "stages", "label,workcheck"])
+    assert r.exit_code == 0 and Config.load().stages == ["label", "workcheck"]
+    assert CliRunner().invoke(app, ["config", "set", "active_hours", "25:00-01:00"]).exit_code == 2
+    assert CliRunner().invoke(app, ["config", "set", "nope", "1"]).exit_code == 2

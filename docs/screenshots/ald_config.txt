@@ -1,0 +1,13 @@
+                       ald settings (/home/lunarz/.config/ald/config.json)                       
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
+┃ # ┃ setting                                                              ┃ value              ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
+│ 1 │ Display name (re-join to change it on the coordinator)               │ lunarz-4070tis     │
+│ 2 │ Disk budget for ald (GB; empty = 10 GB, always keeps 20 GB free)     │ (default)          │
+│ 3 │ Work only between HH:MM-HH:MM daily (empty = always)                 │ (default)          │
+│ 4 │ Max concurrent requests (empty = 8; auto-tuned below it)             │ (default)          │
+│ 5 │ Stages subset, comma-separated (empty = all allowed for the tier)    │ (default)          │
+│ 6 │ GPU lock file shared with other programs (Linux/macOS; empty = none) │ /tmp/aacv_gpu.lock │
+│ 7 │ Install updates automatically                                        │ yes                │
+│ 8 │ Keep the computer awake while working (off = allow sleep)            │ yes                │
+└───┴──────────────────────────────────────────────────────────────────────┴────────────────────┘

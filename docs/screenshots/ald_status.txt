@@ -1,0 +1,15 @@
+╭─────────────────────────────────────────── ald status - COLLIN ────────────────────────────────────────────╮
+│ Worker       working  pid 28372 (service)                                                                  │
+│ Coordinator  https://ald-coordinator.lunarzdev.workers.dev  last contact 37s ago                           │
+│ Keep-awake   held                                                                                          │
+│ Power        desktop (no battery)                                                                          │
+│ Tier / GPU   t12  NVIDIA GeForce RTX 3060 (12.0 GB)                                                        │
+│ Stages       label, workcheck, cloze, alt_label, embed                                                     │
+│ Ollama       gemma4:12b-it-q4_K_M 100% on GPU                                                              │
+│ Job          w01_disc_rand_a_disc_00181 (label) ████████████████████ 0%  ETA 14m                           │
+│ Throughput   label: 1700/h (c=2), workcheck: 2011/h (c=4), cloze: 10990/h (c=8), alt_label: 1298/h (c=4),  │
+│              embed: 343258/h (c=8)                                                                         │
+│ Disk         4.6 MB used of 10.0 GB budget (free 725.2 GB, reserve 20.0 GB)                                │
+│ Outbox       0 pending upload(s), 0 B                                                                      │
+│ Version      0.1.6  (latest)                                                                               │
+╰───────────────────────────────────── C:\Users\Mrmag\AppData\Local\ald ─────────────────────────────────────╯
