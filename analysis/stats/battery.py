@@ -249,7 +249,8 @@ def _naive_pair(variant_labels: pd.DataFrame, labels: pd.DataFrame, split: str) 
 def run_all(labels_path: str, human_path: str, frame_path: str | None, keywords_path: str,
             alt_path: str | None = None, seg_paths: tuple = (), rep_labels: str | None = None,
             rep_human: str | None = None, rep_frame: str | None = None, split: str = "confirmation",
-            n_perm: int = 200, out_dir: str = "analysis/stats/out/confirmatory") -> pd.DataFrame:
+            n_perm: int = 200, out_dir: str = "analysis/stats/out/confirmatory",
+            expert: str = "teacher") -> pd.DataFrame:
     import functools
     from pathlib import Path
 
