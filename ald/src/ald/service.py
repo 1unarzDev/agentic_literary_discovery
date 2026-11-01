@@ -370,7 +370,11 @@ def refresh_definition(run: Runner = _run, platform: str = sys.platform) -> str:
         p = _plist_path()
         if not p.exists():
             return ""
-        args = re.findall(r"<string>(.*?)</string>", p.read_text(encoding="utf-8"))
+        import plistlib
+        try:
+            args = list(plistlib.loads(p.read_bytes()).get("ProgramArguments") or [])
+        except Exception:  # noqa: BLE001 - unreadable plist: rewrite without extras
+            args = []
         extra = _extra_after_service(args)
         p.write_text(launchd_plist(work_command(extra), Path.home() / "Library" / "Logs" / "ald-worker.log"),
                      encoding="utf-8", newline="\n")

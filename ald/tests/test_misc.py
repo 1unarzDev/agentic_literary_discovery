@@ -311,3 +311,23 @@ def test_windows_install_keeps_admin_created_task(monkeypatch):
     msgs = service.install(run=run, platform="win32")
     assert any("kept it" in m for m in msgs) and not any(m.startswith("FAILED") for m in msgs)
     assert ["schtasks", "/Run", "/TN", "ald-worker"] in calls
+
+
+def test_launchd_plist_is_valid_and_robust():
+    import plistlib
+    d = plistlib.loads(service.launchd_plist(["/Users/a b/.local/bin/ald", "work", "--service", "--gpu-lock", "/tmp/x&y"],
+                                             Path("/Users/a b/Library/Logs/ald-worker.log")).encode())
+    assert d["Label"] == "org.ald.worker" and d["RunAtLoad"] is True and d["KeepAlive"] is True
+    assert d["ThrottleInterval"] == 30 and d["ProgramArguments"][-1] == "/tmp/x&y"
+    assert "/opt/homebrew/bin" in d["EnvironmentVariables"]["PATH"]
+
+
+def test_mac_refresh_definition_keeps_args(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    p = tmp_path / "Library" / "LaunchAgents" / "org.ald.worker.plist"
+    p.parent.mkdir(parents=True)
+    p.write_text(service.launchd_plist(["/u/ald", "work", "--keep-awake", "--service", "--max-concurrency", "3"],
+                                       tmp_path / "l.log"))
+    assert "refreshed" in service.refresh_definition(run=lambda c: P(0, "", ""), platform="darwin")
+    import plistlib
+    assert plistlib.loads(p.read_bytes())["ProgramArguments"][-2:] == ["--max-concurrency", "3"]
