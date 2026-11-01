@@ -228,6 +228,7 @@ class Worker:
                     return True
             self.log(f"[registry] poll failed: {e}")
             return False
+        self.last_contact = self.clock.time()
         if raw is None:
             return False
         try:
@@ -919,6 +920,7 @@ class Worker:
             ping = self.client.ping()
         except (CoordinatorError, httpx.TransportError):
             return
+        self.last_contact = self.clock.time()
         d = decide(ping)
         self._update_available = d.update_available
         if d.required:

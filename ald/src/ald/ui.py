@@ -100,15 +100,16 @@ def local_summary(cfg: Config) -> dict[str, Any]:
     st = read_json(root / "state.json", {}) or {}
     ok, why = svc.verify(root / "state.json")
     rep = st.get("report") or {}
+    alive = ok or "has not reached the coordinator" in why  # process up, coordinator contact pending
     storage = StorageManager(root, budget_bytes=int(cfg.disk_budget_gb * GB) if cfg.disk_budget_gb else None)
     n_out, out_bytes = Outbox(root).size()
     ping = _ping(cfg.coordinator_url)
     from .updater import decide
     upd = decide(ping, current=CLIENT_VERSION) if ping else None
     return {
-        "worker_running": ok, "worker_detail": why, "state": rep.get("state") if ok else "not running",
+        "worker_running": ok, "worker_detail": why, "state": rep.get("state") if alive else "not running",
         "pid": st.get("pid"), "service": st.get("service"), "last_contact": st.get("last_contact"),
-        "keep_awake": bool(rep.get("keep_awake")) if ok else False,
+        "keep_awake": bool(rep.get("keep_awake")) if alive else False,
         "battery": battery_info(), "tier": st.get("tier") or cfg.tier, "stages": st.get("stages") or [],
         "excluded": st.get("excluded") or {}, "gpu": rep.get("gpu"), "ollama_models": _ollama_ps(cfg.ollama_url),
         "jobs": st.get("held_jobs") or [], "concurrency": st.get("concurrency") or {},
