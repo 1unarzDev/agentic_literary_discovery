@@ -102,8 +102,12 @@ def _parse_stages(stages: Optional[str]) -> list[str] | None:
 
 def install_hint(os_name: str) -> tuple[str, list[str]]:
     if os_name == "windows":
-        return "winget install --silent Ollama.Ollama", ["winget", "install", "--silent", "--accept-package-agreements",
-                                                          "--accept-source-agreements", "Ollama.Ollama"]
+        if (Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama.exe").exists():
+            return "(Ollama is installed but did not start; start the Ollama app, then re-run)", []
+        return "winget install --silent Ollama.Ollama", ["winget", "install", "--id", "Ollama.Ollama", "-e",
+                                                          "--source", "winget", "--silent",
+                                                          "--accept-package-agreements",
+                                                          "--accept-source-agreements", "--disable-interactivity"]
     if os_name == "macos":
         if shutil.which("brew"):
             return "brew install ollama && brew services start ollama", ["brew", "install", "ollama"]
@@ -113,29 +117,10 @@ def install_hint(os_name: str) -> tuple[str, list[str]]:
             ["sh", "-c", "curl -fsSL https://ollama.com/install.sh | sh"])
 
 
-def start_ollama(os_name: str) -> str:
+def start_ollama(os_name: str, env: dict[str, str] | None = None) -> str:
     """Best-effort start of a local Ollama server; returns what we did."""
-    if os_name == "macos" and shutil.which("brew") and subprocess.run(
-            ["brew", "list", "ollama"], capture_output=True).returncode == 0:
-        subprocess.run(["brew", "services", "start", "ollama"], capture_output=True)
-        return "brew services start ollama"
-    if os_name == "macos" and Path("/Applications/Ollama.app").exists():
-        subprocess.run(["open", "-a", "Ollama"], capture_output=True)
-        return "open -a Ollama"
-    exe = shutil.which("ollama")
-    if not exe and os_name == "windows":
-        cand = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama.exe"
-        exe = str(cand) if cand.exists() else None
-    if exe:
-        kw: dict[str, Any] = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
-        if os_name == "windows":
-            kw["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
-                subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        else:
-            kw["start_new_session"] = True
-        subprocess.Popen([exe, "serve"], **kw)
-        return f"{exe} serve (background)"
-    return ""
+    from . import ollama_env
+    return ollama_env.start(env or {}, log=lambda m: None)
 
 
 def _wait_for_ollama(backend: OllamaBackend, seconds: float = 20.0) -> bool:
@@ -160,6 +145,9 @@ def doctor(
     registry_path: Optional[Path] = typer.Option(None, "--registry", help="Local models.v1.json."),
     as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
     save: bool = typer.Option(True, "--save/--no-save", help="Remember tier + benchmark in config."),
+    levels: Optional[str] = typer.Option(None, "--levels", help="Concurrency levels to benchmark, e.g. 1,2,4,6,8."),
+    bench_stages: Optional[str] = typer.Option(None, "--stages", help="Benchmark only these stages (default: the "
+                                               "tier's main stages)."),
 ) -> None:
     """Detect hardware, pick a tier, test bandwidth and (optionally) benchmark."""
     cfg = Config.load()
@@ -207,15 +195,19 @@ def doctor(
         if report["ollama_version"] is None:
             err.print("[red]Ollama is not running; `ald setup` first.[/red]")
         else:
-            res = run_bench(backend, reg, reg.allowed_stages(tier["name"]), total_seconds=seconds,
+            from .bench import LEVELS, default_bench_stages
+            lv = tuple(int(x) for x in levels.split(",")) if levels else LEVELS
+            sel = _parse_stages(bench_stages) or default_bench_stages(reg, tier["name"])
+            res = run_bench(backend, reg, [s for s in sel if s in reg.stages], total_seconds=seconds, levels=lv,
                             accel=hw.accel, log=(lambda m: None) if as_json else (lambda m: err.print(m)))
             for s, r in res.items():
                 if "passages_per_hour" in r:
                     r["eta"] = eta_for_share(status or report.get("ping"), s, r["passages_per_hour"])
             report["bench"] = res
             if save:
-                cfg.bench = {s: {k: r[k] for k in ("best_concurrency", "passages_per_hour", "tok_s")}
-                             for s, r in res.items() if "best_concurrency" in r}
+                cfg.bench = {**(cfg.bench or {}),
+                             **{s: {k: r[k] for k in ("best_concurrency", "passages_per_hour", "tok_s")}
+                                for s, r in res.items() if "best_concurrency" in r}}
     if save and (cfg.coordinator_url or cfg.token or bench):
         cfg.tier = tier["name"]
         cfg.save()
@@ -252,7 +244,7 @@ def _print_doctor(r: dict[str, Any]) -> None:
     if bw:
         t.add_row("Bandwidth", f"{bw['mbit_s']:.0f} Mbit/s ({bw['bytes'] / 1e6:.1f} MB in {bw['seconds']:.1f}s)"
                   if "mbit_s" in bw else f"[yellow]{bw.get('error')}[/yellow]")
-    if r.get("status_error"):
+    if r.get("status_error") and "401" not in r["status_error"]:  # /v1/status is admin-only; ping has the queue
         t.add_row("Queue status", f"[yellow]unavailable: {r['status_error']}[/yellow]")
     for n in hw.get("notes") or []:
         t.add_row("note", n)
@@ -292,14 +284,21 @@ def setup(
     registry_path: Optional[Path] = typer.Option(None, "--registry"),
     stages: Optional[str] = typer.Option(None, "--stages", help="Comma-separated subset of stages."),
     tier_override: Optional[str] = typer.Option(None, "--tier"),
+    ollama_env: bool = typer.Option(True, "--ollama-env/--no-ollama-env",
+                                    help="Set OLLAMA_NUM_PARALLEL / OLLAMA_FLASH_ATTENTION / OLLAMA_KEEP_ALIVE for "
+                                         "this tier (persistently) and restart Ollama if they changed."),
 ) -> None:
     """Check/install Ollama, then pull and verify the pinned models for your tier."""
     cfg = Config.load()
     hw = detect()
     backend = OllamaBackend(cfg.ollama_url)
+    reg, src = load_registry(cfg, registry_path)
+    tier = tier_override or cfg.tier or reg.select_tier(hw.usable_vram_gb)["name"]
+    from . import ollama_env as oenv
+    want_env = oenv.wanted_env(reg.num_parallel_hint(tier), hw.accel)
     if not backend.available():
-        started = start_ollama(hw.os)
-        if started and _wait_for_ollama(backend, 20):
+        started = start_ollama(hw.os, want_env if cfg.manage_ollama else None)
+        if started and _wait_for_ollama(backend, 45):
             console.print(f"Started Ollama: {started}")
     if not backend.available():
         hint, cmd = install_hint(hw.os)
@@ -316,23 +315,27 @@ def setup(
                 raise typer.Exit(rc)
             if hw.os == "macos" and shutil.which("brew"):
                 subprocess.run(["brew", "services", "start", "ollama"])
-            start_ollama(hw.os)
+            start_ollama(hw.os, want_env if cfg.manage_ollama else None)
             if not _wait_for_ollama(backend, 60):
                 console.print("[red]Ollama installed but not reachable yet; start it and re-run `ald setup`.[/red]")
                 raise typer.Exit(1)
         else:
             raise typer.Exit(1)
+    if ollama_env and cfg.manage_ollama:
+        rep = oenv.ensure(want_env, url=cfg.ollama_url, log=lambda m: console.print(m, markup=False, highlight=False))
+        console.print("Ollama settings for tier " + tier + ": " + " ".join(f"{k}={v}" for k, v in want_env.items())
+                      + (" (restarted Ollama)" if rep["restarted"] else ""))
+        if rep.get("hint"):
+            console.print(f"[yellow]To apply them to the Ollama system service run:[/yellow]\n  {rep['hint']}")
+        if not _wait_for_ollama(backend, 30):
+            console.print("[red]Ollama is not reachable after applying its settings; start it and re-run.[/red]")
+            raise typer.Exit(1)
     ver = backend.version(refresh=True)
-    reg, src = load_registry(cfg, registry_path)
-    tier = tier_override or cfg.tier or reg.select_tier(hw.usable_vram_gb)["name"]
     wanted = reg.allowed_stages(tier)
     sel = _parse_stages(stages)
     if sel:
         wanted = [s for s in wanted if s in sel]
     console.print(f"Ollama {ver}; registry {reg.version} ({src}); tier {tier}; stages {', '.join(wanted) or '-'}")
-    hint = reg.num_parallel_hint(tier)
-    if hint and os.environ.get("OLLAMA_NUM_PARALLEL") != str(hint):
-        console.print(f"Tip: run the Ollama server with OLLAMA_NUM_PARALLEL={hint} for this tier.")
     ok = True
     pulled: set[str] = set()
     for s in wanted:
@@ -572,6 +575,7 @@ def _make_worker(cfg: Config, **kw: Any):
     client = CoordinatorClient(cfg.coordinator_url, cfg.token)
     backend = OllamaBackend(cfg.ollama_url)
     hw = kw.pop("hw", None) or detect()
+    kw.setdefault("manage_ollama", cfg.manage_ollama)
     return Worker(cfg, client, backend, data_root=root, hw=hw, log=log, **kw)
 
 
@@ -632,6 +636,10 @@ def work(
     no_auto_update: bool = typer.Option(False, "--no-auto-update", help="Do not self-update."),
     disk_budget_gb: Optional[float] = typer.Option(None, "--disk-budget-gb", help="Cap ald's disk use."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Non-interactive (accepted for service use)."),
+    gpu_lock: Optional[str] = typer.Option(None, "--gpu-lock", envvar="ALD_GPU_LOCK",
+                                           help="Share the GPU via flock(2) on PATH: hold it per shard, unload the "
+                                                "model before releasing when others wait (Linux/macOS; no-op on Windows)."),
+    service_mode: bool = typer.Option(False, "--service", hidden=True, help="Started by `ald service`."),
 ) -> None:
     """Lease jobs and label passages until stopped."""
     from .keepawake import KeepAwake
@@ -642,7 +650,8 @@ def work(
     window = RunWindow.from_args(until, hours)
     argv = sys.argv[1:]
     w = _make_worker(cfg, stages=_parse_stages(stages), max_concurrency=max_concurrency, window=window,
-                     auto_update=not no_auto_update, argv=argv, auto_pull=not dry_run)
+                     auto_update=not no_auto_update, argv=argv, auto_pull=not dry_run, gpu_lock=gpu_lock,
+                     service_mode=service_mode)
     if dry_run:
         try:
             w.refresh_registry(force=True)
@@ -709,6 +718,10 @@ def service_status() -> None:
 
 
 def main() -> None:
+    # Under pythonw.exe (the Windows Scheduled Task) there is no console: sys.stdout/stderr are None.
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
     app()
 
 

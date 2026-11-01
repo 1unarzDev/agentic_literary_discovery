@@ -64,7 +64,7 @@ def test_lease_to_result_put(env):
     # Inference options per contract / plan.
     body = env.ollama.chats[0]
     assert body["options"]["temperature"] == 0 and body["options"]["seed"] == 0
-    assert body["keep_alive"] == -1 and body["stream"] is False and body["think"] is False
+    assert body["keep_alive"] == "30m" and body["stream"] is False and body["think"] is False
     assert body["messages"][0]["role"] == "system" and "CODEBOOK" in body["messages"][0]["content"]
     assert body["messages"][-1]["content"].rstrip().endswith("It was _very_ dark.")  # passage LAST
     assert body["format"]["type"] == "object"

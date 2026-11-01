@@ -184,3 +184,35 @@ describe("pin activation and close_jobs", () => {
     else expect(hb.body.revoked).toEqual([held]);
   });
 });
+
+describe("every stage in STAGES is storable", () => {
+  it("accepts pins and jobs for workcheck and alt_label (D1 CHECK constraints match STAGES)", async () => {
+    const { STAGES } = await import("../src/util");
+    const w = await makeWorker("allstages");
+    for (const stage of STAGES) {
+      const pin = await makePin(stage);
+      const [id] = await addJobs([{ pin_hash: pin.pin_hash, stage }]);
+      const r = await lease(w.token, [stage]);
+      expect(r.status).toBe(200);
+      expect(r.body.jobs.map((j: { job_id: string }) => j.job_id)).toEqual([id]);
+    }
+  });
+});
+
+describe("close_jobs by wave", () => {
+  it("closes every open job of a wave and nothing else", async () => {
+    const pin = await makePin();
+    const [keep] = await addJobs([{ pin_hash: pin.pin_hash }]); // wave w1
+    await admin("POST", "/v1/admin/jobs", {
+      jobs: ["t1", "t2"].map((id) => ({ job_id: `wt-${id}`, stage: "label", wave: "wtest", shard_key: `wtest/${id}`,
+        pin_hash: pin.pin_hash, n_passages: 3, split: "discovery", priority: 1 })),
+    });
+    const r = await admin("POST", "/v1/admin/close_jobs", { wave: "wtest" });
+    expect(r.status).toBe(200);
+    expect(r.body.closed.sort()).toEqual(["wt-t1", "wt-t2"]);
+    const w = await makeWorker("wavecheck");
+    const l = await lease(w.token, ["label"], 4);
+    expect(l.body.jobs.map((j: { job_id: string }) => j.job_id)).toEqual([keep]);
+    expect((await admin("POST", "/v1/admin/close_jobs", {})).status).toBe(400);
+  });
+});

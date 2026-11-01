@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 from collections import namedtuple
 from pathlib import Path
@@ -72,6 +73,26 @@ def test_updater_guard_and_log(tmp_path):
     assert [e["ok"] for e in state["log"]] == [False, True]
 
 
+def test_updater_windows_defers_to_helper(tmp_path, monkeypatch):
+    monkeypatch.setattr("ald.updater.shutil.which", lambda n: r"C:\u\.local\bin\ald.exe" if n == "ald" else None)
+    spawned, exits, run = [], [], FakeRun()
+    u = Updater(tmp_path / "u.json", current="0.1.0", run=run, reexec=lambda a: None, which=lambda n: r"C:\u\uv.exe",
+                log=lambda m: None, platform="win32", spawn=spawned.append, exit_fn=exits.append, service_mode=True)
+    d = decide({"latest_client_version": "0.2.0", "wheel_url": "https://c/dist/ald-0.2.0-py3-none-any.whl"}, current="0.1.0")
+    assert u.apply(d, ["work", "--keep-awake", "--service"]) is True
+    assert run.calls == [] and exits == [0]  # nothing installed in-process; the process exits
+    script = spawned[0].read_bytes().decode("utf-8")
+    assert "\r\n" in script and f"PID eq {os.getpid()}" in script
+    assert "uv.exe tool install --force --python 3.12 https://c/dist/ald-0.2.0-py3-none-any.whl" in script
+    assert script.index("tool install") < script.index("schtasks /Run /TN ald-worker")
+    assert not u.can_attempt("0.2.0")  # loop guard still applies
+    # interactive `ald work`: relaunch in a new console with the same arguments
+    u2 = Updater(tmp_path / "u2.json", current="0.1.0", run=run, which=lambda n: "uv", log=lambda m: None,
+                 platform="win32", spawn=spawned.append, exit_fn=exits.append)
+    u2.apply(d, ["work", "--hours", "2"])
+    assert 'start "ald" C:\\u\\.local\\bin\\ald.exe work --hours 2' in spawned[1].read_text(encoding="utf-8")
+
+
 def test_updater_without_uv(tmp_path):
     u = Updater(tmp_path / "u.json", run=FakeRun(), reexec=lambda a: None, which=lambda n: None, log=lambda m: None)
     assert u.apply(decide({"latest_client_version": "99.0.0"}), []) is False
@@ -94,18 +115,54 @@ def test_systemd_unit_and_install(tmp_path, monkeypatch):
     assert not (tmp_path / "systemd" / "user" / "ald-worker.service").exists()
 
 
+def test_service_without_systemctl(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("PATH", str(tmp_path))  # nothing on PATH
+    msgs = service.install(platform="linux")
+    assert any("-> 127" in m for m in msgs)  # reported, not raised
+
+
 def test_launchd_plist():
     xml = service.launchd_plist(["/u/bin/ald", "work", "--keep-awake"], Path("/tmp/l.log"))
     assert "<string>org.ald.worker</string>" in xml and "<string>work</string>" in xml
     assert "<key>RunAtLoad</key><true/>" in xml
 
 
-def test_windows_task_command():
-    calls = []
-    service.install(run=lambda c: (calls.append(c), P(0, "", ""))[1], platform="win32")
-    create = calls[0]
-    assert create[:3] == ["schtasks", "/Create", "/TN"] and "ONLOGON" in create
-    assert "work --keep-awake" in create[create.index("/TR") + 1]
+def test_windows_task_xml():
+    cmd = service.windows_command(python=r"C:\Users\a b\tools\ald\Scripts\python.exe")
+    assert cmd[0].endswith("pythonw.exe") and cmd[1:] == ["-m", "ald", "work", "--keep-awake", "--service"]
+    xml = service.windows_task_xml(cmd, r"PC\a b", s4u=True, workdir=r"C:\Users\a b")
+    import xml.etree.ElementTree as ET
+    ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
+    root = ET.fromstring(xml.replace('encoding="UTF-16"', ""))
+    assert root.find("t:Principals/t:Principal/t:LogonType", ns).text == "S4U"
+    assert root.find("t:Triggers/t:BootTrigger", ns) is not None
+    st = root.find("t:Settings", ns)
+    assert st.find("t:ExecutionTimeLimit", ns).text == "PT0S"  # no 72 h default limit
+    assert st.find("t:DisallowStartIfOnBatteries", ns).text == "false"
+    assert st.find("t:StopIfGoingOnBatteries", ns).text == "false"
+    assert root.find("t:Actions/t:Exec/t:Arguments", ns).text == "-m ald work --keep-awake --service"
+    xml = service.windows_task_xml(cmd, r"PC\a", s4u=False, workdir="C:\\")
+    root = ET.fromstring(xml.replace('encoding="UTF-16"', ""))
+    assert root.find("t:Principals/t:Principal/t:LogonType", ns).text == "InteractiveToken"
+    assert root.find("t:Triggers/t:BootTrigger", ns) is None
+
+
+def test_windows_install_falls_back_to_logon_task(monkeypatch):
+    monkeypatch.setattr(service, "_windows_user", lambda: "PC\\vol")
+    calls, xmls = [], []
+
+    def run(c):
+        calls.append(c)
+        if c[:2] == ["schtasks", "/Create"]:
+            xmls.append(Path(c[c.index("/XML") + 1]).read_bytes().decode("utf-16"))
+            return P(1, "", "ERROR: Access is denied.") if len(xmls) == 1 else P(0, "SUCCESS", "")
+        return P(0, "", "")
+
+    msgs = service.install(run=run, platform="win32")
+    assert "<LogonType>S4U</LogonType>" in xmls[0] and "<LogonType>InteractiveToken</LogonType>" in xmls[1]
+    assert ["schtasks", "/Run", "/TN", "ald-worker"] in calls
+    assert any("while PC\\vol is signed in" in m for m in msgs)
 
 
 # --- CLI --------------------------------------------------------------------------

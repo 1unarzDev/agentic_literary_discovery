@@ -60,6 +60,9 @@ class LLMNoise:
     dom_acc: tuple = (0.65, 0.72, 0.80)       # P(pred primary domain correct | both obstacle)
     cause_acc: tuple = (0.60, 0.68, 0.75)
     night_acc: tuple = (0.70, 0.72, 0.75)
+    night_fp: float = 0.05                    # P(pred night function | not a night passage)
+    locus_follow: float = 0.9                 # P(model follows a codebook locus override it saw)
+    d2_keep: float = 0.5                      # P(model reports the true secondary domain)
     # where domain errors go, per era: early errors skew material, late errors skew inward/social,
     # i.e. naive labels exaggerate the hypothesised inward turn
     err_dom: tuple = (
@@ -75,7 +78,8 @@ class LLMNoise:
 
     @staticmethod
     def perfect() -> "LLMNoise":
-        return LLMNoise(sens=(1, 1, 1), spec=(1, 1, 1), dom_acc=(1, 1, 1), cause_acc=(1, 1, 1), night_acc=(1, 1, 1))
+        return LLMNoise(sens=(1, 1, 1), spec=(1, 1, 1), dom_acc=(1, 1, 1), cause_acc=(1, 1, 1), night_acc=(1, 1, 1),
+                        night_fp=0.0, locus_follow=1.0, d2_keep=1.0)
 
 
 @dataclass
@@ -261,22 +265,26 @@ def _llm(cfg: SimConfig, rng: np.random.Generator, tr: dict, era_i: np.ndarray) 
     true_obs = tr["has"] == 1
     u = rng.random(n)
     pred_obs = np.where(true_obs, u < sens, u > spec)
-    has = np.where(pred_obs, 1, np.where(rng.random(n) < 0.03, 2, 0))
+    # insufficient_context: kept when true (w.p. spec), spuriously given for 30% of specificity errors
+    ins = np.where(tr["has"] == 2, rng.random(n) < spec, rng.random(n) < 0.3 * (1 - spec))
+    has = np.where(pred_obs, 1, np.where(ins, 2, 0))
     err_dom = np.array([_vec(e, DOMAINS) for e in nz.err_dom])[era_i]
     rnd_dom = _draw(rng, err_dom)
     keep = true_obs & (rng.random(n) < np.asarray(nz.dom_acc)[era_i])
     d1 = np.where(pred_obs, np.where(keep, tr["d1"], rnd_dom), -1)
-    d2 = np.where(pred_obs & (tr["d2"] >= 0) & (rng.random(n) < 0.5) & (tr["d2"] != d1), tr["d2"], -1)
+    d2 = np.where(pred_obs & (tr["d2"] >= 0) & (rng.random(n) < nz.d2_keep) & (tr["d2"] != d1), tr["d2"], -1)
     comm = (d1 == D["COMMUNICATION_INFORMATION"]) | (d2 == D["COMMUNICATION_INFORMATION"])
     err_c = np.array([_vec(e, CAUSES) for e in nz.err_cause])[era_i]
     rnd_c = _draw(rng, err_c)
     keep_c = (tr["cause"] >= 0) & (rng.random(n) < np.asarray(nz.cause_acc)[era_i])
     cause = np.where(comm, np.where(keep_c, tr["cause"], rnd_c), -1)
-    locus = np.where(pred_obs, _locus(d1, cause), -1)
+    locus = _locus(d1, cause)
+    same = (d1 == tr["d1"]) & (cause == tr["cause"]) & (rng.random(n) < nz.locus_follow)
+    locus = np.where(pred_obs, np.where(same & (tr["locus"] >= 0), tr["locus"], locus), -1)
     tn = tr["night"] >= 0
     rnd_n = rng.integers(0, 5, n)
     keep_n = rng.random(n) < np.asarray(nz.night_acc)[era_i]
-    night = np.where(tn, np.where(keep_n, tr["night"], rnd_n), np.where(rng.random(n) < 0.05, rnd_n, -1))
+    night = np.where(tn, np.where(keep_n, tr["night"], rnd_n), np.where(rng.random(n) < nz.night_fp, rnd_n, -1))
     correct = (pred_obs == true_obs) & ((d1 == tr["d1"]) | ~pred_obs)
     conf = np.where(correct, rng.beta(8, 2, n), rng.beta(4, 3, n))
     return {"has": has, "d1": d1, "d2": d2, "cause": cause, "locus": locus, "night": night, "confidence": conf}
@@ -418,7 +426,7 @@ def _audit(c: Corpus, rng: np.random.Generator, hu: dict) -> None:
     teach = set(rng.choice(disc_auth, k, replace=False)) if k else set()
     sel_rng = np.random.default_rng(rng.integers(1 << 31))
     audit, frame = draw_audit(lab, teach, sel_rng, n_target=c.cfg.audit_n)
-    lab.drop(columns=["era", "group"], inplace=True)
+    c.labels = lab = lab.drop(columns=["era", "group"])
     dbl = set(audit.passage_id.iloc[:40])
     rest = list(audit.passage_id.iloc[40:])
     pos = pd.Series(np.arange(len(lab)), index=lab.passage_id)

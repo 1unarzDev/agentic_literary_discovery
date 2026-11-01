@@ -14,7 +14,14 @@ from .inference import run_passage
 from .registry import Registry, Stage
 from .scheduler import DEFAULT_PASSAGES_PER_JOB
 
-LEVELS = (1, 4, 8)
+LEVELS = (1, 2, 4)
+MAIN_STAGES = ("label", "workcheck")  # the bulk of the queue; other stages start from the tier hint
+
+
+def default_bench_stages(registry: Registry, tier: str) -> list[str]:
+    allowed = registry.allowed_stages(tier)
+    main = [s for s in MAIN_STAGES if s in allowed]
+    return main or allowed[:1]
 
 
 def sample_passages() -> list[dict[str, Any]]:

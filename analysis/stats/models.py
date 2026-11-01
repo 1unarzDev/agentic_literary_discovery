@@ -307,9 +307,10 @@ def divergence(kw: np.ndarray, fn: np.ndarray) -> float:
 def h3(wd: WorkData, keywords: pd.DataFrame, n_boot: int = 2000, block: int = 3, seed: int = 0,
        min_works: int = 30) -> Effect:
     """keywords: columns decade, group (comm|travel|dark), kw_rate. Decades with < min_works works
-    are dropped. Statistic: mean over pairs of D. Test: H0 = function rates are an affine function of
-    keyword rates and differ only by DSL sampling error (parametric bootstrap); estimate = D_obs -
-    E_H0[D] (excess divergence, expected > 0). CI for D: circular moving-block bootstrap over decades
+    are dropped. Statistic: mean over pairs of D. Test: H0 = the true function series tracks the
+    keyword series perfectly (identical in z-units, positive direction) and the observed series
+    differs only by DSL sampling error (parametric bootstrap); estimate = D_obs - E_H0[D] (excess
+    divergence, expected > 0). CI for D: circular moving-block bootstrap over decades
     (same blocks for every pair), each replicate also perturbed by the function-rate sampling error."""
     rng = np.random.default_rng(seed)
     ok = wd.cov.decade.value_counts()
@@ -322,12 +323,13 @@ def h3(wd: WorkData, keywords: pd.DataFrame, n_boot: int = 2000, block: int = 3,
     se = np.array([m[m.group == g].sort_values("decade").fn_se.values for g in groups])
     T = kw.shape[1]
     Dobs = float(np.mean([divergence(kw[i], fn[i]) for i in range(len(groups))]))
-    # H0: fn = a + b kw + error(se)
+    # H0 (perfect positive tracking): the TRUE function series is the keyword series in z-units,
+    # fn_true = mean(fn) + sd_true * z(kw) with sd_true^2 = var(fn) - mean(se^2); observed = true + error
     null = np.empty(n_boot)
     fitted = []
     for i in range(len(groups)):
-        b, a = np.polyfit(kw[i], fn[i], 1)
-        fitted.append(a + b * kw[i])
+        sd_true = np.sqrt(max(fn[i].var() - np.mean(se[i] ** 2), 1e-12))
+        fitted.append(fn[i].mean() + sd_true * _z(kw[i]))
     fitted = np.array(fitted)
     for r in range(n_boot):
         fstar = fitted + rng.normal(0, 1, fitted.shape) * se

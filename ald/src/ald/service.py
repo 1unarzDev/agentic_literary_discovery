@@ -22,7 +22,11 @@ Runner = Callable[[list[str]], subprocess.CompletedProcess]
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              stdin=subprocess.DEVNULL)
+    except OSError as e:  # e.g. no systemctl in a container
+        return subprocess.CompletedProcess(cmd, 127, "", f"{cmd[0]}: {e.strerror or e}")
 
 
 def ald_executable() -> str:
@@ -36,7 +40,126 @@ def ald_executable() -> str:
 def work_command(extra: list[str] | None = None) -> list[str]:
     exe = ald_executable()
     base = [exe] if exe != sys.executable else [exe, "-m", "ald"]
-    return base + ["work", "--keep-awake"] + (extra or [])
+    return base + ["work", "--keep-awake", "--service"] + (extra or [])
+
+
+def windows_command(extra: list[str] | None = None, python: str | None = None) -> list[str]:
+    """``pythonw.exe -m ald work ...`` from ald's own environment: no console window (a console window
+    would pop up at every logon and closing it would kill the worker)."""
+    py = Path(python or sys.executable)
+    pyw = py.with_name("pythonw.exe")
+    exe = str(pyw if pyw.exists() or python else py)
+    return [exe, "-m", "ald", "work", "--keep-awake", "--service"] + (extra or [])
+
+
+def _xml_escape(s: str) -> str:
+    from xml.sax.saxutils import escape
+    return escape(s, {'"': "&quot;"})
+
+
+def windows_task_xml(cmd: list[str], user: str, *, s4u: bool, workdir: str) -> str:
+    """Task Scheduler 1.2 XML. ``s4u``: run whether or not the user is signed in (also at boot), no stored
+    password; otherwise run in the user's session at logon. No 72 h execution limit, runs on battery
+    (ald pauses leasing itself below 30 %), restarts after failures, one instance."""
+    args = subprocess.list2cmdline(cmd[1:])
+    boot = ("\n    <BootTrigger><Enabled>true</Enabled><Delay>PT2M</Delay></BootTrigger>" if s4u else "")
+    return f"""<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>ald worker: distributed passage labeling (https://github.com/1unarzDev/agentic_literary_discovery). Remove with: ald service uninstall</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger><Enabled>true</Enabled><UserId>{_xml_escape(user)}</UserId><Delay>PT1M</Delay></LogonTrigger>{boot}
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>{_xml_escape(user)}</UserId>
+      <LogonType>{"S4U" if s4u else "InteractiveToken"}</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings><StopOnIdleEnd>false</StopOnIdleEnd><RestartOnIdle>false</RestartOnIdle></IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+    <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>{_xml_escape(cmd[0])}</Command>
+      <Arguments>{_xml_escape(args)}</Arguments>
+      <WorkingDirectory>{_xml_escape(workdir)}</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>
+"""
+
+
+def _windows_user() -> str:
+    """DOMAIN\\user of this process's token. (%USERDOMAIN% is not reliable: under OpenSSH it is
+    'WORKGROUP', which Task Scheduler cannot map to an account.)"""
+    try:
+        import ctypes
+        n = ctypes.c_ulong(512)
+        buf = ctypes.create_unicode_buffer(n.value)
+        if ctypes.windll.secur32.GetUserNameExW(2, buf, ctypes.byref(n)):  # NameSamCompatible
+            return buf.value
+    except Exception:  # noqa: BLE001
+        pass
+    r = _run(["whoami"])
+    if r.returncode == 0 and r.stdout.strip():
+        return r.stdout.strip()
+    dom, user = os.environ.get("COMPUTERNAME", ""), os.environ.get("USERNAME", "")
+    return f"{dom}\\{user}" if dom else user
+
+
+def _install_windows(run: Runner, extra: list[str] | None, msgs: list[str]) -> None:
+    import tempfile
+    cmd = windows_command(extra)
+    user = _windows_user()
+    workdir = os.environ.get("USERPROFILE", str(Path.home()))
+    mode = None
+    for s4u in (True, False):
+        xml = windows_task_xml(cmd, user, s4u=s4u, workdir=workdir)
+        fd, path = tempfile.mkstemp(suffix=".xml")
+        with os.fdopen(fd, "wb") as f:
+            f.write(xml.encode("utf-16"))
+        try:
+            r = run(["schtasks", "/Create", "/TN", TASK, "/XML", path, "/F"])
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        if r.returncode == 0:
+            mode = "s4u" if s4u else "logon"
+            break
+        msgs.append(f"schtasks /Create ({'S4U' if s4u else 'interactive'}) -> {r.returncode} "
+                    f"{(r.stderr or r.stdout).strip()}")
+    if mode is None:
+        msgs.append("could not create the Scheduled Task; run `ald work` manually")
+        return
+    if mode == "s4u":
+        msgs.append(f"Scheduled Task '{TASK}' installed: starts at boot and at logon, keeps running after "
+                    f"sign-out ({subprocess.list2cmdline(cmd)})")
+    else:
+        msgs.append(f"Scheduled Task '{TASK}' installed: runs while {user} is signed in (starts at logon). "
+                    f"For start-at-boot without signing in, re-run `ald service install` from an "
+                    f"Administrator PowerShell.")
+    run(["schtasks", "/End", "/TN", TASK])  # an older instance would block IgnoreNew
+    r = run(["schtasks", "/Run", "/TN", TASK])
+    msgs.append(f"schtasks /Run -> {r.returncode}")
 
 
 def systemd_unit(cmd: list[str]) -> str:
@@ -55,6 +178,7 @@ RestartSec=30
 TimeoutStopSec=90
 KillSignal=SIGTERM
 Environment=PYTHONUNBUFFERED=1
+Environment="PATH=%h/.local/bin:%h/.local/ollama/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 [Install]
 WantedBy=default.target
@@ -77,6 +201,10 @@ def launchd_plist(cmd: list[str], log_path: Path) -> str:
     <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
     <key>ThrottleInterval</key><integer>30</integer>
     <key>ProcessType</key><string>Background</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key><string>{escape(str(Path.home()))}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
     <key>StandardOutPath</key><string>{escape(str(log_path))}</string>
     <key>StandardErrorPath</key><string>{escape(str(log_path))}</string>
 </dict>
@@ -120,12 +248,7 @@ def install(run: Runner = _run, platform: str = sys.platform, extra: list[str] |
             r = run(["launchctl", "load", "-w", str(p)])
         msgs.append(f"launchctl -> {r.returncode} {r.stderr.strip()}; log: {log}")
     elif platform == "win32":
-        tr = subprocess.list2cmdline(cmd)
-        c = ["schtasks", "/Create", "/TN", TASK, "/SC", "ONLOGON", "/TR", tr, "/RL", "LIMITED", "/F"]
-        r = run(c)
-        msgs.append(f"schtasks /Create -> {r.returncode} {(r.stdout or r.stderr).strip()}")
-        r = run(["schtasks", "/Run", "/TN", TASK])
-        msgs.append(f"schtasks /Run -> {r.returncode}")
+        _install_windows(run, extra, msgs)
     else:
         msgs.append(f"unsupported platform {platform}; run `ald work` manually")
     return msgs

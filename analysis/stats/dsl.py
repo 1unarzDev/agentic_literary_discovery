@@ -132,8 +132,11 @@ def audit_design(labels: pd.DataFrame, human: pd.DataFrame, frame: pd.DataFrame 
     n_cell = h.groupby("audit_cell").size()
     N_from_w = (h.groupby("audit_cell").weight.first() * n_cell)
     N_derived = cell[in_pool].value_counts()
+    splits = set(labels.split.astype(str))
+    N_from_w = N_from_w[[c.rsplit("|", 1)[-1] in splits for c in N_from_w.index]]
     common = N_from_w.index.intersection(N_derived.index)
-    if len(common) < len(N_from_w) or (np.abs(N_derived[common] / N_from_w[common] - 1) > tol).any():
+    if len(common) < len(N_from_w) or len(common) < len(N_derived) or \
+            (np.abs(N_derived[common] / N_from_w[common] - 1) > tol).any():
         raise ValueError("audit cells re-derived from labels do not match human.weight; "
                          "pass audit_frame.parquet (labels were probably relabelled after selection)")
     pi = cell.map(n_cell / N_from_w).fillna(0.0).values
@@ -303,7 +306,12 @@ def prepare(labels: pd.DataFrame, human: pd.DataFrame | None = None, frame: pd.D
                 ycode[hidx] = T.fn(h)
                 Yt = pseudo_outcomes(yhat, ycode, labelled, pi, T.K, method=g, strata=era_s, folds=folds)
         Ys[tname] = Yt
-    # within-work Hajek weights
+    return aggregate_to_works(lab, Ys, method if method != "dsl" else f"dsl_{g}", info)
+
+
+def aggregate_to_works(lab: pd.DataFrame, Ys: dict[str, np.ndarray], method: str = "dsl",
+                       info: dict | None = None) -> WorkData:
+    """Within-work Hajek weights (1/inclusion_prob, normalised per work); works weighted equally."""
     wid, wcodes = np.unique(lab.work_id.values, return_inverse=True)
     w = 1 / lab.inclusion_prob.values
     wsum = np.bincount(wcodes, w)
@@ -316,7 +324,25 @@ def prepare(labels: pd.DataFrame, human: pd.DataFrame | None = None, frame: pd.D
     cols = WORK_COLS + [c for c in OPT_WORK_COLS if c in lab.columns]
     cov = lab.drop_duplicates("work_id").set_index("work_id").loc[wid].reset_index()[cols]
     cov["n_passages"] = np.bincount(wcodes)
-    return WorkData(cov.reset_index(drop=True), agg, method if method != "dsl" else f"dsl_{g}", info)
+    return WorkData(cov.reset_index(drop=True), agg, method, info or {})
+
+
+def pseudo_outcomes_two_phase(Yhat2: np.ndarray, Y3: np.ndarray, Yh: np.ndarray, R3: np.ndarray, pi3: np.ndarray,
+                              Rh: np.ndarray, pih3: np.ndarray, K: int) -> np.ndarray:
+    """Nested two-phase DSL (recommended design): Tier-2 labels on all passages, a strong Tier-3
+    model on a probability subsample (R3, pi3), humans on a probability subsample of that (Rh, pih3 =
+    P(human | in phase 3)). Ytilde = Yhat2 + R3/pi3 (Y3 - Yhat2) + R3 Rh/(pi3 pih3) (Y - Y3);
+    E[Ytilde] = Y. Codes are integer categories (Y3 / Yh read only where R3 / Rh)."""
+    A = onehot(Yhat2, K)
+    B = np.zeros_like(A)
+    C = np.zeros_like(A)
+    B[R3] = onehot(Y3[R3], K)
+    m = R3 & Rh
+    C[m] = onehot(Yh[m], K)
+    out = A.copy()
+    out[R3] += (B[R3] - A[R3]) / pi3[R3, None]
+    out[m] += (C[m] - B[m]) / (pi3[m] * pih3[m])[:, None]
+    return out
 
 
 # ------------------------------------------------------------------ cluster-robust machinery

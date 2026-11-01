@@ -43,6 +43,7 @@ from .scheduler import (
     DEFAULT_PASSAGES_PER_JOB, GB, Backoff, Clock, ConcurrencyTuner, HardwareFit, PlanSummary, RateTracker,
     RunWindow, StorageManager, lease_size, should_prefetch,
 )
+from .gpulock import GpuLock
 from .updater import Updater, decide
 
 LEASE_TTL_S = 600.0
@@ -120,6 +121,9 @@ class Worker:
         idle_polls_before_exit: int = 1,
         rng: random.Random | None = None,
         registry: Registry | None = None,
+        gpu_lock: str | None = None,
+        service_mode: bool = False,
+        manage_ollama: bool = False,
     ):
         self.cfg = cfg
         self.client = client
@@ -175,6 +179,12 @@ class Worker:
         self.uploaded: list[dict[str, Any]] = []  # for status / tests
         self._lease_backoff = Backoff(base=5, cap=300, rng=self.rng)
         self._backend_version_cache: str | None = None
+        self.gpu_lock = GpuLock(gpu_lock, log=log)
+        self._gpu_models_loaded = False
+        self.service_mode = service_mode
+        self.updater.service_mode = service_mode
+        self.manage_ollama = manage_ollama
+        self._last_ollama_ensure = -1e18
 
     # ------------------------------------------------------------------
     # Registry / pins
@@ -652,9 +662,48 @@ class Worker:
         self._current = hj
         hj.started = True
         try:
+            # --gpu-lock: the lock covers this shard's inference (heartbeats keep the lease alive meanwhile).
+            if not self.gpu_lock.acquire(self.stop):
+                self.store.remove_job(hj.job_id)
+                self._release([hj.job_id])
+                return "stopped"
+            self._gpu_models_loaded = True
             return self._run_job(hj)
         finally:
             self._current = None
+            self._release_gpu_lock()
+
+    def _unload_stage_models(self, why: str) -> None:
+        if self._registry is None:
+            return
+        models = {self.registry.stages[s].model_ref for s in self.stages if s in self.registry.stages}
+        gone = []
+        for m in self.backend.ps():
+            name = m.get("name") or m.get("model")
+            if name and any(self.backend.same_model(name, k) for k in models):
+                try:
+                    self.backend.unload(name)
+                    gone.append(name)
+                except BackendError:
+                    pass
+        self._gpu_models_loaded = False
+        if gone:
+            self.log(f"[gpu-lock] unloaded {', '.join(gone)} ({why})")
+
+    def _release_gpu_lock(self) -> None:
+        if not self.gpu_lock.held:
+            return
+        # Unload BEFORE releasing, so the next holder never loads next to our model.
+        n = self.gpu_lock.waiters()
+        if n:
+            self._unload_stage_models(f"{n} process(es) waiting for the GPU lock")
+        self.gpu_lock.release()
+
+    def _idle_gpu_unload(self) -> None:
+        """With --gpu-lock, free the VRAM when there is nothing to do (also covers OSes where lock
+        waiters cannot be detected)."""
+        if self.gpu_lock.enabled and self._gpu_models_loaded:
+            self._unload_stage_models("worker idle")
 
     def _run_job(self, hj: HeldJob) -> str:
         st: Stage = self.registry.stages[hj.stage]
@@ -727,6 +776,7 @@ class Worker:
                         continue
                     except BackendUnavailable as e:
                         todo.appendleft(p)
+                        self.ensure_ollama(min_interval_s=60.0)  # e.g. Ollama died with the session that started it
                         delay = backend_backoff.next()
                         self.log(f"[backend] unavailable ({e}); retrying in {delay:.0f}s")
                         self.clock.sleep(delay, self.stop)
@@ -866,9 +916,30 @@ class Worker:
         self.recover_interrupted()
         self.flush_outbox(force=True)
         self.check_for_update(force=True)
+        self.ensure_ollama()
         self.resolve_stages()
         self.unload_non_pinned()
         self._save_state()
+
+    def ensure_ollama(self, min_interval_s: float = 0.0) -> None:
+        """Start Ollama if it is down and keep the tier's OLLAMA_* settings applied (see ollama_env)."""
+        if not self.manage_ollama:
+            return
+        now = self.clock.monotonic()
+        if now - self._last_ollama_ensure < min_interval_s:
+            return
+        self._last_ollama_ensure = now
+        from . import ollama_env
+        try:
+            reg = self._registry
+            tier = self.tier or (reg.select_tier(self.hw.usable_vram_gb)["name"] if reg else None)
+            hint = reg.num_parallel_hint(tier) if (reg and tier) else None
+            ollama_env.ensure(ollama_env.wanted_env(hint, self.hw.accel), url=self.cfg.ollama_url, log=self.log,
+                              service_mode=self.service_mode)
+            self.backend._version = None
+            self._backend_version_cache = None
+        except Exception as e:  # noqa: BLE001 - never fatal: resolve_stages reports Ollama as unavailable
+            self.log(f"[ollama] could not start/configure Ollama: {type(e).__name__}: {e}")
 
     # ------------------------------------------------------------------
     # GPU residency: a stray resident model splits the pinned one onto the CPU
@@ -959,6 +1030,8 @@ class Worker:
                 paused_for_update = self.maybe_apply_update()
                 if not self.stages:
                     self.log("[work] no runnable stages: " + "; ".join(f"{k}: {v}" for k, v in self.excluded.items()))
+                    if any("Ollama unavailable" in v for v in self.excluded.values()):
+                        self.ensure_ollama(min_interval_s=120.0)
                     if self.exit_when_idle:
                         break
                     if self.clock.sleep(min(300.0, self._lease_backoff.next()), self.stop):
@@ -976,6 +1049,7 @@ class Worker:
                     hj = self._queue.popleft() if got and self._queue else None
                 if hj is None:
                     idle += 1
+                    self._idle_gpu_unload()
                     if self.exit_when_idle and idle >= self.idle_polls_before_exit:
                         break
                     if not self.window.allow_new_lease(None):
@@ -1018,5 +1092,10 @@ class Worker:
         if n:
             self.log(f"[shutdown] {n} upload(s) ({size / 1e6:.1f} MB) stay in the outbox; "
                      f"they are sent on the next start or `ald sync-now`")
+        try:
+            self._idle_gpu_unload()
+        except Exception:  # noqa: BLE001
+            pass
+        self.gpu_lock.release()
         self._save_state()
         self.shutdown_done.set()

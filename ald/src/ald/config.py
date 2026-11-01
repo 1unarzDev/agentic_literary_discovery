@@ -112,6 +112,7 @@ class Config:
     ollama_url: str = DEFAULT_OLLAMA_URL
     disk_budget_gb: float | None = None
     bench: dict[str, Any] = field(default_factory=dict)  # stage -> {best_concurrency, pph, tok_s}
+    manage_ollama: bool = True  # start Ollama / apply the tier's OLLAMA_* settings (ALD_MANAGE_OLLAMA=0: never)
 
     @classmethod
     def load(cls) -> "Config":
@@ -124,6 +125,8 @@ class Config:
         env_tok = os.environ.get("ALD_TOKEN")
         if env_tok:
             cfg.token = env_tok
+        if os.environ.get("ALD_MANAGE_OLLAMA", "").strip().lower() in ("0", "false", "no"):
+            cfg.manage_ollama = False
         env_ollama = os.environ.get("OLLAMA_HOST")
         if env_ollama and "ollama_url" not in raw:
             cfg.ollama_url = env_ollama if env_ollama.startswith("http") else f"http://{env_ollama}"

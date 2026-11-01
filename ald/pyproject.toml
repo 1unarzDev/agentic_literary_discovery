@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ald"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Worker client for the agentic literary discovery distributed passage-labeling system"
 requires-python = ">=3.11"
 dependencies = [
@@ -22,6 +22,9 @@ ald = "ald.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8"]
+
+[tool.hatch.version]
+path = "src/ald/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ald"]

@@ -17,6 +17,11 @@ OOM_MARKERS = (
 )
 
 
+# How long Ollama keeps a model loaded after the last request. Long enough to span the gaps between
+# shards; short enough that an idle or stopped worker gives the VRAM back to the volunteer.
+KEEP_ALIVE = "30m"
+
+
 class BackendError(Exception):
     pass
 
@@ -165,7 +170,7 @@ class OllamaBackend:
     # -- inference ----------------------------------------------------------
     def embed(self, model: str, text: str, *, options: dict[str, Any] | None = None) -> ChatResult:
         """/api/embed for one input. ``content`` holds the JSON list of floats."""
-        body: dict[str, Any] = {"model": model, "input": text, "keep_alive": -1, "truncate": True}
+        body: dict[str, Any] = {"model": model, "input": text, "keep_alive": KEEP_ALIVE, "truncate": True}
         if options:
             body["options"] = options
         data = self._req("POST", "/api/embed", json=body).json()
@@ -185,7 +190,7 @@ class OllamaBackend:
             "messages": messages,
             "stream": False,
             "options": options,
-            "keep_alive": -1,
+            "keep_alive": KEEP_ALIVE,
         }
         if schema is not None:
             body["format"] = schema

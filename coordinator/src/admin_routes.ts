@@ -211,16 +211,20 @@ adminRoutes.post("/v1/admin/jobs", async (c) => {
 });
 
 adminRoutes.post("/v1/admin/close_jobs", async (c) => {
-  const b = await readJson<{ job_ids?: unknown }>(c.req.raw);
-  if (!isStringArray(b.job_ids)) throw new HttpError(400, "job_ids must be an array of strings");
+  const b = await readJson<{ job_ids?: unknown; wave?: unknown }>(c.req.raw);
+  const byWave = typeof b.wave === "string" && b.wave.length > 0;
+  if (b.job_ids !== undefined && !isStringArray(b.job_ids)) throw new HttpError(400, "job_ids must be an array of strings");
+  if (!byWave && !isStringArray(b.job_ids)) throw new HttpError(400, "job_ids (array of strings) or wave (string) required");
   // Queued jobs are cancelled; leased jobs are closed too and their holder sees
-  // them in heartbeat `revoked`. Done/dead jobs are untouched.
+  // them in heartbeat `revoked`. Done/dead jobs are untouched. `wave` closes
+  // every open job of that wave (e.g. a test wave).
   const { results } = await c.env.DB.prepare(
     `UPDATE jobs SET status = 'closed', lease_worker = NULL, lease_expires = NULL
-      WHERE status IN ('queued', 'leased') AND job_id IN (SELECT value FROM json_each(?))
+      WHERE status IN ('queued', 'leased')
+        AND (job_id IN (SELECT value FROM json_each(?1)) OR (?2 IS NOT NULL AND wave = ?2))
       RETURNING job_id`,
   )
-    .bind(JSON.stringify(b.job_ids))
+    .bind(JSON.stringify(isStringArray(b.job_ids) ? b.job_ids : []), byWave ? (b.wave as string) : null)
     .all<{ job_id: string }>();
   return json({ closed: results.map((r) => r.job_id) });
 });
