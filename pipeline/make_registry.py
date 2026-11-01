@@ -283,7 +283,7 @@ STAGES = {
     # num_ctx 4096 lets Ollama reuse the system-prompt prefix (SWA checkpoint), which it cannot at 8192.
     "label": dict(model_ref="gemma4:12b-it-q4_K_M", schema=V09_SCHEMA, system_template=V09_SYSTEM,
                   user_template=V09_USER, num_ctx=4096, num_predict=200, evidence_field="evidence_quote",
-                  vram_gb_required=10.0, model_size_gb=8.0, kv_gb_per_slot=0.35, priority=20),  # measured: RTX 3060, docs/perf_label_ab.md
+                  vram_gb_required=10.0, model_size_gb=8.0, kv_gb_per_slot=0.2, priority=20),  # measured: RTX 3060, docs/perf_label_ab.md
     # cloze at 4096 too: one num_ctx per model, so label <-> cloze switches do not force a reload
     "cloze": dict(model_ref="gemma4:12b-it-q4_K_M", schema=CLOZE_SCHEMA, system_template=CLOZE_SYSTEM,
                   user_template=CLOZE_USER, num_ctx=4096, num_predict=16, evidence_field=None,
