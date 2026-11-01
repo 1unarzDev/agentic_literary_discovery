@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { AppEnv, requireAdmin } from "./auth";
+import { AppEnv, requireAdmin, requireViewer } from "./auth";
 import { sealState } from "./db";
 import { STAGES, json, nowIso } from "./util";
 
 export const statusRoutes = new Hono<AppEnv>();
 statusRoutes.use("/v1/status", requireAdmin);
+statusRoutes.use("/v1/fleet", requireViewer);
 
 const STATUSES = ["queued", "leased", "done", "dead", "closed"] as const;
 
@@ -27,13 +28,29 @@ SELECT ${groupBy} AS k,
   )
  GROUP BY ${groupBy}`;
 
-statusRoutes.get("/v1/status", async (c) => {
+statusRoutes.get("/v1/status", async (c) => json(await fleetStatus(c.env, true)));
+
+/** Read-only fleet view (viewer or admin token): /v1/status without worker ids. */
+statusRoutes.get("/v1/fleet", async (c) => json(await fleetStatus(c.env, false)));
+
+function parseStats(s: unknown): Record<string, unknown> | null {
+  if (typeof s !== "string") return null;
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+async function fleetStatus(env: AppEnv["Bindings"], withIds: boolean) {
   const now = Date.now();
   const h1 = nowIso(now - 3600_000);
   const h24 = nowIso(now - 24 * 3600_000);
-  const db = c.env.DB;
-  const [workers, perWorker, perStage, queue, covered, cells] = await db.batch([
-    db.prepare("SELECT id, name, tier, os, last_seen, tok_s FROM workers WHERE disabled = 0 ORDER BY last_seen DESC"),
+  const db = env.DB;
+  const [workers, perWorker, perStage, queue, covered, cells, waves, hourly, quality] = await db.batch([
+    db.prepare(
+      "SELECT id, name, tier, os, gpu, vram_gb, client_version, last_seen, tok_s, stats_json FROM workers WHERE disabled = 0 ORDER BY last_seen DESC",
+    ),
     db.prepare(THROUGHPUT_SQL("worker_id")).bind(h1, h24),
     db.prepare(THROUGHPUT_SQL("stage")).bind(h1, h24),
     db.prepare("SELECT stage, status, COUNT(*) AS n, SUM(n_passages) AS p FROM jobs GROUP BY stage, status"),
@@ -49,6 +66,15 @@ statusRoutes.get("/v1/status", async (c) => {
       `SELECT cell, stage, status, COUNT(*) AS n, SUM(n_passages) AS p
          FROM jobs WHERE cell IS NOT NULL GROUP BY cell, stage, status ORDER BY cell, stage`,
     ),
+    db.prepare("SELECT wave, stage, status, COUNT(*) AS n, SUM(n_passages) AS p FROM jobs GROUP BY wave, stage, status ORDER BY wave"),
+    // Fleet passages per hour over the last 24 h (full results only: partials would double count).
+    db.prepare(
+      `SELECT substr(created, 1, 13) AS h, SUM(n_passages) AS n FROM results WHERE created >= ?1 GROUP BY h ORDER BY h`,
+    ).bind(h24),
+    db.prepare(
+      `SELECT stage, SUM(json_extract(stats_json, '$.n_ok')) AS n_ok, SUM(json_extract(stats_json, '$.n_flagged')) AS n_flagged,
+              COUNT(*) AS results FROM results WHERE created >= ?1 GROUP BY stage`,
+    ).bind(h24),
   ]);
 
   const tp = new Map((perWorker.results as { k: string; n_1h: number; n_24h: number }[]).map((r) => [r.k, r]));
@@ -88,23 +114,47 @@ statusRoutes.get("/v1/status", async (c) => {
   }
   const cellsOut = [...cellMap.values()].map((e) => ({ ...e, open: (e.queued as number) + (e.leased as number) > 0 }));
 
-  return json({
+  const waveMap = new Map<string, Record<string, unknown>>();
+  for (const r of waves.results as { wave: string; stage: string; status: string; n: number; p: number }[]) {
+    const key = `${r.wave}\u0000${r.stage}`;
+    let e = waveMap.get(key);
+    if (!e) {
+      e = { wave: r.wave, stage: r.stage, jobs: Object.fromEntries(STATUSES.map((st) => [st, 0])), passages: Object.fromEntries(STATUSES.map((st) => [st, 0])) };
+      waveMap.set(key, e);
+    }
+    (e.jobs as Record<string, number>)[r.status] = r.n;
+    (e.passages as Record<string, number>)[r.status] = r.p ?? 0;
+  }
+  const hourMap = new Map((hourly.results as { h: string; n: number }[]).map((r) => [r.h, r.n]));
+  const hourlyOut = Array.from({ length: 24 }, (_, i) => {
+    const h = nowIso(now - (23 - i) * 3600_000).slice(0, 13);
+    return { hour: h, passages: hourMap.get(h) ?? 0 };
+  });
+
+  return {
     generated: nowIso(now),
     workers: (workers.results as Record<string, unknown>[]).map((w) => ({
-      id: w.id,
+      ...(withIds ? { id: w.id } : {}),
       name: w.name,
       tier: w.tier,
       os: w.os,
+      gpu: w.gpu,
+      vram_gb: w.vram_gb,
+      client_version: w.client_version,
       last_seen: w.last_seen,
       passages_1h: tp.get(w.id as string)?.n_1h ?? 0,
       passages_24h: tp.get(w.id as string)?.n_24h ?? 0,
       tok_s: w.tok_s,
+      report: parseStats(w.stats_json),
     })),
+    waves: [...waveMap.values()],
+    hourly_passages: hourlyOut,
+    quality_24h: quality.results,
     queue: queueOut,
     remaining_passages: remaining,
     fleet_passages_per_hour: pph,
     eta_hours: eta,
     cells: cellsOut,
-    sealed: (await sealState(c.env)).sealed,
-  });
-});
+    sealed: (await sealState(env)).sealed,
+  };
+}

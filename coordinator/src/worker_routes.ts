@@ -214,6 +214,7 @@ workerRoutes.post("/v1/heartbeat", async (c) => {
   const done = typeof stats.passages_done === "number" && Number.isFinite(stats.passages_done) ? Math.trunc(stats.passages_done) : null;
   const now = Date.now();
   const idsJson = JSON.stringify(ids);
+  const report = sanitizeWorkerStats(stats);
   const [, ext] = await c.env.DB.batch([
     // Jobs whose pin was deactivated go straight back to the queue (not
     // counted as a failed attempt) and are reported as revoked.
@@ -230,8 +231,9 @@ workerRoutes.post("/v1/heartbeat", async (c) => {
         RETURNING job_id`,
     ).bind(w.id, idsJson, now + leaseTtlMs(c.env)),
     c.env.DB.prepare(
-      "UPDATE workers SET last_seen = ?2, tok_s = COALESCE(?3, tok_s), passages_done = COALESCE(?4, passages_done) WHERE id = ?1",
-    ).bind(w.id, nowIso(now), tokS, done),
+      `UPDATE workers SET last_seen = ?2, tok_s = COALESCE(?3, tok_s), passages_done = COALESCE(?4, passages_done),
+              stats_json = COALESCE(?5, stats_json) WHERE id = ?1`,
+    ).bind(w.id, nowIso(now), tokS, done, report),
   ]);
   const extended = new Set((ext.results as { job_id: string }[]).map((r) => r.job_id));
   return json({
@@ -239,6 +241,23 @@ workerRoutes.post("/v1/heartbeat", async (c) => {
     revoked: [...new Set(ids.filter((id) => !extended.has(id)))],
   });
 });
+
+// Worker self-report shown in the fleet view. Only these keys, only scalars, short strings.
+const STAT_KEYS = [
+  "tok_s", "passages_done", "state", "stage", "job_id", "progress", "concurrency", "passages_per_hour",
+  "keep_awake", "battery_percent", "power_plugged", "gpu_fraction", "gpu", "client_version", "service", "gpu_lock",
+] as const;
+
+export function sanitizeWorkerStats(stats: Record<string, unknown>): string | null {
+  const out: Record<string, unknown> = {};
+  for (const k of STAT_KEYS) {
+    const v = stats[k];
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+    else if (typeof v === "boolean" || v === null) out[k] = v;
+    else if (typeof v === "string") out[k] = v.slice(0, 120);
+  }
+  return Object.keys(out).length ? JSON.stringify(out) : null;
+}
 
 workerRoutes.post("/v1/release", async (c) => {
   const w = c.get("worker");

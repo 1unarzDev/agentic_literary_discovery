@@ -59,3 +59,15 @@ export const requireAnnotator: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set("annotator", row);
   await next();
 };
+
+/** Read-only fleet view: a viewer token (POST /v1/admin/viewer_token) or the admin token. */
+export const requireViewer: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const tok = bearer(c.req.raw) ?? c.req.query("t") ?? null;
+  if (!tok || tok.length > 256) throw UNAUTHORIZED();
+  const sha = await sha256Hex(tok);
+  const secret = c.env.ADMIN_TOKEN;
+  if (secret && sha === (await sha256Hex(secret))) return next();
+  const row = await c.env.DB.prepare("SELECT name FROM viewer_tokens WHERE token_sha256 = ?").bind(sha).first();
+  if (!row) throw UNAUTHORIZED();
+  await next();
+};

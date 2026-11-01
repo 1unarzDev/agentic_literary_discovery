@@ -60,6 +60,18 @@ adminRoutes.post("/v1/admin/invite", async (c) => {
   return json({ invites });
 });
 
+// ------------------------------------------------------------------ viewer tokens (read-only fleet view)
+
+adminRoutes.post("/v1/admin/viewer_token", async (c) => {
+  const b = await readJson<{ name?: unknown }>(c.req.raw);
+  const name = typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, 64) : "viewer";
+  const token = randomToken();
+  await c.env.DB.prepare("INSERT INTO viewer_tokens(token_sha256, name, created) VALUES (?, ?, ?)")
+    .bind(await sha256Hex(token), name, nowIso())
+    .run();
+  return json({ token, name, fleet_url: `${new URL(c.req.url).origin}/v1/fleet` });
+});
+
 // ------------------------------------------------------------------ pins
 
 interface PinRow {
