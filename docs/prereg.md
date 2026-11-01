@@ -141,7 +141,7 @@ Fixed by the corpus: about 7,750 works per half, of which the early era has abou
 | comm_infra | for H3 |
 
 - **Covariates (work level):**
-  - year (natural cubic spline, df = 4; knots at the minimum, quartiles and maximum of the pooled work-year distribution, fixed once from the full primary set);
+  - year (natural cubic spline, df = 4, with **fixed knots at 1800, 1850, 1885, 1905, 1929**: the boundaries, the era cut points and the late-era median). Quantile knots fall at about 1891/1906/1917 in this late-heavy corpus, which leaves 1800–1890 as one cubic piece.
   - genre (≤ 8 LCSH-mapped classes; reference = the most common);
   - origin (UK reference; US; unknown);
   - log(n_words), centred.
@@ -169,7 +169,7 @@ For each target and passage i, with Ŷᵢ the model one-hot, Yᵢ the human one-
 - **H1, H2a, H2c(ii).** Multinomial logit of the work-level DSL soft outcomes on ns(year, df = 4) + genre + origin + log length. Fitting solves the estimating equations Σ w xᵢ(Ỹᵢ − pᵢ(β)) = 0. Work weights are as in §3.3.
 - **H2b and H2c(i).** Binary logit with the same covariates. For H2b, the time term is the indicator year ≥ 1850, fitted on 1800–1884 works.
 - **Link fallback (pre-registered).** If the logit fails to converge, the same model is fitted with the identity link and that fit is reported (`fit_target`). DSL pseudo-outcome totals can be negative in sparse cells, and then the MLE does not exist. The fallback is flagged in output; see §7.2 for how often it happens.
-- **Estimand: g-computation.** For each era, average the fitted category probabilities over the pooled reference covariate table (a fixed-seed 3,000-work subsample of the primary set) × every integer year of the era. Then take the ratio of the relevant categories. The contrast is L − E (H2b: M-window − E).
+- **Estimand: g-computation.** For each era, average the fitted category probabilities over the pooled reference covariate table (a fixed-seed 3,000-work subsample of the primary set) × **the era's empirical work-year distribution**. Uniform years would give the near-empty 1800s as much weight as the 1840s, which inflated the SE by about 1.7× in simulation. Then take the ratio of the relevant categories. The contrast is L − E (H2b: M-window − E).
 - **SEs.** Delta method with the author-clustered (CR1) sandwich.
 - **Tests.**
   - Two-sided z-tests; a claim requires the pre-declared sign.
@@ -241,7 +241,73 @@ The verdict is computed mechanically by `battery.verdict`.
 
 ## 7. Power and validation (simulation, `analysis/stats/power.py`, `validate.py`)
 
-POWER_SECTION_PLACEHOLDER
+Simulation settings:
+- Corpora match G0: Confirmation decade counts from `docs/gates.md`; 7,750 works per half, or 5,700 after the author cap; heavy-tailed works per author (mean 3.7, median 1).
+- Early era: about 190 works and about 65 authors per half.
+- 24 random passages per work.
+- Era-varying LLM confusion, early errors skewed toward material and late errors skewed toward internal/social, so naive labels exaggerate H1. Two noise levels:
+  - "base": has_obstacle sensitivity 0.80–0.90, primary-domain accuracy 0.65–0.80;
+  - "good": 0.88–0.94 and 0.78–0.88. This is close to the pilot, which had has_obstacle accuracy 0.86 and locus agreement 0.88 against the Claude reference (`docs/model_selection.md`).
+- Simulated truth: Δ_material = −13 to −14 pp, Δ_internal = +8 pp.
+
+### 7.1 Minimum detectable effect, H1 material-share contrast (80% power, pp)
+
+**(a) Perfect labels on every passage** (the floor, set by works, authors and ICC; 2 replicates per cell, α = 0.05):
+
+| ICC (author, latent) | 0.02 | 0.05 | 0.10 | 0.20 |
+|---|---|---|---|---|
+| 7,750 works, 24 passages | 2.8–3.6 | 3.4–4.0 | 4.2–4.9 | 6.1–6.6 |
+| 7,750 works, 12 passages | 3.9–5.4 | 4.7–5.4 | 6.0–6.3 | 7.5–8.2 |
+| 5,700 works, 24 passages | 3.3–4.5 | 4.4–5.3 | 5.6–6.1 | 7.8–8.2 |
+
+Ranges are over obstacle prevalence 0.30–0.60. The corpus itself is not the constraint: the early era's ~65 authors and the ICC are.
+
+**(b) DSL-corrected, by number of human audit labels in the Confirmation half** (7,750 works, 24 passages, ICC 0.05, prevalence 0.45; 10 replicates; MDE in pp at α = 0.05 / at α = 0.01, the first Holm step):
+
+| Human labels (Confirmation) | ~108 (current plan) | 252 | 504 | 1,008 | 2,004 | ~3,850 |
+|---|---|---|---|---|---|---|
+| base noise | 57 / 69 | 28 / 34 | 23 / 28 | 16 / 19 | 11 / 14 | 8.0 / 9.8 |
+| good noise (≈ pilot) | 39 / 48 | 26 / 31 | 19 / 23 | 12.5 / 15 | 8.9 / 11 | 7.5 / 9.1 |
+| naive model labels | 3.3 MDE, but biased by **−12 pp** (estimate −26.5 vs truth −14.1); CI coverage 0.00 | | | | | |
+
+More findings from the power runs:
+- **Two-phase design.** A strong Tier-3 model on 10,000 Confirmation passages with humans nested in it gives 13.8 pp (base) and 11.9 pp (good) at 1,008 human labels. That is only a 10–15% gain, because a Tier-3 accuracy of 86–92% leaves the human-correction term dominant. It pays only if Tier-3 agrees with humans at ≥ 95%.
+- **Allocation.** Over-allocating the audit to the E and L eras (45/10/45) did **not** help (17.5 vs 15.8 pp at 1,008), so equal allocation across eras is kept.
+- **H2 tests are weaker still.** In the coverage study at 504 labels, the SE of the DARKNESS E→L prevalence contrast was 2.0–2.2 pp against a simulated effect of −2.8 pp. Communication-cause and night-function shares rest on a few dozen audited passages.
+
+**Decision rule (plan §4.7).** If the H1 MDE exceeds 8 pp, collapse before freezing. **At any human-audit size below about 3,800 Confirmation labels, the MDE exceeds 8 pp.** The registered version must therefore adopt one of the following before unsealing (recommendations R1–R6, §7.3):
+- (i) enlarge the audit;
+- (ii) declare H1 the single primary test and H2a–c secondary (still Holm-corrected, but expected to be underpowered);
+- (iii) report the registered MDE alongside every result.
+
+### 7.2 CI coverage (validation, `validate.py`; 250 synthetic corpora per audit size, era-varying noise)
+
+| Human labels (Confirmation) | DSL (calibrated g): range over 13 quantities | DSL (raw g) | Naive model labels |
+|---|---|---|---|
+| ~108 | 0.88–0.96 (era ratio shares undercover, 0.88–0.92: heavy-tailed 1/π terms; model contrasts 0.96 but median SE 0.15 vs empirical SD 0.20) | 0.91–0.97 | 0.00 for every locus quantity |
+| 504 | 0.90–0.97 (median 0.94) | 0.93–0.98 | 0.00 |
+| ~2,000 | 0.93–0.97 (median 0.94) | 0.93–0.97 | 0.00 |
+
+Monte Carlo SE of a coverage proportion: ±0.014.
+
+Further validation findings:
+- **Naive bias.** Naive labels are biased in the hypothesised direction: the 1800–49 material share is +14.7 pp too high and the 1885–1929 share −2.6 pp too low, which roughly doubles the H1 contrast.
+- **Logit fallback rate:** 88% at ~108 labels, 12% at 504, 1% at ~2,000.
+- **Simulation gate (§6)** is met at ≥ 500 labels. At ~108 labels, era-share CIs undercover, so they must be reported as approximate.
+- **PPI cross-check.** Stratified passage-level PPI agrees with DSL point estimates to machine precision under raw g (unit test). Its iid SE undercovers (0.85–0.94) because it ignores within-work clustering, so it is a cross-check only.
+
+Figure: `analysis/stats/figs/dsl_coverage.png`.
+
+### 7.3 Design recommendations (to resolve before the registered version)
+- **R1. Audit size.**
+  - Put the whole human audit into the **Confirmation** half. Discovery already has the teaching set, and Discovery audit labels may still be used to train the calibration g, since any g is valid.
+  - Cut the human task to `has_obstacle` + `locus` (+ `failure_cause` when communication is in play), so about 1,000 Confirmation labels become feasible. That gives an H1 MDE of about 12.5–16 pp.
+  - With volunteer annotators, each must pass a κ ≥ 0.6 check on the 40 double-coded items.
+- **R2. Model accuracy.** This is the cheapest lever. Moving from "base" to "good" noise cut the MDE at 1,008 labels from 15.8 to 12.5 pp, equivalent to about 60% more human labels. Prompt work on locus, and validation against the human audit, should precede the freeze.
+- **R3. H2 strata.** H2a, H2b and H2c(i) need audit strata defined by predicted *domain*, as plan §4.5 describes, not only locus groups. They also need audit coverage of the enrichment strata if enrichment passages are to be used. Otherwise H2a–c have DSL CIs too wide to test anything, and they should be registered as secondary.
+- **R4. Night labels.** Humans (or the 60-item Tier-3/user check, drawn as a probability sample) must label `night_function`, or H2c(ii) is uncorrected and should be dropped from the confirmatory family.
+- **R5. Audit frame.** Persist `audit_frame.parquet` (π for every pool passage) at selection time. This is now implemented in `select_annotation.py`. DSL cannot be computed after the v1.0 relabel without it.
+- **R6. Replication.** ELTeC (1841+) and Chicago (1880+) cannot replicate E-vs-L contrasts. The battery's replication item for H1 and H2b–c is therefore the ELTeC 1841–49 vs L contrast plus the slope sign. The verdict rule is unchanged.
 
 ## 8. Deviations policy
 - **Before registration.** Any change in this draft is logged in the change log below.
@@ -259,4 +325,4 @@ POWER_SECTION_PLACEHOLDER
 
 ## 9. Change log
 - v0.1 (2026-10-31): first draft from plan v2 §3–4.
-- v0.2 (2026-10-31): G0 eras; power and coverage simulation; design recommendations R1–R6.
+- v0.2 (2026-10-31): G0 eras; fixed spline knots; empirical era-year g-computation; work weights for adaptive stopping; power and coverage simulation; design recommendations R1–R6.

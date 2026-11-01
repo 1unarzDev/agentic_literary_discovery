@@ -3,10 +3,10 @@
 Run everything from the repo root (the modules import as `analysis.stats.*`):
 
 ```
-uv run pytest analysis/stats                                    # tests (~2 min)
+uv run pytest analysis/stats                                    # tests (~1 min)
 uv run python -m analysis.stats.simulate OUT_DIR                # synthetic labels/human/audit_frame parquet
-OMP_NUM_THREADS=1 uv run python -m analysis.stats.validate --reps 300 --procs 16   # coverage + figs/dsl_coverage.png
-OMP_NUM_THREADS=1 uv run python -m analysis.stats.power --reps 3 --procs 16        # MDE grid -> out/power_mde.csv
+OMP_NUM_THREADS=1 uv run python -m analysis.stats.validate --reps 250 --procs 8    # coverage + figs/dsl_coverage.png
+OMP_NUM_THREADS=1 uv run python -m analysis.stats.power --reps 2 --procs 8         # MDE grid -> out/power_mde.csv
 OMP_NUM_THREADS=1 uv run python -m analysis.stats.power --curve --reps 12          # audit-size curve
 uv run python -m analysis.stats.battery labels.parquet human.parquet keywords.csv \
     --frame audit_frame.parquet [--alt alt_labels.parquet] [--seg seg250.parquet --seg seg500.parquet] \
@@ -74,7 +74,9 @@ All three function targets are prevalences per passage.
 ## Modelling choices worth knowing
 
 - **Link.** The pre-registered link is the logit (multinomial for H1/H2a/night, binary for H2b/H2c-darkness). With small audits, DSL pseudo-outcomes (±1/π ≈ ±1000) can make a category's total negative in a sparse region (the early spline tail, a small genre). The logit MLE then does not exist. `fit_target` detects non-convergence and falls back to the identity link (`fit.n_iter == -1`), which always has a solution. `models.LINK["default"] = "identity"` switches every model. The validation reports how often the fallback happens.
-- **Estimand.** The era contrast is a g-computation (standardised) share: the average of fitted probabilities over a fixed reference covariate table × every year in the window, then the ratio of obstacle categories. The default reference is the analysis works (a 3,000-work fixed-seed subsample). Holding the genre × origin × length mix fixed is what "within genre" means operationally.
+- **Spline.** ns(year, df = 4) uses fixed knots at 1800/1850/1885/1905/1929 (`models.PREREG_KNOTS`). Quantile knots are badly placed in this late-heavy corpus.
+- **Estimand.** The era contrast is a g-computation (standardised) share: the average of fitted probabilities over a fixed reference covariate table × the era's **empirical** work-year distribution, then the ratio of obstacle categories. Eras follow G0: E = 1800–1849, M = 1850–1884, L = 1885–1929, and H2b compares 1800–49 with 1850–84.
+- **Work weights.** An optional `work_weight` column (1/P(work labelled) under adaptive stopping) is used by every estimator. The default reference is the analysis works (a 3,000-work fixed-seed subsample). Holding the genre × origin × length mix fixed is what "within genre" means operationally.
 - **SEs.** Cluster-robust (CR1) by author, since works nest in authors. Ratio shares use the same linearisation jointly across groups, so contrasts get correct covariances.
 - **Tests.** Two-sided p-values, but a claim needs the pre-declared sign (`Component.p_dir`). Multi-part hypotheses (H1: material falls **and** internal rises; H2c: darkness falls **and** night danger/concealment falls) use the intersection-union p = max of the parts.
 - **H3.**
