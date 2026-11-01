@@ -211,3 +211,58 @@ def test_update_applied_while_waiting_for_lock(env, tmp_path):
     p.kill()
     p.wait()
     assert env.reexec_calls, env.logs[-5:]
+
+
+@linux
+def test_blocked_waiter_wins_between_shards(env, tmp_path, monkeypatch):
+    """flock(2) is not FIFO: a process that blocks on the lock during our shard must get it before our next
+    shard (AAC study vs ald on innovation)."""
+    path = tmp_path / "gpu.lock"
+    stamp = tmp_path / "waiter_got_lock"
+    env.coord.add_job("job-a", "label", _label_pin(env), make_passages("a", 3))
+    env.coord.add_job("job-b", "label", _label_pin(env), make_passages("b", 3))
+    real_sleep = env.clock.sleep
+
+    def sleep(seconds, stop=None):  # let real time pass so the waiter process can run
+        time.sleep(min(seconds, 0.05))
+        return real_sleep(seconds, stop)
+
+    monkeypatch.setattr(env.clock, "sleep", sleep)
+    started = {}
+    code = ("import fcntl,os,sys,time; fd=os.open(sys.argv[1],os.O_RDWR|os.O_CREAT); "
+            "fcntl.flock(fd,fcntl.LOCK_EX); open(sys.argv[2],'w').write(repr(time.time())); time.sleep(0.5)")
+
+    def on_chat(body, n):
+        text = body["messages"][-1]["content"]
+        if "of a" in text and "waiter" not in started:
+            started["waiter"] = subprocess.Popen([sys.executable, "-c", code, str(path), str(stamp)])
+            for _ in range(200):  # until it is blocked in flock (visible in /proc/locks)
+                if GpuLock(path).waiters():
+                    break
+                time.sleep(0.01)
+        if "of b" in text and "b" not in started:
+            started["b"] = time.time()
+
+    env.ollama.on_chat = on_chat
+    w = env.make_worker(gpu_lock=str(path))
+    w.run()
+    started["waiter"].wait(timeout=10)
+    assert env.coord.state == {"job-a": "done", "job-b": "done"}
+    assert stamp.exists() and float(stamp.read_text()) < started["b"]  # the waiter got the GPU first
+    assert any("yielding" in m for m in env.logs)
+    assert env.registry.stages["label"].model_ref in env.ollama.unloads  # and our model was out of VRAM
+
+
+@posix
+def test_waiter_file_convention(tmp_path):
+    path = tmp_path / "gpu.lock"
+    lk = GpuLock(path, proc_locks=tmp_path / "no-proc-locks")
+    assert lk.acquire()
+    assert lk.waiters() is None  # nothing knowable here
+    wf = tmp_path / "gpu.lock.wait"
+    wf.write_text("")
+    assert lk.waiters() == 1
+    old = time.time() - 3600
+    os.utime(wf, (old, old))
+    assert not lk.waiter_file_fresh()  # a stale file (crashed waiter) is ignored
+    lk.release()

@@ -23,6 +23,7 @@ except ImportError:  # Windows
     fcntl = None  # type: ignore[assignment]
 
 PROC_LOCKS = Path("/proc/locks")
+WAITER_FILE_MAX_AGE_S = 600.0
 
 
 def parse_waiters(proc_locks: str, inode: int) -> int:
@@ -48,6 +49,7 @@ class GpuLock:
         self.poll_s = poll_s
         self.proc_locks = proc_locks
         self._fd: int | None = None
+        self.waited_last = False
         if path and not self.enabled:
             log("[gpu-lock] not supported on this platform; ignoring --gpu-lock")
 
@@ -66,6 +68,7 @@ class GpuLock:
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 self._fd = fd
+                self.waited_last = waited
                 if waited:
                     self.log(f"[gpu-lock] acquired {self.path}")
                 return True
@@ -106,12 +109,40 @@ class GpuLock:
             self._fd = None
 
     def waiters(self) -> int | None:
-        """Processes blocked on this lock, or None if that cannot be known on this OS."""
+        """Processes waiting for this lock: blocked flock(2) callers (/proc/locks, Linux) plus a fresh
+        ``<lock>.wait`` file (convention for programs that poll instead of blocking: touch it while
+        waiting, delete it when done). None if neither can be known on this OS."""
         if not self.enabled or self.path is None:
             return None
+        n: int | None = None
         try:
             text = self.proc_locks.read_text(encoding="utf-8", errors="replace")
-            ino = os.stat(self.path).st_ino
+            n = parse_waiters(text, os.stat(self.path).st_ino)
         except OSError:
-            return None
-        return parse_waiters(text, ino)
+            pass
+        if self.waiter_file_fresh():
+            n = (n or 0) + 1
+        return n
+
+    def waiter_file_fresh(self, max_age_s: float = WAITER_FILE_MAX_AGE_S) -> bool:
+        if self.path is None:
+            return False
+        try:
+            return time.time() - os.stat(str(self.path) + ".wait").st_mtime <= max_age_s
+        except OSError:
+            return False
+
+    def held_by_other(self) -> bool:
+        """Someone else holds the lock right now (we do not)."""
+        if not self.enabled or self.path is None or self.held:
+            return False
+        fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o666)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        else:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            return False
+        finally:
+            os.close(fd)

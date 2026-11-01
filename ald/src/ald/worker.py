@@ -53,6 +53,10 @@ HEARTBEAT_S = 60.0
 REGISTRY_POLL_S = 300.0
 PING_POLL_S = 300.0
 FLUSH_POLL_S = 30.0
+GPU_YIELD_S = 2.0              # --gpu-lock: pause between shards when nobody waited recently
+GPU_YIELD_CONTENDED_S = 30.0   # ... when the lock was contended in the last GPU_CONTENDED_WINDOW_S
+GPU_YIELD_UNKNOWN_S = 20.0     # ... where waiters cannot be detected (macOS)
+GPU_CONTENDED_WINDOW_S = 900.0
 DESKTOP_VRAM_BASELINE_GB = 1.5  # VRAM other programs may hold without lowering ald's plan
 IDLE_HEARTBEAT_S = 300.0  # self-report while holding nothing (fleet view); cheap on D1 writes
 STATE_SAVE_S = 15.0
@@ -765,6 +769,14 @@ class Worker:
             # --gpu-lock: the lock covers this shard's inference (heartbeats keep the lease alive meanwhile).
             # --gpu-lock: the run loop waits for the lock BEFORE leasing, so no job is held while waiting.
             # A prefetched job that finds the lock taken (someone was waiting) goes straight back.
+            if self.gpu_lock.enabled and not self.gpu_lock.held:
+                rem = getattr(self, "_gpu_yield_until", -1e18) - self.clock.monotonic()
+                if rem > 5:  # a long (contended) yield: do not sit on a leased job meanwhile
+                    self.log(f"[gpu-lock] yielding {rem:.0f}s to other GPU users; handing {hj.job_id} back")
+                    self.store.remove_job(hj.job_id)
+                    self._release([hj.job_id])
+                    return "gpu_yield"
+                self._gpu_yield_wait()
             if not self.gpu_lock.try_acquire():
                 self.log(f"[gpu-lock] {self.gpu_lock.path} taken by another process; handing {hj.job_id} back")
                 self.store.remove_job(hj.job_id)
@@ -775,7 +787,7 @@ class Worker:
             return self._run_job(hj)
         finally:
             self._current = None
-            self._release_gpu_lock()
+            self._release_gpu_lock(after_shard=True)
 
     def ensure_model_context(self, st: Stage) -> bool:
         """Two stages may share a model with different pinned num_ctx (e.g. label and cloze). Ollama keeps
@@ -811,14 +823,44 @@ class Worker:
         if gone:
             self.log(f"[gpu-lock] unloaded {', '.join(gone)} ({why})")
 
-    def _release_gpu_lock(self) -> None:
+    def _release_gpu_lock(self, after_shard: bool = False) -> None:
         if not self.gpu_lock.held:
             return
+        now = self.clock.monotonic()
+        if self.gpu_lock.waited_last:
+            self._gpu_contended_at = now
         # Unload BEFORE releasing, so the next holder never loads next to our model.
         n = self.gpu_lock.waiters()
         if n:
+            self._gpu_contended_at = now
             self._unload_stage_models(f"{n} process(es) waiting for the GPU lock")
         self.gpu_lock.release()
+        if not after_shard:
+            return
+        # flock(2) is not FIFO: re-locking right away beats a blocked waiter that the kernel just woke.
+        if n:
+            self._gpu_handover(n)
+        recent = now - getattr(self, "_gpu_contended_at", -1e18) < GPU_CONTENDED_WINDOW_S
+        if n is None:  # waiters cannot be detected here (macOS): always leave a real gap
+            yield_s = GPU_YIELD_UNKNOWN_S
+        else:
+            yield_s = GPU_YIELD_CONTENDED_S if recent else GPU_YIELD_S
+        self._gpu_yield_until = self.clock.monotonic() + yield_s
+
+    def _gpu_handover(self, n: int) -> None:
+        """A waiter exists: wait (up to 60 s) until it actually holds the lock, then queue behind it."""
+        self.log(f"[gpu-lock] yielding {self.gpu_lock.path} to {n} waiting process(es)")
+        t0 = self.clock.monotonic()
+        while self.clock.monotonic() - t0 < 60 and not self.stop.is_set():
+            if self.gpu_lock.held_by_other():
+                return
+            if self.clock.sleep(0.5, self.stop):
+                return
+
+    def _gpu_yield_wait(self) -> None:
+        rem = getattr(self, "_gpu_yield_until", -1e18) - self.clock.monotonic()
+        if rem > 0:
+            self.clock.sleep(rem, self.stop)
 
     def _idle_gpu_unload(self) -> None:
         """With --gpu-lock, free the VRAM when there is nothing to do (also covers OSes where lock
@@ -1300,6 +1342,7 @@ class Worker:
                     if self.gpu_lock.enabled and not self.gpu_lock.held:
                         self.activity = "waiting_gpu_lock"
                         self._save_state()
+                        self._gpu_yield_wait()
                         def _abort_wait() -> bool:  # keep updating while another program holds the GPU
                             self.check_for_update()
                             return self.auto_update and self._update_pending()
