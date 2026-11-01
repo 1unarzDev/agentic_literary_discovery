@@ -1,0 +1,17 @@
+country_name,variable,first_year,last_year,n_observed,missing_between_endpoints
+United Kingdom,mail,1839,1925,83,1915;1916;1917;1918
+United Kingdom,telegram,1870,1925,56,
+United Kingdom,telephone,1894,1925,32,
+United Kingdom,railline,1825,1925,93,1868;1869;1870;1914;1915;1916;1917;1918
+United Kingdom,railp,1838,1925,78,1839;1840;1841;1842;1868;1914;1915;1916;1917;1918
+United Kingdom,railpkm,,,0,
+United Kingdom,railt,1856,1925,62,1868;1869;1870;1914;1915;1916;1917;1918
+United Kingdom,railtkm,1920,1925,6,
+United States,mail,1886,1923,29,1914;1915;1916;1917;1918;1919;1920;1921;1922
+United States,telegram,1867,1925,53,1911;1912;1913;1914;1915;1916
+United States,telephone,1876,1925,50,
+United States,railline,1830,1925,96,
+United States,railp,1882,1925,44,
+United States,railpkm,1882,1925,44,
+United States,railt,1870,1925,37,1871;1872;1873;1874;1875;1876;1877;1878;1879;1880;1881;1891;1892;1893;1894;1895;1896;1897;1898
+United States,railtkm,1865,1925,61,

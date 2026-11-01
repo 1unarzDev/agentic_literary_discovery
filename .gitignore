@@ -1,0 +1,11 @@
+data/raw/
+data/catalog/
+data/work/
+*.parquet
+data/manifests/*.parquet
+__pycache__/
+.venv/
+research/codex_tasks/logs/
+coordinator/node_modules/
+coordinator/.wrangler/
+dist/
