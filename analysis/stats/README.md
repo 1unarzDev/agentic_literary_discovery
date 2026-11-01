@@ -54,8 +54,10 @@ Set `OMP_NUM_THREADS=1` for the multiprocess runs, because BLAS threads oversubs
 - π is recomputed per cell from retained labels (`recompute_pi=True`).
 - The battery CLI applies all of this and writes `annotator_agreement.csv` and `overlap_agreement.csv`.
 - **H3's p-value is calibrated ×10** (`models.H3_P_INFLATE`).
+- **H1 (prereg v0.4)** is a **two-sided 2-df Wald test** of (Δmaterial, Δinternal) = 0, E vs L, classified inward / outward / mixed (`models.h1`, `classify_h1`). `h1_mid_late` gives the descriptive M-vs-L contrast. `h1(two_sided=False)` is the v0.3 directional test. The battery re-checks the components whose CI excludes 0, against their observed signs.
+- **Genre and standard.** The genre variable is `data/work/genre.parquet` (`models.attach_genre`). The standard population is `models.reference_covariates(works, genre)`: the primary set of both halves. The battery CLI uses both by default (`--genre`, `--works`).
 - **Family:** H1 is the single primary test; H2a–c and H3 are Holm among themselves. H2c is darkness prevalence only; night function is exploratory (`h2c(include_night=True)`).
-- Final-design power: `uv run python -m analysis.stats.power --final --reps 20`, written to `out/power_final.csv`.
+- Final-design power: `uv run python -m analysis.stats.power --final --reps 20`, written to `out/power_final.csv`. Add `--v04` for the two-sided H1 under the inward, pilot-like (`SimConfig.pilot_step`) and null truths, written to `out/power_final_v04.csv`.
 
 **audit_frame.parquet** (new; `select_annotation.py` now writes it): `passage_id, audit_cell, pi_audit` for **every** passage in the audit pool, not just the audited ones.
 
