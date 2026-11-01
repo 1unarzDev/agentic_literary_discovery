@@ -1,0 +1,151 @@
+version: 1
+purpose: 'Candidate retrieval in English fiction, 1800–1925; mentions are not obstacle labels.'
+review_date: '2026-10-31'
+regex:
+  engine: 'Python re; compile each pattern with re.IGNORECASE; Unicode text.'
+  normalization: 'Normalize curly apostrophes, long s and Unicode dash variants; join line-break hyphenation conservatively. Preserve the original text and offsets. Do not globally remove hyphens.'
+  matching: 'Patterns include word boundaries. Treat variants as one concept per passage; allow cross-domain matches.'
+  context: 'Use the sentence plus adjacent sentences, or ±40 tokens, for suggested sense checks. These are soft reranking signals, not mandatory filters.'
+  time_policy: 'Search every corpus year. Technology-era hints below concern the modern sense, not first word attestations; retrospective settings and metaphors prevent hard date gates.'
+  validation: 'All regexes compile; recall and precision on this corpus are UNVERIFIED. Audit positives and a random sample of nonmatches by period and country.'
+evidence:
+  status: 'Historically informed seed list, not an exhaustive attestation dictionary. Individual earliest dates and UK/US frequency distributions are UNVERIFIED.'
+  sources:
+    - url: 'https://onlinebooks.library.upenn.edu/webbin/book/lookupid?key=olbp31350'
+      title: "Webster's Revised Unabridged Dictionary | University of Pennsylvania Online Books Page"
+      use: 'Period-dictionary reference, based on 1913 edition; archive catalogue verified, every headword not individually checked.'
+    - url: 'https://www.londonmuseum.org.uk/collections/london-stories/penny-post-sparked-letter-writing-revolution/'
+      title: 'The Penny Post sparked a letter-writing revolution'
+      use: 'Post, franking, mail coaches, stamps, pillar boxes; local penny posts predate 1840.'
+    - url: 'https://www.soane.org/exhibitions/georgian-illuminations/lighting'
+      title: 'Artificial light in Georgian England'
+      use: 'Candle, oil and gas lighting context.'
+    - url: 'https://www.bt.com/bt-plc/assets/documents/about-bt/our-history/bt-archives/information-sheets-and-timelines/private-and-municipal-telephone-companies.pdf'
+      title: 'Private and municipal telephone companies | BT Archives'
+      use: 'Early telephone exchange context; see timeline for rollout.'
+    - url: 'https://www.etymonline.com/word/phone'
+      title: 'Phone | Online Etymology Dictionary'
+      use: 'Colloquial telephone vocabulary belongs in the later nineteenth-century retrieval tier.'
+domains:
+  communication:
+    era_hint: 'Letters and couriers throughout; electric telegraph from late 1830s UK / 1840s US; cable overseas from 1858 briefly and 1866 durably; electric telephone from late 1870s. Earlier telegraph can be optical.'
+    groups:
+      - id: written_message
+        forms: [letter, epistle, missive, billet, billet-doux, billets-doux, note, correspondence, communication, message, despatch, dispatch]
+        pattern: '\b(?:letters?|epistles?|missives?|billets?(?:[ -]doux)?|notes?|correspondence|communications?|messages?|d[ei]spatch(?:es|ed|ing)?)\b'
+      - id: postal_system
+        forms: [post, penny post, twopenny post, general post, post office, mail, mails, mail-coach, postman, post-boy, letter-carrier, post-bag, letter-box, pillar-box, postage, stamp, frank, crossed letter]
+        pattern: '\b(?:(?:penny|two[ -]?penny|general)[ -]post|post[ -]?offices?|posts?|mails?|mail[ -]?coach(?:es)?|postm[ae]n|post[ -]?boys?|letter[ -]?carriers?|post[ -]?bags?|letter[ -]?boxes|letter[ -]?box|pillar[ -]?boxes|pillar[ -]?box|postage|stamps?|frank(?:s|ed|ing)?|cross(?:ed|[ -]written)[ -]letters?)\b'
+      - id: human_messenger
+        forms: [courier, express, messenger, bearer, errand, runner]
+        pattern: '\b(?:couriers?|express(?:es)?|messengers?|bearers?|errands?|runners?)\b'
+      - id: electric_message
+        forms: [telegraph, telegram, telegraphic message, wire, wired, cable, cablegram, marconigram]
+        pattern: '\b(?:telegraphs?|telegraph(?:ed|ing|ic)|telegrams?|wires?|wired|wiring|cables?|cabled|cabling|cablegrams?|marconigrams?)\b'
+        note: 'Wireless/marconigram is a later-period supplement; exact attestation years UNVERIFIED.'
+      - id: voice_network
+        forms: [telephone, telephonic, phone, telephone exchange, central, ring up, rang up, rung up, call office, call-box, trunk call, receiver, speaking tube]
+        pattern: '\b(?:telephones?|telephon(?:ed|ing|ic)|phones?|phon(?:ed|ing)|exchanges?|central|(?:ring|rings|rang|rung|ringing)[ -]up|call[ -]offices?|call[ -]?boxes|call[ -]?box|trunk[ -]calls?|receivers?|speaking[ -]tubes?)\b'
+        note: 'Speaking tubes are building/ship communication and need no public telephone network. Early telephone can denote acoustic signaling.'
+      - id: optical_signal
+        forms: [semaphore, shutter telegraph, signal, beacon]
+        pattern: '\b(?:semaphores?|shutter[ -]telegraphs?|signals?|signal(?:led|ling|ed|ing)|beacons?)\b'
+      - id: information_failure_candidates
+        forms: [unanswered, undelivered, misdirected, intercepted, suppressed, withheld, conceal, silence, no reply, no tidings]
+        pattern: '\b(?:unanswered|undelivered|misdirected|intercept(?:ed|ion)|suppress(?:ed|ion)|withh(?:eld|old(?:s|ing)?)|conceal(?:s|ed|ing|ment)?|silence|no[ -](?:reply|answer|tidings))\b'
+        note: 'Optional expansion only; do not require these words or infer intention from them. Annotate accident/infrastructure/intent from causal context.'
+    ambiguity:
+      - term: 'letter'
+        other_senses: 'Alphabet character; letter of the law; letters as learning.'
+        suggestion: 'Rerank up with write/read/send/receive/address/envelope/seal/post or a sender and recipient; rerank down with alphabet/capital/type or letter of the law.'
+      - term: 'note / billet'
+        other_senses: 'Music, banknote, observation; billet as lodging or wood.'
+        suggestion: 'Look for a written object passed/read/addressed; retain financial notes as cross-domain candidates when communication matters.'
+      - term: 'post / stamp / frank'
+        other_senses: 'Job, military station, upright support; foot-stamp; candid adjective or personal name.'
+        suggestion: 'Prefer postal co-occurrences. Do not reject every post of duty or Frank solely by case; inspect sentence.'
+      - term: 'express / bearer / runner'
+        other_senses: 'Express emotion; express train; bearer securities; running person or plant.'
+        suggestion: 'Message-bearing task distinguishes courier; express train can legitimately match mobility.'
+      - term: 'wire / cable'
+        other_senses: 'Physical metal wire, rope or nautical cable.'
+        suggestion: 'Communication verbs and sender/recipient favour messaging; fence/rope/rigging favour material sense. Literal broken telegraph wire may itself be an obstacle.'
+      - term: 'exchange / central / receiver / rang up'
+        other_senses: 'Commerce or conversation; central location; receiver of property; rang a total up on a till.'
+        suggestion: 'Telephone/number/operator/connection/speaking co-occurrence favours telephone. A bell alone is weak evidence.'
+      - term: 'signal / silence / communication'
+        other_senses: 'Gesture, quiet scene, generic interaction.'
+        suggestion: 'Keep for broad recall; classify medium and causal role separately. Silence does not establish intentional withholding.'
+  mobility:
+    era_hint: 'Horse, foot and sail vocabulary throughout; rail and steam later coexist with older modes. Diligence often names a continental coach in English travel scenes.'
+    groups:
+      - id: road_vehicles
+        forms: [coach, stage-coach, mail-coach, post-chaise, chaise, diligence, carriage, chariot, gig, curricle, phaeton, barouche, landau, brougham, cab, hansom, omnibus, waggon, wagon, cart, trap, fly]
+        pattern: '\b(?:coach(?:es)?|stage[ -]?coach(?:es)?|mail[ -]?coach(?:es)?|post[ -]?chaises?|chaises?|diligences?|carriages?|chariots?|gigs?|curricles?|phaetons?|barouches?|landaus?|broughams?|cabs?|hansoms?|omnibus(?:es)?|wagg?ons?|carts?|traps?|flies|fly)\b'
+      - id: road_infrastructure
+        forms: [turnpike, high-road, highway, toll-gate, posting-house, post-horse, postilion, postillion, coaching inn, road, journey, travel, on foot, horseback]
+        pattern: '\b(?:turnpikes?|high[ -]?roads?|highways?|toll[ -]?gates?|posting[ -]?houses?|post[ -]?horses?|postil{1,2}ions?|coaching[ -]inns?|roads?|journeys?|travel(?:s|led|ling|ed|ing)?|on[ -]foot|horseback)\b'
+      - id: railway
+        forms: [railway, railroad, rail-road, train, locomotive, engine, railway carriage, compartment, station, platform, junction, terminus, time-table, ticket, booking-office, guard]
+        pattern: '\b(?:rail[ -]?ways?|rail[ -]?roads?|trains?|locomotives?|engines?|compartments?|stations?|platforms?|junctions?|terminus|termini|time[ -]?tables?|tickets?|booking[ -]?offices?|guards?)\b'
+      - id: water_transport
+        forms: [steamer, steam-boat, steamship, packet, packet-boat, mail-packet, liner, ship, vessel, ferry, passage, crossing, embark, quay, wharf, port, harbour, harbor, canal, barge]
+        pattern: '\b(?:steamers?|steam[ -]?boats?|steam[ -]?ships?|(?:mail[ -])?packets?|packet[ -]?boats?|liners?|ships?|vessels?|ferr(?:y|ies)|passages?|crossings?|embark(?:s|ed|ing)?|quays?|whar(?:f|ves)|ports?|harbou?rs?|canals?|barges?)\b'
+      - id: later_land_transport
+        forms: [bicycle, cycle, motor-car, motorcar, automobile, tram, tramway, street-car]
+        pattern: '\b(?:bicycles?|cycles?|motor[ -]?cars?|automobiles?|trams?|tram[ -]?ways?|street[ -]?cars?)\b'
+        note: 'Later-century/early-twentieth-century expansion; do not use a single invented introduction date.'
+      - id: delay_candidates
+        forms: [missed the train, impassable, snowbound, stranded, delayed, blocked, breakdown]
+        pattern: '\b(?:miss(?:ed|ing)[ -](?:the[ -])?(?:train|coach|boat)|impassable|snow[ -]?bound|stranded|delay(?:s|ed|ing)?|block(?:s|ed|ing)?|break[ -]?downs?)\b'
+        note: 'Retrieve possible obstacles as well as transport settings; these cues are neither necessary nor sufficient.'
+    ambiguity:
+      - term: 'train / carriage / coach'
+        other_senses: 'Dress train, train of thought, retinue, training; bodily carriage; tutor or instruction.'
+        suggestion: 'Prefer station/rails/departure/engine or passengers/drive/horses. Preserve dress trains for other annotations but do not count as railway mentions.'
+      - term: 'diligence / gig / trap / fly'
+        other_senses: 'Careful effort; performance or boat; snare; insect or flight.'
+        suggestion: 'Vehicle boarding/driving, horses, wheels and roads support road transport. Gig may properly match water transport too.'
+      - term: 'post / express / engine / guard'
+        other_senses: 'Postal or employment sense; expression; other machinery; protection or soldier.'
+        suggestion: 'Assign railway sense only with transport context; avoid relying on isolated words.'
+      - term: 'station / platform / junction / ticket / line'
+        other_senses: 'Social station, rhetorical platform, generic joining, label, poetic or written line.'
+        suggestion: 'Stationmaster/train/rail/booking support rail; line is omitted as a standalone pattern because of extreme ambiguity.'
+      - term: 'packet / passage / vessel / port / crossing'
+        other_senses: 'Small bundle, text passage, anatomical vessel, wine or left side of ship, religious gesture.'
+        suggestion: 'Sea/sail/board/deck/arrival/fare or named ports support voyage sense. Postal packet may validly match communication.'
+  darkness_lighting:
+    era_hint: 'Candles, oil lamps and unlit places persist after gas and electricity. Street lighting, domestic lighting and rural coverage differ.'
+    groups:
+      - id: flame_light
+        forms: [candle, candle-light, candlestick, taper, tallow, rushlight, rush-light, waxlight, lamp, oil-lamp, lantern, lanthorn, dark-lantern, torch, flambeau, link, link-boy, lucifer, match]
+        pattern: '\b(?:candles?|candle[ -]?light|candlesticks?|tapers?|tallow|rush[ -]?lights?|wax[ -]?lights?|lamps?|oil[ -]?lamps?|lanterns?|lanthorns?|dark[ -]?lanterns?|torches|torch|flambeaux|flambeaus?|links?|link[ -]?boys?|lucifers?|matches|match)\b'
+      - id: supplied_light
+        forms: [gas, gaslight, gas-light, gas-lamp, gas-jet, gas-burner, gas-mantle, street-lamp, lamp-post, lamplighter, electric light, arc-light, incandescent lamp, paraffin, kerosene, petroleum]
+        pattern: '\b(?:gas|gas[ -]?(?:lights?|lamps?|jets?|burners?|mantles?)|street[ -]?lamps?|lamp[ -]?posts?|lamplighters?|electric[ -](?:lights?|lamps?)|arc[ -]lights?|incandescent[ -]lamps?|paraffin|kerosene|petroleum)\b'
+      - id: ambient_darkness
+        forms: [dark, darkness, darkened, dusk, dusky, twilight, night, nightfall, midnight, moonless, moonlight, starlight, pitch-dark, pitchy, murk, gloom, shadow, obscure, obscurity, unlighted, unlit, blackness]
+        pattern: '\b(?:dark|darkness|darken(?:s|ed|ing)?|dusk|dusky|twilight|nights?|nightfall|midnight|moonless|moon[ -]?light|star[ -]?light|pitch[ -]?dark|pitchy|murk(?:y)?|gloom(?:y)?|shadows?|obscure|obscurity|unlighted|unlit|blackness)\b'
+      - id: visibility_failure_candidates
+        forms: [could not see, could not discern, could not distinguish, groped, stumbled, extinguished, blown out, went out]
+        pattern: '\b(?:(?:could|can|did)[ -]not[ -](?:see|discern|distinguish)|grop(?:e|es|ed|ing)|stumbl(?:e|es|ed|ing)|extinguish(?:ed|es|ing)?|blown[ -]out|went[ -]out)\b'
+        note: 'A failure to see can be bodily impairment or fog; a light going out needs an identified light source. Do not force these into darkness.'
+    ambiguity:
+      - term: 'dark / gloom / shadow / obscurity / blackness'
+        other_senses: 'Mood, moral judgement, skin or clothing, unknown information, social obscurity.'
+        suggestion: 'Physical light, space, navigation or seeing supports visibility; in the dark about is usually information. Permit overlap when the passage establishes both.'
+      - term: 'night / moonlight / twilight'
+        other_senses: 'Time or atmosphere without an impediment; twilight of a life.'
+        suggestion: 'Code setting, enabling cover, atmosphere and obstructed action separately. Darkness may facilitate an action instead of blocking it.'
+      - term: 'light / gas / taper / match / link / torch'
+        other_senses: 'Weight or knowledge; fuel or anaesthetic; shape/verb; marriage or contest; connection; metaphorical love.'
+        suggestion: 'Standalone light deliberately omitted; use illumination context for ambiguous forms. Burning/lighting/wick/flame/carrying plus an object supports a source of light.'
+      - term: 'lantern / dark-lantern'
+        other_senses: 'Magic lantern projection; a shuttered lantern need not be extinguished.'
+        suggestion: 'Retain historically specific variants and inspect how visibility affects the action.'
+annotation_reminders:
+  - 'Measure mention rates separately from obstacle rates (H3); do not use this lexicon to define the gold label.'
+  - 'For every putative obstacle identify actor, goal, blocking condition, and causal evidence in context.'
+  - 'No-match passages remain eligible for random annotation; lexical retrieval must not replace the random-sampling design.'
+  - 'Publication year, story setting year, country of author and scene location are distinct variables.'

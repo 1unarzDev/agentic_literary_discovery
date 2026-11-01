@@ -22,6 +22,7 @@ S={
 'loc_morse':('https://www.loc.gov/item/mcc00054/','First telegraph message, 24 May 1844 | Library of Congress'),
 'si_morse':('https://www.si.edu/object/what-hath-god-wrought-telegraph-message%3Anmah_713485','What Hath God Wrought Telegraph Message | Smithsonian'),
 'lm_tele':('https://www.londonmuseum.org.uk/collections/london-stories/how-telegraph-took-off-victorian-london/','How the telegraph took off in Victorian London | London Museum'),
+'eb_post':('https://en.wikisource.org/wiki/1911_Encyclop%C3%A6dia_Britannica/Post_and_Postal_Service','1911 Encyclopaedia Britannica: Post, and Postal Service'),
 'bt_archive':('https://www.bt.com/about/bt/our-history/bt-archives/major-collections','Major collections | BT Group Archives'),
 'act1885':('https://www.legislation.gov.uk/ukpga/Vict/48-49/58/pdfs/ukpga_18850058_en.pdf','Telegraph Act 1885'),
 'illmag':('https://victorianweb.org/periodicals/englishillustrated/6.html','Post-Office Parcels and Telegraphs | The English Illustrated Magazine (Victorian Web transcription)'),
@@ -40,7 +41,7 @@ S={
 'loc_phone_timeline':('https://guides.loc.gov/chronicling-america-telephone-invention','Invention of the Telephone: Topics in Chronicling America | Library of Congress'),
 'hagley':('https://www.hagley.org/research/news/hagley-vault/date-january-25-1915-alexander-graham-bell','On this date ... January 25 ... 1915 ... Alexander Graham Bell | Hagley'),
 'census_phone':('https://www2.census.gov/library/working-papers/2025/comm/bell-and-the-1900-census.pdf','Alexander Graham Bell and the 1900 Census | U.S. Census Bureau'),
-'ucd_phone':('https://itspubs.ucdavis.edu/download_pdf.php?id=267','Prospecting the Environmental Impacts of Telecommunications: A Study of Telework | UC Davis'),
+'ucd_phone':('https://itspubs.ucdavis.edu/download_pdf.php?id=267','Prospecting the Future for Hydrogen Fuel Cell Vehicle Markets | UC Davis'),
 'stockton':('https://heritage.stockton.gov.uk/articles/stories/stockton-where-passenger-railways-began/','Stockton: Where Passenger Railways Began | Stockton Heritage'),
 'historic_rail':('https://historicengland.org.uk/whats-new/research/a-brief-overview-of-the-stockton-and-darlington-railway/','A Brief Overview of the Stockton & Darlington Railway | Historic England'),
 'smg_lmrail':('https://collection.sciencemuseumgroup.org.uk/people/cp29532/liverpool-and-manchester-railway','Liverpool & Manchester Railway | Science Museum Group'),
@@ -55,7 +56,7 @@ S={
 'gas_museum':('https://www.nationalgasmuseum.org.uk/discover/the-early-days/','The early days | National Gas Museum'),
 'gas_lamps':('https://www.nationalgasmuseum.org.uk/lamp-locations/','Lamp locations | National Gas Museum'),
 'soane':('https://www.soane.org/exhibitions/georgian-illuminations/lighting',"Artificial light in Georgian England | Sir John Soane's Museum"),
-'maryland':('https://msa.maryland.gov/megafile/ecp/26/040/html/0300.html','Baltimore street lighting history | Maryland State Archives (page heading UNVERIFIED)'),
+'maryland':('https://msa.maryland.gov/megafile/ecp/26/040/html/0300.html','A City Divided, 1814-1865, III | Maryland State Archives'),
 'aoghs':('https://aoghs.org/technology/manufactured-gas/','Illuminating Gaslight | American Oil & Gas Historical Society'),
 'menlo':('https://www.menloparkmuseum.org/history','Thomas Edison and Menlo Park | Thomas Edison Center at Menlo Park'),
 'nps_edison':('https://www.nps.gov/edis/learn/historyculture/edison-biography.htm?simple=True','Edison Biography | Thomas Edison National Historical Park'),
@@ -86,7 +87,7 @@ add('UK_CW_1839','communication','UK',1839,'','Demonstration line installed on G
 add('US_MORSE_1844','communication','US',1844,5,'24 May: Morse formally demonstrates Washington–Baltimore telegraph line.','Rapid messaging begins on a particular corridor, not everywhere.','loc_morse','si_morse')
 add('ATLANTIC_CABLE_1858','communication','both',1858,8,'First transatlantic telegraph cable connects Ireland and Newfoundland; fails within weeks.','Do not code 1858 as continuous reliable Atlantic connectivity; endpoints are not in the U.S.','loc_cable','iet1858')
 add('ATLANTIC_CABLE_1866','communication','both',1866,7,'Durable transatlantic cable service established; second working cable recovered in September.','Fast Atlantic news becomes feasible but tariffs and access remain constraints.','state_cable','met_cable')
-add('UK_TELEGRAPH_STATE','communication','UK',1870,2,'5 February: Post Office takes over inland private telegraph networks; not all international cable companies.','More coordinated inland messaging infrastructure; evaluate access locally.','lm_tele','bt_archive','high for year/scope; February day corroborated by EB1911 in README')
+add('UK_TELEGRAPH_STATE','communication','UK',1870,2,'5 February: Post Office takes over inland private telegraph networks; not all international cable companies.','More coordinated inland messaging infrastructure; evaluate access locally.','lm_tele','eb_post')
 add('UK_SIXPENNY_TELEGRAM','communication','UK',1885,10,'1 October: inland minimum telegram charge cut to sixpence for twelve words including addresses; halfpenny per additional word.','Cost falls but word limits and addressed delivery still constrain messages.','act1885','illmag')
 add('US_BELL_PATENT','communication','US',1876,3,'7 March: Bell granted U.S. patent 174465; intelligible speech experiment on 10 March is a separate event.','Patent date is a technological hinge, not a household adoption threshold.','loc_phone','si_phone')
 add('US_PHONE_EXCHANGE','communication','US',1878,1,'28 January: commercial telephone exchange opens in New Haven.','Switching allows subscribers to contact multiple others locally.','nps_exchange','uconn')

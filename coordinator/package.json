@@ -1,0 +1,32 @@
+{
+  "name": "ald-coordinator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:html": "node scripts/build-html.mjs",
+    "dev": "npm run build:html && wrangler dev",
+    "deploy": "npm run build:html && wrangler deploy",
+    "pretest": "npm run build:html",
+    "test": "vitest run",
+    "typecheck": "npm run build:html && tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.13.14"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.11",
+    "@cloudflare/workers-types": "^5.20261101.1",
+    "@vitest/runner": "~4.1.0",
+    "@vitest/snapshot": "~4.1.0",
+    "typescript": "^7.0.2",
+    "vitest": "~4.1.0",
+    "wrangler": "^4.156.0"
+  },
+  "allowScripts": {
+    "workerd@1.20260815.1": true,
+    "workerd@1.20261023.1": true,
+    "esbuild@0.28.1": true,
+    "esbuild@0.28.2": true
+  }
+}

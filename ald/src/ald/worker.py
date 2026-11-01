@@ -1,0 +1,993 @@
+"""``ald work``: lease -> download -> infer -> verify -> checkpoint -> upload.
+
+Durability model
+----------------
+* Every completed passage is appended to ``jobs/<job>/checkpoint.jsonl``
+  immediately (fsync every 20 lines).
+* A finished job becomes one final blob in the on-disk outbox; an interrupted
+  job (Ctrl-C, SIGTERM, console close / logoff / shutdown, deadline, revoked,
+  lease lost while offline, pin retired, stage demoted) becomes a PARTIAL blob
+  (``PUT /v1/result/<job>?partial=1``) and the lease is released.
+* At startup, before leasing, interrupted jobs found on disk (crash / power
+  loss) are turned into partial blobs, released, and the outbox is flushed. A
+  background thread keeps flushing with backoff + jitter while the network is
+  down. Local files are deleted only after HTTP 200.
+* Leases may carry ``skip_passage_ids`` (covered by an earlier partial
+  upload); those passages are neither run nor included in the final blob.
+"""
+
+from __future__ import annotations
+
+import datetime as _dt
+import json
+import random
+import threading
+import time
+from collections import deque
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable
+
+import httpx
+
+from . import CLIENT_VERSION
+from .backend.ollama import BackendError, BackendOOM, BackendUnavailable, OllamaBackend
+from .client import CoordinatorClient, CoordinatorError, UpgradeRequired
+from .config import Config, atomic_write_json, read_json
+from .hw import HardwareInfo
+from .inference import is_flagged, run_passage
+from .registry import Registry, RegistryError, Stage, digests_match, version_in_range
+from .results import JobStore, Outbox, encode_jsonl_gz, read_jsonl_gz, sha256_bytes
+from .scheduler import (
+    DEFAULT_PASSAGES_PER_JOB, GB, Backoff, Clock, ConcurrencyTuner, HardwareFit, PlanSummary, RateTracker,
+    RunWindow, StorageManager, lease_size, should_prefetch,
+)
+from .updater import Updater, decide
+
+LEASE_TTL_S = 600.0
+HEARTBEAT_S = 60.0
+REGISTRY_POLL_S = 300.0
+PING_POLL_S = 300.0
+FLUSH_POLL_S = 30.0
+MAX_PASSAGE_ERRORS = 2
+OOM_DEMOTE_AFTER = 2  # OOMs at concurrency 1 before the stage is demoted
+
+
+def parse_ts(v: Any, default: float) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        return float(v) / 1000.0 if v > 1e12 else float(v)
+    try:
+        s = str(v).replace("Z", "+00:00")
+        return _dt.datetime.fromisoformat(s).timestamp()
+    except ValueError:
+        try:
+            return parse_ts(float(v), default)
+        except ValueError:
+            return default
+
+
+def is_network_error(e: BaseException) -> bool:
+    return isinstance(e, httpx.TransportError)
+
+
+@dataclass
+class HeldJob:
+    job: dict[str, Any]
+    lease_expires: float
+    revoked: threading.Event = field(default_factory=threading.Event)
+    started: bool = False
+    progress: float = 0.0
+    remaining_s: float | None = None
+
+    @property
+    def job_id(self) -> str:
+        return self.job["job_id"]
+
+    @property
+    def stage(self) -> str:
+        return self.job["stage"]
+
+    @property
+    def pin_hash(self) -> str:
+        return self.job["pin_hash"]
+
+
+class Worker:
+    def __init__(
+        self,
+        cfg: Config,
+        client: CoordinatorClient,
+        backend: OllamaBackend,
+        *,
+        data_root: Path,
+        hw: HardwareInfo,
+        tier: str | None = None,
+        stages: list[str] | None = None,
+        max_concurrency: int = 8,
+        clock: Clock | None = None,
+        storage: StorageManager | None = None,
+        updater: Updater | None = None,
+        auto_update: bool = True,
+        auto_pull: bool = True,
+        window: RunWindow | None = None,
+        argv: list[str] | None = None,
+        log: Callable[[str], None] = print,
+        background: bool = True,
+        exit_when_idle: bool = False,
+        idle_polls_before_exit: int = 1,
+        rng: random.Random | None = None,
+        registry: Registry | None = None,
+    ):
+        self.cfg = cfg
+        self.client = client
+        self.backend = backend
+        self.root = Path(data_root)
+        self.hw = hw
+        self.tier = tier or cfg.tier
+        self.requested = stages
+        self.max_concurrency = max(1, max_concurrency)
+        self.clock = clock or Clock()
+        self.storage = storage or StorageManager(
+            self.root, budget_bytes=int(cfg.disk_budget_gb * GB) if cfg.disk_budget_gb else None)
+        self.updater = updater or Updater(self.root / "update_state.json", log=log)
+        self.auto_update = auto_update
+        self.auto_pull = auto_pull
+        self.window = window or RunWindow(None, self.clock)
+        self.argv = argv or []
+        self.log = log
+        self.background = background
+        self.exit_when_idle = exit_when_idle
+        self.idle_polls_before_exit = idle_polls_before_exit
+        self.rng = rng or random.Random()
+
+        self.store = JobStore(self.root)
+        self.outbox = Outbox(self.root)
+        self.fit = HardwareFit(usable_vram_gb=hw.usable_vram_gb, ram_gb=hw.ram_gb, accel=hw.accel)
+        self.rates = RateTracker(initial={s: float(b.get("passages_per_hour", 0)) / 3600.0
+                                          for s, b in (cfg.bench or {}).items() if b.get("passages_per_hour")})
+        self.tuners: dict[str, ConcurrencyTuner] = {}
+        self.stop = threading.Event()
+        self.shutdown_done = threading.Event()
+        self._lease_lock = threading.Lock()
+        self._queue: deque[HeldJob] = deque()
+        self._current: HeldJob | None = None
+        self._prefetching = False
+        self._offline = False
+        self._registry = registry
+        self._registry_etag: str | None = None
+        self._registry_changed = registry is not None
+        self.active_pins: dict[str, str] = {}
+        self.local_digests: dict[str, str] = {}
+        self.stages: list[str] = []
+        self.excluded: dict[str, str] = {}
+        self._update_required = False
+        self._last_registry_poll = -1e18
+        self._last_ping = -1e18
+        self._last_heartbeat = self.clock.monotonic()
+        self._last_flush = -1e18
+        self._oom_at_one: dict[str, int] = {}
+        self._residency_retry: dict[str, bool] = {}
+        self._threads: list[threading.Thread] = []
+        self.passages_done = 0
+        self.uploaded: list[dict[str, Any]] = []  # for status / tests
+        self._lease_backoff = Backoff(base=5, cap=300, rng=self.rng)
+        self._backend_version_cache: str | None = None
+
+    # ------------------------------------------------------------------
+    # Registry / pins
+    # ------------------------------------------------------------------
+    @property
+    def registry(self) -> Registry:
+        if self._registry is None:
+            raise RuntimeError("registry not loaded")
+        return self._registry
+
+    def _registry_cache_path(self) -> Path:
+        return self.root / "registry.json"
+
+    def refresh_registry(self, force: bool = False) -> bool:
+        """Poll GET /v1/registry with If-None-Match. Returns True if a new
+        registry was installed (hot reload)."""
+        now = self.clock.monotonic()
+        if not force and now - self._last_registry_poll < REGISTRY_POLL_S:
+            return False
+        self._last_registry_poll = now
+        try:
+            raw, etag = self.client.registry(self._registry_etag if self._registry else None)
+        except (CoordinatorError, httpx.TransportError) as e:
+            if self._registry is None:
+                cached = read_json(self._registry_cache_path())
+                if cached:
+                    self.log(f"[registry] coordinator unreachable ({e}); using cached registry")
+                    self._install_registry(Registry.from_dict(cached["registry"]), cached.get("etag"))
+                    return True
+            self.log(f"[registry] poll failed: {e}")
+            return False
+        if raw is None:
+            return False
+        try:
+            reg = Registry.from_dict(raw)
+        except RegistryError as e:
+            self.log(f"[registry] coordinator served an invalid registry, keeping current one: {e}")
+            return False
+        if self._registry is not None and reg.content_hash == self._registry.content_hash:
+            self._registry_etag = etag
+            return False
+        old = self._registry.version if self._registry else None
+        self._install_registry(reg, etag)
+        atomic_write_json(self._registry_cache_path(), {"etag": etag, "registry": raw})
+        if old is not None:
+            self.log(f"[registry] hot-reloaded {old} -> {reg.version}")
+        return True
+
+    def _install_registry(self, reg: Registry, etag: str | None) -> None:
+        self._registry = reg
+        self._registry_etag = etag
+        self._registry_changed = True
+        # Pins are recomputed by resolve_stages() against local digests; until
+        # then, only pins that the registry itself defines are active.
+        self.active_pins = reg.active_pins()
+
+    def backend_version(self) -> str:
+        if self._backend_version_cache is None:
+            self._backend_version_cache = self.backend.backend_version(self.hw.accel)
+        return self._backend_version_cache
+
+    def resolve_stages(self) -> list[str]:
+        """tier -> allowed stages -> requested -> registry -> HW fit -> Ollama
+        version -> model present with pinned digest (pull if allowed)."""
+        reg = self.registry
+        self._registry_changed = False
+        excluded: dict[str, str] = {}
+        tier = self.tier or reg.select_tier(self.hw.usable_vram_gb)["name"]
+        self.tier = tier
+        allowed = reg.allowed_stages(tier)
+        if self.requested:
+            for s in allowed:
+                if s not in self.requested:
+                    excluded[s] = "not requested (--stages)"
+            for s in self.requested:
+                if s not in allowed:
+                    excluded[s] = f"not allowed for tier {tier}"
+            allowed = [s for s in allowed if s in self.requested]
+        fit_ok, why = self.fit.filter_stages(reg.stages[s] for s in allowed)
+        excluded.update(why)
+        try:
+            ver = self.backend.version(refresh=True)
+        except BackendError as e:
+            for s in fit_ok:
+                excluded[s] = f"Ollama unavailable: {e}"
+            self.stages, self.excluded = [], excluded
+            return []
+        ok: list[str] = []
+        digests: dict[str, str] = {}
+        for s in fit_ok:
+            st = reg.stages[s]
+            if not version_in_range(ver, st.version_range):
+                excluded[s] = f"Ollama {ver} outside {st.version_range}"
+                continue
+            d = self.backend.local_digest(st.model_ref)
+            if d is None and self.auto_pull:
+                if not self.storage.model_fits(st.model_size_gb):
+                    excluded[s] = f"model {st.model_ref} ({st.model_size_gb} GB) does not fit on disk"
+                    continue
+                self.log(f"[setup] pulling {st.model_ref} for stage {s} ...")
+                try:
+                    self.backend.pull(st.model_ref)
+                    d = self.backend.local_digest(st.model_ref)
+                except BackendError as e:
+                    excluded[s] = f"pull failed: {e}"
+                    continue
+            if d is None:
+                excluded[s] = f"model {st.model_ref} not pulled (run `ald setup`)"
+                continue
+            if not digests_match(d, st.model_digest):
+                excluded[s] = f"local digest {d[:12]} != pinned {st.model_digest[:12]}"
+                continue
+            if not reg.pin_is_active(st.pin_hash(st.model_digest)):
+                excluded[s] = "pin not in registry active_pins (stale)"
+                continue
+            digests[s] = st.model_digest
+            ok.append(s)
+        self.local_digests = digests
+        self.active_pins = {reg.stages[s].pin_hash(digests[s]): s for s in ok}
+        self.stages, self.excluded = ok, excluded
+        for s in ok:
+            st = reg.stages[s]
+            cap = max(1, self.fit.max_concurrency(st, self.max_concurrency))
+            start = int((self.cfg.bench or {}).get(s, {}).get("best_concurrency", 2))
+            if s not in self.tuners:
+                self.tuners[s] = ConcurrencyTuner(start=min(start, cap), max_c=cap, clock=self.clock)
+            else:
+                self.tuners[s].set_max(cap)
+        return ok
+
+    def expected_pin(self, stage: str) -> str | None:
+        st = self.registry.stages.get(stage)
+        d = self.local_digests.get(stage)
+        if st is None or d is None:
+            return None
+        return st.pin_hash(d)
+
+    # ------------------------------------------------------------------
+    # Upload / outbox
+    # ------------------------------------------------------------------
+    def _put(self, job_id: str, body: bytes, headers: dict[str, str], partial: bool) -> dict[str, Any]:
+        return self.client.put_result(job_id, body, headers, partial=partial)
+
+    def _on_ack(self, e: Any, resp: dict[str, Any]) -> None:
+        held = {j.job_id for j in self._held()}
+        self.uploaded.append({"job_id": e.job_id, "partial": e.partial, "status": resp.get("status"),
+                              "n_lines": e.meta.get("n_lines")})
+        self.log(f"[upload] {e.job_id} {'partial' if e.partial else 'final'} "
+                 f"({e.meta.get('n_lines')} lines): {resp.get('status', 'ok')}")
+        if e.job_id not in held:
+            self.store.remove_job(e.job_id)
+
+    def _on_reject(self, e: Any, reason: str) -> None:
+        self.log(f"[upload] {e.job_id} rejected ({reason}); kept in outbox/rejected")
+        if e.job_id not in {j.job_id for j in self._held()}:
+            self.store.remove_job(e.job_id)
+
+    def flush_outbox(self, force: bool = False) -> dict[str, int]:
+        if not self.outbox.entries():
+            return {"acked": 0, "rejected": 0, "deferred": 0}
+        jitter = self.rng
+
+        def backoff(n: int) -> float:
+            hi = min(600.0, 5.0 * (2 ** n))
+            return jitter.uniform(hi / 2, hi)
+
+        counts = self.outbox.flush(self._put, now=self.clock.time(), on_ack=self._on_ack,
+                                   on_reject=self._on_reject, backoff=backoff, force=force,
+                                   is_network_error=is_network_error)
+        self._last_flush = self.clock.monotonic()
+        return counts
+
+    def _stats(self, lines: list[dict[str, Any]], wall_s: float) -> dict[str, Any]:
+        gen = sum(int(l.get("gen_tokens", 0) or 0) for l in lines)
+        prompt = sum(int(l.get("prompt_tokens", 0) or 0) for l in lines)
+        flagged = sum(1 for l in lines if is_flagged(l))
+        return {"n_ok": len(lines) - flagged, "n_flagged": flagged,
+                "tok_s": round(gen / wall_s, 2) if wall_s > 0 else 0.0, "wall_s": round(wall_s, 2),
+                "prompt_tokens": prompt, "gen_tokens": gen}
+
+    def _enqueue_result(self, job_id: str, lines: list[dict[str, Any]], meta: dict[str, Any], partial: bool) -> None:
+        body = encode_jsonl_gz(lines)
+        headers = {
+            "X-Content-Sha256": sha256_bytes(body),
+            "X-Pin-Hash": meta["pin_hash"],
+            "X-Model-Digest": meta["model_digest"],
+            "X-Backend-Version": meta["backend_version"],
+            "X-Stats": json.dumps(self._stats(lines, float(meta.get("wall_s", 0.0))), separators=(",", ":")),
+        }
+        if not partial:
+            # A final blob supersedes any not-yet-acked partial of the same job.
+            for e in self.outbox.entries():
+                if e.job_id == job_id and e.partial:
+                    self.outbox.remove(e)
+        self.outbox.add(job_id, body, headers, partial=partial, n_lines=len(lines), created=self.clock.time())
+        meta["state"] = "queued_partial" if partial else "queued_final"
+        self.store.write_meta(job_id, meta)
+
+    # ------------------------------------------------------------------
+    # Recovery
+    # ------------------------------------------------------------------
+    def recover_interrupted(self) -> int:
+        """Jobs left on disk by a crash / power loss -> partial (or final, if
+        complete) outbox entries + release. Returns number recovered."""
+        held = {j.job_id for j in self._held()}
+        n = 0
+        to_release: list[str] = []
+        for d, meta in list(self.store.iter_jobs()):
+            job_id = meta.get("job_id")
+            if not job_id or job_id in held:
+                continue
+            if meta.get("state") not in ("active", "leased"):
+                continue
+            ck = self.store.checkpoint(job_id).load()
+            skip = set(meta.get("skip_passage_ids") or [])
+            order = meta.get("order") or list(ck.keys())
+            lines = [ck[p] for p in order if p in ck and p not in skip and ck[p].get("pin_hash") == meta["pin_hash"]]
+            expected = int(meta.get("n_todo", -1))
+            complete = expected >= 0 and len(lines) >= expected
+            if lines:
+                self._enqueue_result(job_id, lines, meta, partial=not complete)
+                self.log(f"[recover] {job_id}: {len(lines)} lines from checkpoint -> "
+                         f"{'final' if complete else 'partial'} upload queued")
+            else:
+                self.store.remove_job(job_id)
+            if not complete:
+                to_release.append(job_id)
+            n += 1
+        if to_release:
+            self.flush_outbox(force=True)
+            self._release(to_release)
+        return n
+
+    def _release(self, job_ids: list[str]) -> None:
+        if not job_ids:
+            return
+        try:
+            self.client.release(job_ids)
+            self.log(f"[lease] released {', '.join(job_ids)}")
+        except (CoordinatorError, httpx.TransportError) as e:
+            self.log(f"[lease] release failed ({e}); leases will expire on their own")
+
+    # ------------------------------------------------------------------
+    # Leasing
+    # ------------------------------------------------------------------
+    def _held(self) -> list[HeldJob]:
+        out = list(self._queue)
+        if self._current is not None:
+            out.append(self._current)
+        return out
+
+    def _lease_count(self) -> int:
+        rates = [self.rates.rate(s) for s in self.stages if self.rates.rate(s)]
+        rate = min(rates) if rates else None
+        n = lease_size(rate, ttl_s=LEASE_TTL_S)
+        plan = self.storage.plan(n)
+        if plan.paused:
+            # Try to make room from caches before pausing.
+            self.storage.evict(self._evictable(), plan.per_job_bytes)
+            plan = self.storage.plan(n)
+        if plan.paused:
+            self.log(f"[disk] {plan.reason}")
+        return plan.jobs
+
+    def _evictable(self) -> list[Path]:
+        held = {j.job_id for j in self._held()}
+        pending = {e.job_id for e in self.outbox.entries()}
+        out: list[Path] = []
+        held_names = {self.store.shard_path(h).name for h in held}
+        if self.store.shards_dir.exists():
+            out.extend(p for p in self.store.shards_dir.iterdir() if p.name not in held_names)
+        if self.outbox.rejected.exists():
+            out.extend(self.outbox.rejected.iterdir())
+        logs = self.root / "logs"
+        if logs.exists():
+            out.extend(p for p in logs.iterdir() if p.suffix != ".log")
+        pending_names = {self.store.shard_path(j).name for j in pending}
+        return [p for p in out if p.name not in pending_names]
+
+    def lease_jobs(self) -> list[HeldJob]:
+        """Lease, verify pins, download shards. Refused jobs are released."""
+        with self._lease_lock:
+            if self.stop.is_set() or not self.stages:
+                return []
+            exp_job_s = None
+            rates = [self.rates.rate(s) for s in self.stages if self.rates.rate(s)]
+            if rates:
+                exp_job_s = DEFAULT_PASSAGES_PER_JOB / min(rates)
+            if not self.window.allow_new_lease(exp_job_s):
+                return []
+            # Registry check on every lease (cheap with ETag).
+            self._last_registry_poll = -1e18
+            if self.refresh_registry():
+                self.resolve_stages()
+                if not self.stages:
+                    return []
+            n = self._lease_count()
+            if n <= 0:
+                return []
+            accepted: list[HeldJob] = []
+            refused: list[str] = []
+            # Refused jobs stay leased by us until the end of this call, so a
+            # retry gets past them instead of being handed the same job again.
+            for _attempt in range(3):
+                try:
+                    jobs = self.client.lease(self.tier, self.stages, n)
+                    self._offline = False
+                except UpgradeRequired as e:
+                    self._update_required = True
+                    if isinstance(e.body, dict) and e.body.get("min_client_version"):
+                        self._last_decision = decide(e.body)
+                    self.log("[lease] coordinator requires a newer client (426)")
+                    break
+                except httpx.TransportError as e:
+                    self._offline = True
+                    self.log(f"[lease] network error: {e}")
+                    break
+                except CoordinatorError as e:
+                    self.log(f"[lease] {e}")
+                    break
+                now = self.clock.time()
+                for j in jobs:
+                    stage = j.get("stage")
+                    exp = self.expected_pin(stage) if stage else None
+                    if exp is None or j.get("pin_hash") != exp:
+                        self.log(f"[pin] refusing {j.get('job_id')}: job pin {str(j.get('pin_hash'))[:12]} != "
+                                 f"local {(exp or 'none')[:12]} for stage {stage}")
+                        refused.append(j["job_id"])
+                        continue
+                    hj = HeldJob(job=j, lease_expires=parse_ts(j.get("lease_expires"), now + LEASE_TTL_S))
+                    try:
+                        self.client.download_shard(j, self.store.shard_path(hj.job_id))
+                    except (CoordinatorError, httpx.TransportError, OSError) as e:
+                        self.log(f"[shard] download failed for {hj.job_id}: {e}")
+                        refused.append(hj.job_id)
+                        continue
+                    accepted.append(hj)
+                if accepted or not jobs or not refused:
+                    break
+            if refused:
+                self._release(refused)
+            self._queue.extend(accepted)
+            return accepted
+
+    def _prefetch_async(self) -> None:
+        if self._prefetching or self._queue or self.stop.is_set():
+            return
+        self._prefetching = True
+
+        def go() -> None:
+            try:
+                self.lease_jobs()
+            finally:
+                self._prefetching = False
+
+        if self.background:
+            t = threading.Thread(target=go, name="ald-prefetch", daemon=True)
+            t.start()
+        else:
+            go()
+
+    # ------------------------------------------------------------------
+    # Heartbeat (background)
+    # ------------------------------------------------------------------
+    def heartbeat_once(self) -> dict[str, Any] | None:
+        held = self._held()
+        if not held:
+            return None
+        ids = [j.job_id for j in held]
+        stats = {"tok_s": round(self._recent_tok_s(), 2), "passages_done": self.passages_done}
+        try:
+            resp = self.client.heartbeat(ids, stats)
+            self._offline = False
+        except httpx.TransportError as e:
+            self._offline = True
+            self.log(f"[heartbeat] network error ({e}); working offline while leases are valid")
+            return None
+        except CoordinatorError as e:
+            self.log(f"[heartbeat] {e}")
+            return None
+        now = self.clock.time()
+        ext = set(resp.get("extended") or [])
+        rev = set(resp.get("revoked") or [])
+        for j in held:
+            if j.job_id in ext:
+                j.lease_expires = max(j.lease_expires, now + LEASE_TTL_S)
+            if j.job_id in rev:
+                j.revoked.set()
+                self.log(f"[heartbeat] {j.job_id} revoked by coordinator; abandoning")
+        # Drop revoked jobs that have not started.
+        for j in [q for q in list(self._queue) if q.revoked.is_set()]:
+            try:
+                self._queue.remove(j)
+            except ValueError:  # popped by the main thread meanwhile
+                continue
+            self.store.remove_job(j.job_id)
+        return resp
+
+    _tok_window: deque
+
+    def _recent_tok_s(self) -> float:
+        win = getattr(self, "_tok_window", None)
+        if not win:
+            return 0.0
+        now = self.clock.monotonic()
+        while win and now - win[0][0] > 300:
+            win.popleft()
+        if len(win) < 2:
+            return 0.0
+        span = max(win[-1][0] - win[0][0], 1e-6)
+        return sum(t for _, t in win) / span
+
+    def _bg_loop(self) -> None:
+        while not self.stop.is_set():
+            now = self.clock.monotonic()
+            try:
+                if now - self._last_heartbeat >= HEARTBEAT_S:
+                    self._last_heartbeat = now
+                    self.heartbeat_once()
+                if now - self._last_flush >= FLUSH_POLL_S:
+                    self._last_flush = now
+                    if self.outbox.entries():
+                        self.flush_outbox()
+                if now - self._last_registry_poll >= REGISTRY_POLL_S:
+                    self.refresh_registry()
+            except Exception as e:  # noqa: BLE001 - background thread must survive
+                self.log(f"[bg] {type(e).__name__}: {e}")
+            self.stop.wait(1.0)
+
+    # ------------------------------------------------------------------
+    # Running one job
+    # ------------------------------------------------------------------
+    def _interrupt_reason(self, hj: HeldJob) -> str | None:
+        if self.stop.is_set():
+            return "stopped"
+        if hj.revoked.is_set():
+            return "revoked"
+        if self.window.expired():
+            return "window_end"
+        if hj.pin_hash not in self.active_pins:
+            return "pin_retired"
+        if hj.stage not in self.stages:
+            return "stage_demoted"
+        if self._offline and self.clock.time() > hj.lease_expires:
+            return "lease_lost"
+        return None
+
+    def run_job(self, hj: HeldJob) -> str:
+        """Returns 'done' or the interrupt reason."""
+        self._current = hj
+        hj.started = True
+        try:
+            return self._run_job(hj)
+        finally:
+            self._current = None
+
+    def _run_job(self, hj: HeldJob) -> str:
+        st: Stage = self.registry.stages[hj.stage]
+        digest = self.local_digests[hj.stage]
+        passages = read_jsonl_gz(self.store.shard_path(hj.job_id))
+        skip = set(hj.job.get("skip_passage_ids") or [])
+        order = [p["passage_id"] for p in passages]
+        ck = self.store.checkpoint(hj.job_id)
+        prior_meta = self.store.read_meta(self.store.job_dir(hj.job_id)) or {}
+        done = {pid: l for pid, l in ck.load().items() if l.get("pin_hash") == hj.pin_hash}
+        want = [p for p in passages if p["passage_id"] not in skip]
+        missing_ids = {p["passage_id"] for p in want if p["passage_id"] not in done}
+        cached = self.store.cached_lines(hj.pin_hash, missing_ids) if missing_ids else {}
+        for pid, line in cached.items():
+            if pid not in done:
+                ck.append(line)
+                done[pid] = line
+        meta = {
+            "job_id": hj.job_id, "stage": hj.stage, "pin_hash": hj.pin_hash, "model_digest": digest,
+            "backend_version": self.backend_version(), "state": "active", "order": order,
+            "skip_passage_ids": sorted(skip), "n_todo": len(want),
+            "wall_s": float(prior_meta.get("wall_s", 0.0)), "leased_at": self.clock.time(), "job": hj.job,
+        }
+        self.store.write_meta(hj.job_id, meta)
+        todo = deque(p for p in want if p["passage_id"] not in done)
+        n_total = len(want)
+        tuner = self.tuners[hj.stage]
+        errors: dict[str, int] = {}
+        ran = 0
+        t_start = self.clock.monotonic()
+        self.log(f"[job] {hj.job_id} stage={hj.stage} passages={n_total} (resume {len(done)}, skip {len(skip)}) "
+                 f"c={tuner.current}")
+        reason: str | None = None
+        backend_backoff = Backoff(base=2, cap=120, rng=self.rng)
+        ex = ThreadPoolExecutor(max_workers=self.max_concurrency, thread_name_prefix="ald-infer")
+        inflight: dict[Future, dict[str, Any]] = {}
+        bv = self.backend_version()
+        # Between jobs: only this stage's model may stay resident on the GPU.
+        self.unload_non_pinned(keep={st.model_ref})
+        residency_checked = False
+        residency_tries = 0
+
+        def submit(p: dict[str, Any]) -> None:
+            fut = ex.submit(run_passage, self.backend, st, p, pin_hash=hj.pin_hash, model_digest=digest,
+                            backend_version=bv)
+            inflight[fut] = p
+
+        try:
+            while todo or inflight:
+                reason = self._interrupt_reason(hj)
+                if reason:
+                    break
+                while todo and len(inflight) < tuner.current:
+                    submit(todo.popleft())
+                finished, _ = wait(list(inflight), timeout=0.5, return_when=FIRST_COMPLETED)
+                for f in finished:
+                    p = inflight.pop(f)
+                    pid = p["passage_id"]
+                    try:
+                        line = f.result()
+                    except BackendOOM as e:
+                        self.log(f"[backend] OOM at c={tuner.current}: {e}")
+                        if tuner.current <= 1:
+                            self._oom_at_one[hj.stage] = self._oom_at_one.get(hj.stage, 0) + 1
+                            if self._oom_at_one[hj.stage] >= OOM_DEMOTE_AFTER:
+                                self._demote(hj.stage, "OOM at concurrency 1")
+                        tuner.on_error(oom=True)
+                        todo.appendleft(p)
+                        continue
+                    except BackendUnavailable as e:
+                        todo.appendleft(p)
+                        delay = backend_backoff.next()
+                        self.log(f"[backend] unavailable ({e}); retrying in {delay:.0f}s")
+                        self.clock.sleep(delay, self.stop)
+                        continue
+                    except BackendError as e:
+                        errors[pid] = errors.get(pid, 0) + 1
+                        tuner.on_error(oom=False)
+                        if errors[pid] <= MAX_PASSAGE_ERRORS:
+                            todo.append(p)
+                            continue
+                        line = self._error_line(st, p, hj.pin_hash, digest, str(e))
+                    backend_backoff.reset()
+                    if not residency_checked and residency_tries < 20:
+                        residency_tries += 1
+                        residency_checked = self.check_residency(hj.stage) == "ok"
+                    ck.append(line)
+                    done[pid] = line
+                    ran += 1
+                    self.passages_done += 1
+                    lat = float(line.get("latency_ms", 0)) / 1000.0
+                    tuner.observe(lat, int(line.get("gen_tokens", 0) or 0))
+                    if not hasattr(self, "_tok_window"):
+                        self._tok_window = deque()
+                    self._tok_window.append((self.clock.monotonic(), int(line.get("gen_tokens", 0) or 0)))
+                hj.progress = len(done) / max(1, n_total)
+                elapsed = self.clock.monotonic() - t_start
+                rate = (ran / elapsed) if ran >= 5 and elapsed > 0 else self.rates.rate(hj.stage)
+                hj.remaining_s = (len(todo) + len(inflight)) / rate if rate else None
+                if should_prefetch(hj.progress, hj.remaining_s) and not self._update_pending():
+                    self._prefetch_async()
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
+            ck.close()
+        # Inference for this job is over: it is no longer "held" for heartbeats,
+        # and its local files may be removed once the upload is acked.
+        self._current = None
+        wall = self.clock.monotonic() - t_start
+        meta["wall_s"] = float(meta["wall_s"]) + wall
+        if wall > 0 and ran > 0:
+            self.rates.update(hj.stage, ran, wall)
+        lines = [done[p] for p in order if p in done and p not in skip]
+        if reason is None and len(lines) >= n_total:
+            self._enqueue_result(hj.job_id, lines, meta, partial=False)
+            self.flush_outbox(force=True)
+            self._save_state()
+            return "done"
+        reason = reason or "incomplete"
+        self.log(f"[job] {hj.job_id} interrupted ({reason}) after {len(lines)}/{n_total} passages")
+        if reason == "revoked":
+            # Adaptive stopping: the coordinator no longer wants this job.
+            self.store.remove_job(hj.job_id)
+            self._save_state()
+            return reason
+        if lines:
+            self._enqueue_result(hj.job_id, lines, meta, partial=True)
+        else:
+            self.store.remove_job(hj.job_id)
+        # Upload first, then release: whoever leases the job next gets the
+        # uploaded passages as skip_passage_ids.
+        self.flush_outbox(force=True)
+        self._release([hj.job_id])
+        self._save_state()
+        return reason
+
+    @staticmethod
+    def _error_line(st: Stage, p: dict[str, Any], pin: str, digest: str, err: str) -> dict[str, Any]:
+        return {"passage_id": p["passage_id"], "stage": st.name, "pin_hash": pin, "model_digest": digest,
+                "backend_version": "", "output": None, "valid_schema": False, "evidence": [],
+                "latency_ms": 0, "prompt_tokens": 0, "gen_tokens": 0, "flags": ["backend_error"],
+                "error": err[:300]}
+
+    def _demote(self, stage: str, why: str = "OOM at concurrency 1") -> None:
+        self.log(f"[hw] stage {stage}: {why}; demoting this machine to its other stages "
+                 f"(the pinned model is never swapped)")
+        self.fit.demote(stage)
+        self.stages = [s for s in self.stages if s != stage]
+        self.excluded[stage] = f"demoted: {why}"
+        self.active_pins = {p: s for p, s in self.active_pins.items() if s != stage}
+
+    # ------------------------------------------------------------------
+    # Updates
+    # ------------------------------------------------------------------
+    def _update_pending(self) -> bool:
+        return self._update_required or getattr(self, "_update_available", False)
+
+    def check_for_update(self, force: bool = False) -> None:
+        if not self.auto_update:
+            return
+        now = self.clock.monotonic()
+        if not force and now - self._last_ping < PING_POLL_S:
+            return
+        self._last_ping = now
+        try:
+            ping = self.client.ping()
+        except (CoordinatorError, httpx.TransportError):
+            return
+        d = decide(ping)
+        self._update_available = d.update_available
+        if d.required:
+            self._update_required = True
+        self._last_decision = d
+
+    def maybe_apply_update(self) -> bool:
+        """Between jobs: release prefetched leases, flush, install, re-exec.
+        Returns True if leasing must stay paused (required update failed)."""
+        if not self.auto_update or not self._update_pending():
+            return self._update_required and not self.auto_update
+        d = getattr(self, "_last_decision", None)
+        if d is None:
+            self.check_for_update(force=True)
+            d = getattr(self, "_last_decision", None)
+            if d is None:
+                return self._update_required
+        target = str(d.latest or d.minimum or "")
+        if not target or not self.updater.can_attempt(target):
+            return self._update_required
+        # Finish line: hand back prefetched work, upload everything.
+        queued = [j.job_id for j in self._queue]
+        self._queue.clear()
+        for jid in queued:
+            self.store.remove_job(jid)
+        self._release(queued)
+        self.flush_outbox(force=True)
+        self.updater.apply(d, self.argv)  # does not return on success
+        self._update_available = False
+        return self._update_required
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+    def startup(self) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        if self._registry is None or not self.active_pins:
+            self.refresh_registry(force=True)
+        if self._registry is None:
+            raise RuntimeError("no registry available (coordinator unreachable and no cached copy)")
+        self.recover_interrupted()
+        self.flush_outbox(force=True)
+        self.check_for_update(force=True)
+        self.resolve_stages()
+        self.unload_non_pinned()
+        self._save_state()
+
+    # ------------------------------------------------------------------
+    # GPU residency: a stray resident model splits the pinned one onto the CPU
+    # (~8x slower), so keep only the model being run on the GPU.
+    # ------------------------------------------------------------------
+    def unload_non_pinned(self, keep: set[str] | None = None) -> list[str]:
+        if self.hw.accel == "cpu":
+            return []
+        if keep is None:
+            keep = {self.registry.stages[s].model_ref for s in self.stages}
+        try:
+            gone = self.backend.unload_others(keep)
+        except BackendError:
+            return []
+        if gone:
+            self.log(f"[gpu] unloaded resident model(s) to keep the pinned model fully on GPU: {', '.join(gone)}")
+        return gone
+
+    def check_residency(self, stage: str) -> str:
+        """'ok' | 'unknown' | 'retry' (unloaded everything; reloads on the next
+        request) | 'demoted' (still split after a clean reload)."""
+        if self.hw.accel == "cpu":
+            return "ok"
+        st = self.registry.stages[stage]
+        try:
+            frac = self.backend.residency(st.model_ref)
+        except BackendError:
+            return "ok"
+        if frac is None:
+            return "unknown"  # not (yet) resident; check again on the next passage
+        if frac >= 0.99:
+            self._residency_retry.pop(stage, None)
+            return "ok"
+        if not self._residency_retry.get(stage):
+            self._residency_retry[stage] = True
+            self.log(f"[gpu] {st.model_ref} only {frac:.0%} on GPU; unloading other models and reloading it")
+            self.unload_non_pinned(keep=set())
+            return "retry"
+        self.log(f"[gpu] {st.model_ref} still only {frac:.0%} on GPU after a clean reload "
+                 f"(num_ctx is pinned and cannot be lowered)")
+        self._demote(stage, f"model only {frac:.0%} on GPU")
+        return "demoted"
+
+    def _save_state(self) -> None:
+        try:
+            atomic_write_json(self.root / "state.json", {
+                "updated": self.clock.time(), "tier": self.tier, "stages": self.stages,
+                "excluded": self.excluded, "rates_pps": self.rates.rates,
+                "concurrency": {s: t.current for s, t in self.tuners.items()},
+                "held_jobs": [{"job_id": j.job_id, "stage": j.stage, "progress": round(j.progress, 3),
+                               "remaining_s": j.remaining_s} for j in self._held()],
+                "passages_done": self.passages_done, "client_version": CLIENT_VERSION,
+                "registry_version": self._registry.version if self._registry else None,
+            })
+        except OSError:
+            pass
+
+    def plan(self) -> PlanSummary:
+        conc, pph, lsz = {}, {}, {}
+        for s in self.stages:
+            conc[s] = self.tuners[s].current if s in self.tuners else 1
+            r = self.rates.rate(s)
+            pph[s] = round(r * 3600) if r else None
+            lsz[s] = lease_size(r, ttl_s=LEASE_TTL_S)
+        return PlanSummary(tier=self.tier or "?", stages=list(self.stages), excluded=dict(self.excluded),
+                           concurrency=conc, disk=self.storage.report(), passages_per_hour=pph,
+                           lease_size=lsz, deadline=self.window.deadline)
+
+    def run(self) -> None:
+        """Main loop. Returns on stop / window end / idle exit."""
+        self.startup()
+        if self.background:
+            t = threading.Thread(target=self._bg_loop, name="ald-bg", daemon=True)
+            t.start()
+            self._threads.append(t)
+        idle = 0
+        try:
+            while not self.stop.is_set():
+                if self.window.expired():
+                    self.log("[window] run window ended")
+                    break
+                if self._registry_changed:
+                    self.resolve_stages()
+                self.check_for_update()
+                paused_for_update = self.maybe_apply_update()
+                if not self.stages:
+                    self.log("[work] no runnable stages: " + "; ".join(f"{k}: {v}" for k, v in self.excluded.items()))
+                    if self.exit_when_idle:
+                        break
+                    if self.clock.sleep(min(300.0, self._lease_backoff.next()), self.stop):
+                        break
+                    self._registry_changed = True
+                    continue
+                if paused_for_update:
+                    self.flush_outbox()
+                    if self.clock.sleep(min(600.0, self._lease_backoff.next()), self.stop):
+                        break
+                    continue
+                hj = self._queue.popleft() if self._queue else None
+                if hj is None:
+                    got = self.lease_jobs()
+                    hj = self._queue.popleft() if got and self._queue else None
+                if hj is None:
+                    idle += 1
+                    if self.exit_when_idle and idle >= self.idle_polls_before_exit:
+                        break
+                    if not self.window.allow_new_lease(None):
+                        break
+                    delay = self._lease_backoff.next()
+                    rem = self.window.remaining()
+                    if rem is not None:
+                        delay = max(0.0, min(delay, rem))
+                    self.log(f"[work] nothing leased; next try in {delay:.0f}s")
+                    if self.clock.sleep(delay, self.stop):
+                        break
+                    continue
+                idle = 0
+                self._lease_backoff.reset()
+                if hj.revoked.is_set():
+                    self.store.remove_job(hj.job_id)
+                    continue
+                if hj.pin_hash not in self.active_pins:
+                    self.log(f"[pin] {hj.job_id}: pin retired by registry update; releasing")
+                    self.store.remove_job(hj.job_id)
+                    self._release([hj.job_id])
+                    continue
+                self.run_job(hj)
+        finally:
+            self.shutdown()
+
+    def shutdown(self, flush_timeout_s: float = 20.0) -> None:
+        """Release everything we hold and push what we have."""
+        self.stop.set()
+        queued = [j.job_id for j in self._queue]
+        self._queue.clear()
+        for jid in queued:
+            self.store.remove_job(jid)
+        self._release(queued)
+        try:
+            self.flush_outbox(force=True)
+        except Exception as e:  # noqa: BLE001
+            self.log(f"[shutdown] flush failed: {e}")
+        n, size = self.outbox.size()
+        if n:
+            self.log(f"[shutdown] {n} upload(s) ({size / 1e6:.1f} MB) stay in the outbox; "
+                     f"they are sent on the next start or `ald sync-now`")
+        self._save_state()
+        self.shutdown_done.set()

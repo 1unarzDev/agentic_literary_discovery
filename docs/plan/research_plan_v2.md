@@ -116,6 +116,15 @@ Population: "English-language fiction 1800–1925 preserved in Project Gutenberg
 - **Replication frames.** The Confirmation half, ELTeC-eng (100 UK novels, 1841–1920), and the Chicago US Novel Corpus public build (about 1,245 works, 1880–1923), deduped against Discovery authors.
 - **Manifest and audit.** One JSON record per work/edition (schema in brief §5) with sha256. Show works and authors per decade × origin × genre beside every trend.
 
+### 4.1b Data-quality protocol (see `docs/data_quality.md`)
+- A work-level `workcheck` stage verifies fiction vs non-fiction, translation, juvenile, abridgement and setting period *before* sharding.
+- Text-quality thresholds are applied per work.
+- Date-confidence tiers: the primary analysis uses high and medium.
+- Author cap: at most 5 works per author per decade.
+- **Composition decomposition**: within-genre change vs. genre-mix shift, plus a fixed-composition reweighted trend.
+- Denominators are shown on every figure.
+- The pre-1830 gap is handled by gate G0, with HathiTrust/HTRC as the Phase-2 fill.
+
 ### 4.2 Splits (Day 1, before any labels)
 - Authors are hashed into **Discovery (50%)** and **Confirmation (50%)**, stratified by decade × origin × genre.
 - Confirmation results sit in a sealed R2 prefix. `ald sync` refuses to read them until `docs/prereg.md` contains the OSF hash.

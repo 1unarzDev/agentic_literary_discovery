@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Passage annotation</title>
+<style>
+:root {
+  --paper: #f7f3ea;
+  --paper-2: #efe8da;
+  --card: #fbf8f2;
+  --ink: #1f1b16;
+  --ink-2: #4a4238;
+  --muted: #8a7f70;
+  --rule: #d9cfbd;
+  --red: #b3322a;
+  --red-soft: #f3dcd6;
+  --mark: #f6e3a1;
+  --focus: #2f5d8a;
+  --ok: #2f6b3a;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, Cambria, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1b1915; --paper-2: #24211c; --card: #211e19; --ink: #ebe4d6; --ink-2: #c9bfae;
+    --muted: #8f8676; --rule: #3a352d; --red: #e0685c; --red-soft: #3d2420; --mark: #5a4a1c; --focus: #7fb0e0; --ok: #7cc28a;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); }
+body { font-family: var(--sans); font-size: 15px; line-height: 1.45; }
+header {
+  position: sticky; top: 0; z-index: 5; background: var(--paper);
+  border-bottom: 1px solid var(--rule); padding: 10px 20px 8px;
+}
+.hrow { display: flex; align-items: center; gap: 16px; max-width: 1180px; margin: 0 auto; }
+.brand { font-family: var(--serif); font-size: 17px; letter-spacing: .02em; }
+.brand b { color: var(--red); font-weight: 600; }
+.progress { flex: 1; display: flex; align-items: center; gap: 10px; }
+.bar { flex: 1; height: 6px; background: var(--paper-2); border-radius: 3px; overflow: hidden; border: 1px solid var(--rule); }
+.bar > i { display: block; height: 100%; width: 0; background: var(--red); transition: width .3s ease; }
+.count { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13px; min-width: 7em; text-align: right; }
+button.link { background: none; border: 0; color: var(--ink-2); cursor: pointer; font: inherit; padding: 4px 6px; border-radius: 4px; }
+button.link:hover { color: var(--ink); background: var(--paper-2); }
+main { max-width: 1180px; margin: 0 auto; padding: 22px 20px 80px; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 36px; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } aside { position: static !important; } }
+
+/* ---- passage */
+article { font-family: var(--serif); color: var(--ink); max-width: 40em; }
+.ctx { color: var(--muted); font-size: 16px; line-height: 1.6; }
+.ctx p { margin: 0 0 .7em; }
+.ctx.before { border-bottom: 1px dashed var(--rule); padding-bottom: .6em; margin-bottom: 1.1em; }
+.ctx.after { border-top: 1px dashed var(--rule); padding-top: .6em; margin-top: 1.1em; }
+.ctx-label { font-family: var(--sans); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: .4em; }
+#text { font-size: 20px; line-height: 1.7; hyphens: auto; -webkit-hyphens: auto; text-align: left; }
+#text p { margin: 0 0 .85em; }
+#text p + p { text-indent: 1.4em; margin-top: -.5em; }
+#text::selection, #text *::selection { background: var(--red-soft); }
+mark { background: var(--mark); color: inherit; padding: 0 .05em; border-radius: 2px; }
+.passage-box { background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--red); padding: 18px 22px 8px; border-radius: 2px; }
+.done-box { font-family: var(--serif); font-size: 22px; padding: 60px 0; text-align: center; color: var(--ink-2); }
+
+/* ---- form */
+aside { position: sticky; top: 64px; align-self: start; display: flex; flex-direction: column; gap: 16px; }
+fieldset { border: 0; margin: 0; padding: 0; }
+legend, .flabel { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin-bottom: 6px; padding: 0; display: flex; justify-content: space-between; width: 100%; }
+legend .hint, .flabel .hint { text-transform: none; letter-spacing: 0; color: var(--muted); }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.opt {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none;
+  border: 1px solid var(--rule); background: var(--card); color: var(--ink); border-radius: 4px;
+  padding: 5px 9px; font: inherit; font-size: 13.5px; text-align: left;
+}
+.opt:hover { border-color: var(--ink-2); }
+.opt[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.opt[aria-pressed="true"] kbd { background: transparent; color: var(--paper); border-color: var(--paper); }
+.opt[disabled] { opacity: .4; cursor: not-allowed; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.grid .opt { width: 100%; }
+kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; min-width: 1.5em; text-align: center; color: var(--ink-2); background: var(--paper); }
+.hidden { display: none !important; }
+textarea { width: 100%; min-height: 58px; resize: vertical; font: inherit; font-size: 14px; color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 7px 9px; }
+textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ev-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ev-list li { font-family: var(--serif); font-size: 14px; background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 4px 28px 4px 8px; position: relative; }
+.ev-list li button { position: absolute; right: 4px; top: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; }
+.ev-empty { color: var(--muted); font-size: 13px; }
+.actions { display: flex; gap: 8px; align-items: center; }
+.primary { background: var(--red); color: #fff; border: 0; border-radius: 4px; padding: 8px 16px; font: inherit; font-weight: 600; cursor: pointer; }
+.primary:hover { filter: brightness(1.08); }
+.secondary { background: none; border: 1px solid var(--rule); color: var(--ink-2); border-radius: 4px; padding: 7px 12px; font: inherit; cursor: pointer; }
+#msg { min-height: 1.3em; font-size: 13px; color: var(--red); }
+#msg.ok { color: var(--ok); }
+
+/* ---- help */
+#help { position: fixed; inset: 0; background: rgba(20, 16, 12, .45); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; z-index: 20; }
+#help .sheet { background: var(--card); color: var(--ink); max-width: 760px; width: 100%; max-height: 86vh; overflow: auto; border-radius: 6px; padding: 22px 26px; border: 1px solid var(--rule); box-shadow: 0 10px 40px rgba(0, 0, 0, .25); }
+#help h2 { font-family: var(--serif); font-weight: 600; margin: 0 0 6px; font-size: 22px; }
+#help h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--red); margin: 18px 0 6px; }
+#help dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 0; font-size: 14px; }
+#help dt { font-family: var(--mono); font-size: 12px; color: var(--ink-2); padding-top: 2px; }
+#help dd { margin: 0; }
+#help p { margin: 4px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow">
+    <div class="brand">What <b>Stands</b> in the Way</div>
+    <div class="progress" aria-label="progress">
+      <div class="bar"><i id="bar"></i></div>
+      <div class="count" id="count">&nbsp;</div>
+    </div>
+    <button class="link" id="helpBtn" title="Help (?)">Help <kbd>?</kbd></button>
+  </div>
+</header>
+
+<main id="main">
+  <section>
+    <div class="done-box hidden" id="doneBox">All assigned passages are labelled. Thank you.<br><small>(Press u to reopen the last one.)</small></div>
+    <article id="article">
+      <div class="ctx before" id="ctxBeforeWrap"><div class="ctx-label">Before</div><div id="ctxBefore"></div></div>
+      <div class="passage-box"><div id="text">Loading&hellip;</div></div>
+      <div class="ctx after" id="ctxAfterWrap"><div class="ctx-label">After</div><div id="ctxAfter"></div></div>
+    </article>
+  </section>
+
+  <aside id="form">
+    <fieldset>
+      <legend>Plot obstacle? <span class="hint">y / 0 / i</span></legend>
+      <div class="seg" id="hasObstacle"></div>
+    </fieldset>
+
+    <fieldset id="domainSet">
+      <legend>Domain <span class="hint"><span id="domainCount">0</span>/2 &middot; 1&ndash;9, o</span></legend>
+      <div class="grid" id="domains"></div>
+    </fieldset>
+
+    <fieldset id="locusSet">
+      <legend>Locus <span class="hint">m / s / p</span></legend>
+      <div class="seg" id="loci"></div>
+    </fieldset>
+
+    <fieldset id="fcSet" class="hidden">
+      <legend>Communication failure cause <span class="hint">Shift+1&ndash;5</span></legend>
+      <div class="seg" id="fcs"></div>
+    </fieldset>
+
+    <fieldset>
+      <div class="flabel">Evidence <span class="hint">select text, press e</span></div>
+      <ul class="ev-list" id="evList"></ul>
+    </fieldset>
+
+    <fieldset>
+      <div class="flabel">Note <span class="hint">t to type, Esc to leave</span></div>
+      <textarea id="note" maxlength="4000" placeholder="Optional"></textarea>
+    </fieldset>
+
+    <div class="actions">
+      <button class="primary" id="submitBtn">Submit <kbd style="color:#fff;border-color:#fff8;background:transparent">Enter</kbd></button>
+      <button class="secondary" id="undoBtn">Undo last <kbd>u</kbd></button>
+    </div>
+    <div id="msg" role="status" aria-live="polite"></div>
+  </aside>
+</main>
+
+<div id="help" class="hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="sheet">
+    <h2 id="helpTitle">Codebook, in one line each</h2>
+    <p><b>Plot obstacle</b>: something in the passage that blocks, delays or endangers a character&rsquo;s goal <i>and</i> plausibly affects what happens next. Atmosphere or a mere mention does not count.</p>
+    <p>Judge only the bordered passage; the muted context is there to help you read it. You may choose at most two domains.</p>
+    <h3>Plot obstacle?</h3>
+    <dl>
+      <dt>yes</dt><dd>An obstacle as defined above is present in the passage.</dd>
+      <dt>no</dt><dd>No obstacle, or only atmosphere or a passing mention.</dd>
+      <dt>insufficient</dt><dd>The passage and context are not enough to decide.</dd>
+    </dl>
+    <h3>Domain</h3>
+    <dl id="helpDomains"></dl>
+    <h3>Locus</h3>
+    <dl id="helpLoci"></dl>
+    <h3>Communication failure cause (only with COMMUNICATION_INFORMATION)</h3>
+    <dl id="helpFcs"></dl>
+    <h3>Keys</h3>
+    <dl>
+      <dt>1&ndash;9, o</dt><dd>Toggle a domain (picking one also sets &ldquo;yes&rdquo;).</dd>
+      <dt>0</dt><dd>None: no obstacle (clears domain, locus and cause).</dd>
+      <dt>y / i</dt><dd>Obstacle yes / insufficient context.</dd>
+      <dt>m s p</dt><dd>Locus: material, social, psychological.</dd>
+      <dt>Shift+1&ndash;5</dt><dd>Communication failure cause.</dd>
+      <dt>e</dt><dd>Add the current text selection as evidence.</dd>
+      <dt>t</dt><dd>Write a note (Esc to leave the note field).</dd>
+      <dt>Enter</dt><dd>Submit and go to the next passage (Ctrl+Enter inside the note).</dd>
+      <dt>u</dt><dd>Undo your last submission and reopen it.</dd>
+      <dt>? / h</dt><dd>Show or hide this help.</dd>
+    </dl>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var BASE = location.pathname.replace(/\/+$/, "");
+
+  var HAS = [
+    { v: "yes", label: "Yes", key: "y" },
+    { v: "no", label: "No", key: "0" },
+    { v: "insufficient_context", label: "Insufficient context", key: "i" }
+  ];
+  var DOMAINS = [
+    { v: "DISTANCE_TRAVEL", label: "Distance / travel", key: "1", def: "Physical distance, journeys, transport, being in the wrong place." },
+    { v: "COMMUNICATION_INFORMATION", label: "Communication / information", key: "2", def: "Messages, letters, news, secrets, identity: who knows what, and when." },
+    { v: "DARKNESS_VISIBILITY", label: "Darkness / visibility", key: "3", def: "Night, darkness, fog or concealment that prevents seeing or being seen." },
+    { v: "ILLNESS_BODY_DEATH", label: "Illness / body / death", key: "4", def: "Sickness, injury, bodily weakness, pregnancy, dying or death." },
+    { v: "MONEY_PROPERTY_LAW", label: "Money / property / law", key: "5", def: "Debt, poverty, inheritance, wills, contracts, courts and legal status." },
+    { v: "SOCIAL_RANK_CONVENTION", label: "Social rank / convention", key: "6", def: "Class, propriety, reputation, marriage and gender norms." },
+    { v: "INTERPERSONAL_CONFLICT", label: "Interpersonal conflict", key: "7", def: "Another person actively opposes, thwarts, threatens or deceives." },
+    { v: "INNER_STATE", label: "Inner state", key: "8", def: "The character's own doubt, fear, desire, pride or conscience." },
+    { v: "NATURE_WEATHER", label: "Nature / weather", key: "9", def: "Storms, floods, snow, terrain, animals, the natural world." },
+    { v: "OTHER", label: "Other", key: "o", def: "A real obstacle that fits none of the above (say what in the note)." }
+  ];
+  var LOCI = [
+    { v: "material_external", label: "Material / external", key: "m", def: "Rooted in the physical world: bodies, distance, objects, weather, light." },
+    { v: "social_institutional", label: "Social / institutional", key: "s", def: "Rooted in other people, institutions, law, money or social rules." },
+    { v: "internal_psychological", label: "Internal / psychological", key: "p", def: "Rooted in the character's own mind." }
+  ];
+  var FCS = [
+    { v: "infrastructure", label: "Infrastructure", key: "1", def: "The channel itself fails or is too slow: no post, no road, too far." },
+    { v: "accidental_loss", label: "Accidental loss", key: "2", def: "A message is lost, misdelivered, delayed or destroyed by chance." },
+    { v: "intentional_withholding", label: "Intentional withholding", key: "3", def: "Someone keeps a secret, lies, intercepts or suppresses information." },
+    { v: "misinterpretation", label: "Misinterpretation", key: "4", def: "The information arrives but is misread or misunderstood." },
+    { v: "success_resolution", label: "Success as resolution", key: "5", def: "Communication succeeds and is what resolves (or turns) the obstacle." }
+  ];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var state = null;      // current label state
+  var item = null;       // current item {item_id, text, ctx_before, ctx_after}
+  var busy = false;
+  var activeMs = 0, visibleSince = null;
+
+  function blank() { return { has_obstacle: null, domain: [], locus: null, failure_cause: null, evidence: [] }; }
+
+  // ---- timer: counts only time while the tab is visible
+  function timerStart() { activeMs = 0; visibleSince = document.hidden ? null : Date.now(); }
+  function timerSeconds() { return (activeMs + (visibleSince ? Date.now() - visibleSince : 0)) / 1000; }
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { if (visibleSince) { activeMs += Date.now() - visibleSince; visibleSince = null; } }
+    else if (!visibleSince) visibleSince = Date.now();
+  });
+
+  // ---- building the option buttons
+  function makeOpts(container, list, onClick, cls) {
+    list.forEach(function (o) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "opt" + (cls ? " " + cls : "");
+      b.dataset.v = o.v; b.setAttribute("aria-pressed", "false");
+      if (o.def) b.title = o.def;
+      var k = document.createElement("kbd"); k.textContent = o.key;
+      var s = document.createElement("span"); s.textContent = o.label;
+      b.appendChild(k); b.appendChild(s);
+      b.addEventListener("click", function () { onClick(o.v); b.blur(); });
+      container.appendChild(b);
+    });
+  }
+  function helpList(dl, list) {
+    list.forEach(function (o) {
+      var dt = document.createElement("dt"); dt.textContent = o.v;
+      var dd = document.createElement("dd"); dd.textContent = o.def;
+      dl.appendChild(dt); dl.appendChild(dd);
+    });
+  }
+  makeOpts($("hasObstacle"), HAS, setHas);
+  makeOpts($("domains"), DOMAINS, toggleDomain);
+  makeOpts($("loci"), LOCI, setLocus);
+  makeOpts($("fcs"), FCS, setFc);
+  helpList($("helpDomains"), DOMAINS);
+  helpList($("helpLoci"), LOCI);
+  helpList($("helpFcs"), FCS);
+
+  // ---- state transitions
+  function setHas(v) {
+    state.has_obstacle = v;
+    if (v !== "yes") { state.domain = []; state.locus = null; state.failure_cause = null; }
+    render();
+  }
+  function toggleDomain(v) {
+    var i = state.domain.indexOf(v);
+    if (i >= 0) state.domain.splice(i, 1);
+    else {
+      if (state.domain.length >= 2) { say("At most two domains. Remove one first."); return; }
+      state.domain.push(v);
+      state.has_obstacle = "yes";
+    }
+    if (state.domain.indexOf("COMMUNICATION_INFORMATION") < 0) state.failure_cause = null;
+    render();
+  }
+  function setLocus(v) {
+    if (state.has_obstacle !== "yes") state.has_obstacle = "yes";
+    state.locus = state.locus === v ? null : v; render();
+  }
+  function setFc(v) {
+    if (state.domain.indexOf("COMMUNICATION_INFORMATION") < 0) return;
+    state.failure_cause = state.failure_cause === v ? null : v; render();
+  }
+
+  function press(container, pred) {
+    Array.prototype.forEach.call(container.children, function (b) { b.setAttribute("aria-pressed", pred(b.dataset.v) ? "true" : "false"); });
+  }
+  function render() {
+    if (!state) return;
+    press($("hasObstacle"), function (v) { return v === state.has_obstacle; });
+    press($("domains"), function (v) { return state.domain.indexOf(v) >= 0; });
+    press($("loci"), function (v) { return v === state.locus; });
+    press($("fcs"), function (v) { return v === state.failure_cause; });
+    $("domainCount").textContent = String(state.domain.length);
+    $("fcSet").classList.toggle("hidden", state.domain.indexOf("COMMUNICATION_INFORMATION") < 0);
+    var ev = $("evList"); ev.innerHTML = "";
+    if (!state.evidence.length) {
+      var li0 = document.createElement("li"); li0.className = "ev-empty"; li0.style.border = "0"; li0.style.background = "none"; li0.style.padding = "0";
+      li0.textContent = "None yet."; ev.appendChild(li0);
+    }
+    state.evidence.forEach(function (q, idx) {
+      var li = document.createElement("li"); li.textContent = "“" + q + "”";
+      var x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.title = "Remove";
+      x.addEventListener("click", function () { state.evidence.splice(idx, 1); render(); });
+      li.appendChild(x); ev.appendChild(li);
+    });
+    renderText();
+  }
+
+  // ---- passage rendering with evidence highlights
+  function paras(el, text) {
+    el.innerHTML = "";
+    String(text || "").split(/\n\s*\n/).forEach(function (p) {
+      if (!p.trim()) return;
+      var e = document.createElement("p"); e.textContent = p.replace(/\s*\n\s*/g, " ").trim(); el.appendChild(e);
+    });
+  }
+  function renderText() {
+    var el = $("text");
+    if (!item) return;
+    var t = item.text;
+    var ranges = [];
+    state.evidence.forEach(function (q) {
+      var i = t.indexOf(q);
+      if (i >= 0) ranges.push([i, i + q.length]);
+    });
+    ranges.sort(function (a, b) { return a[0] - b[0]; });
+    var merged = [];
+    ranges.forEach(function (r) {
+      var last = merged[merged.length - 1];
+      if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]); else merged.push([r[0], r[1]]);
+    });
+    el.innerHTML = "";
+    // Split into paragraphs while keeping character offsets.
+    var re = /\n\s*\n/g, start = 0, m, blocks = [];
+    while ((m = re.exec(t)) !== null) { blocks.push([start, m.index]); start = m.index + m[0].length; }
+    blocks.push([start, t.length]);
+    blocks.forEach(function (bk) {
+      if (!t.slice(bk[0], bk[1]).trim()) return;
+      var p = document.createElement("p"), pos = bk[0];
+      merged.forEach(function (r) {
+        var a = Math.max(r[0], bk[0]), b = Math.min(r[1], bk[1]);
+        if (a >= b) return;
+        if (a > pos) p.appendChild(document.createTextNode(t.slice(pos, a).replace(/\s*\n\s*/g, " ")));
+        var mk = document.createElement("mark"); mk.textContent = t.slice(a, b).replace(/\s*\n\s*/g, " "); p.appendChild(mk);
+        pos = b;
+      });
+      if (pos < bk[1]) p.appendChild(document.createTextNode(t.slice(pos, bk[1]).replace(/\s*\n\s*/g, " ")));
+      el.appendChild(p);
+    });
+  }
+
+  // ---- evidence from selection
+  function addEvidence() {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) { say("Select some words in the passage first."); return; }
+    var node = sel.getRangeAt(0).commonAncestorContainer;
+    if (!$("text").contains(node.nodeType === 1 ? node : node.parentNode)) { say("Evidence must come from the bordered passage."); return; }
+    var q = sel.toString().replace(/\s+/g, " ").trim();
+    if (!q) return;
+    // Map the (whitespace-normalised) selection back to an exact substring of the source text.
+    var exact = findExact(item.text, q);
+    if (exact === null) { say("Could not match that selection; try a shorter span."); return; }
+    if (state.evidence.indexOf(exact) < 0) state.evidence.push(exact);
+    sel.removeAllRanges();
+    say("Evidence added.", true);
+    render();
+  }
+  function findExact(text, q) {
+    if (text.indexOf(q) >= 0) return q;
+    var pat = q.split(" ").map(function (w) { return w.replace(/[.*+?^$()|[\]\\{}]/g, "\\$&"); }).join("\\s+");
+    var m = new RegExp(pat).exec(text);
+    return m ? m[0] : null;
+  }
+
+  // ---- messages
+  var msgTimer = null;
+  function say(t, ok) {
+    var m = $("msg"); m.textContent = t; m.className = ok ? "ok" : "";
+    clearTimeout(msgTimer); msgTimer = setTimeout(function () { m.textContent = ""; }, 3500);
+  }
+
+  // ---- network
+  function api(path, body) {
+    var opt = body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
+    return fetch(BASE + path, opt).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+        return j;
+      });
+    });
+  }
+  function setProgress(p) {
+    if (!p) return;
+    var pct = p.total ? Math.round(100 * p.done / p.total) : 0;
+    $("bar").style.width = pct + "%";
+    $("count").textContent = p.done + " / " + p.total;
+  }
+  function showItem(j, prefill) {
+    setProgress(j.progress);
+    if (!j.item_id) {
+      item = null; state = null;
+      $("article").classList.add("hidden"); $("doneBox").classList.remove("hidden");
+      $("form").style.visibility = "hidden";
+      return;
+    }
+    $("article").classList.remove("hidden"); $("doneBox").classList.add("hidden");
+    $("form").style.visibility = "visible";
+    item = { item_id: j.item_id, text: j.text || "", ctx_before: j.ctx_before || "", ctx_after: j.ctx_after || "" };
+    paras($("ctxBefore"), item.ctx_before);
+    paras($("ctxAfter"), item.ctx_after);
+    $("ctxBeforeWrap").classList.toggle("hidden", !item.ctx_before.trim());
+    $("ctxAfterWrap").classList.toggle("hidden", !item.ctx_after.trim());
+    state = blank();
+    $("note").value = "";
+    if (prefill) {
+      var L = prefill.label || {};
+      state.has_obstacle = L.has_obstacle || null;
+      state.domain = (L.domain || []).slice(0, 2);
+      state.locus = L.locus || null;
+      state.failure_cause = L.failure_cause || null;
+      state.evidence = prefill.evidence ? prefill.evidence.split("\n").filter(Boolean) : [];
+      $("note").value = L.note || "";
+    }
+    render();
+    window.scrollTo(0, 0);
+    timerStart();
+  }
+  function loadNext(prefill) {
+    busy = true;
+    return api("/next").then(function (j) { showItem(j, prefill); })
+      .catch(function (e) { say("Could not load: " + e.message); })
+      .then(function () { busy = false; });
+  }
+
+  function submit() {
+    if (busy || !state || !item) return;
+    if (!state.has_obstacle) { say("Choose yes, no (0) or insufficient context first."); return; }
+    if (state.has_obstacle === "yes" && !state.domain.length) { say("Pick at least one domain (1–9, o)."); return; }
+    if (state.has_obstacle === "yes" && !state.locus) { say("Pick a locus (m, s, p)."); return; }
+    var label = {
+      has_obstacle: state.has_obstacle,
+      domain: state.has_obstacle === "yes" ? state.domain : [],
+      locus: state.has_obstacle === "yes" ? state.locus : null,
+      failure_cause: state.domain.indexOf("COMMUNICATION_INFORMATION") >= 0 ? state.failure_cause : null,
+      note: $("note").value.trim()
+    };
+    busy = true;
+    api("/label", {
+      item_id: item.item_id,
+      label_json: label,
+      evidence_text: state.evidence.join("\n"),
+      seconds_spent: Math.round(timerSeconds() * 10) / 10
+    }).then(function () { say("Saved.", true); busy = false; return loadNext(); })
+      .catch(function (e) { busy = false; say("Not saved: " + e.message); });
+  }
+  function undo() {
+    if (busy) return;
+    busy = true;
+    api("/undo", {}).then(function (j) {
+      busy = false;
+      if (!j.undone) { setProgress(j.progress); say("Nothing to undo."); return; }
+      say("Reopened your last submission.", true);
+      return loadNext({ label: j.previous_label, evidence: j.evidence_text });
+    }).catch(function (e) { busy = false; say("Undo failed: " + e.message); });
+  }
+
+  // ---- help
+  function toggleHelp(show) {
+    var h = $("help");
+    var on = show === undefined ? h.classList.contains("hidden") : show;
+    h.classList.toggle("hidden", !on);
+  }
+  $("helpBtn").addEventListener("click", function () { toggleHelp(); });
+  $("help").addEventListener("click", function (e) { if (e.target === $("help")) toggleHelp(false); });
+  $("submitBtn").addEventListener("click", submit);
+  $("undoBtn").addEventListener("click", undo);
+
+  // ---- keyboard
+  document.addEventListener("keydown", function (e) {
+    var tag = (e.target && e.target.tagName) || "";
+    var typing = tag === "TEXTAREA" || tag === "INPUT";
+    if (typing) {
+      if (e.key === "Escape") { e.target.blur(); e.preventDefault(); }
+      else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.target.blur(); submit(); }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var helpOpen = !$("help").classList.contains("hidden");
+    if (e.key === "?" || e.key === "h") { toggleHelp(); e.preventDefault(); return; }
+    if (helpOpen) { if (e.key === "Escape") toggleHelp(false); return; }
+    if (e.key === "u") { undo(); e.preventDefault(); return; }
+    if (!state) return;
+    if (e.shiftKey && /^Digit[1-5]$/.test(e.code)) { setFc(FCS[+e.code.slice(5) - 1].v); e.preventDefault(); return; }
+    if (e.key === "Enter") { if (e.target && e.target.tagName === "BUTTON") return; submit(); e.preventDefault(); return; }
+    if (e.shiftKey) return;
+    if (/^[1-9]$/.test(e.key)) { toggleDomain(DOMAINS[+e.key - 1].v); e.preventDefault(); return; }
+    switch (e.key) {
+      case "0": case "n": setHas("no"); break;
+      case "y": setHas("yes"); break;
+      case "i": setHas("insufficient_context"); break;
+      case "o": toggleDomain("OTHER"); break;
+      case "m": setLocus("material_external"); break;
+      case "s": setLocus("social_institutional"); break;
+      case "p": setLocus("internal_psychological"); break;
+      case "e": addEvidence(); break;
+      case "t": $("note").focus(); break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+
+  loadNext();
+})();
+</script>
+</body>
+</html>

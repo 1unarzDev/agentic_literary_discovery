@@ -1,0 +1,29 @@
+# ALD coordinator. See DEPLOY.md before deploying.
+name = "ald-coordinator"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Fallback when no client release has been recorded via PUT /v1/admin/client_release.
+MIN_CLIENT_VERSION = "0.1.0"
+LEASE_TTL_SECONDS = "600"   # initial lease and each heartbeat extension (10 min)
+MAX_ATTEMPTS = "3"          # an expired lease with attempt >= this goes to 'dead'
+MAX_LEASE_JOBS = "16"       # cap on max_jobs per /v1/lease call
+
+# ADMIN_TOKEN is a secret: `npx wrangler secret put ADMIN_TOKEN` (never put it here).
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ald"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"   # printed by `npx wrangler d1 create ald`
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "replace-with-r2-bucket-name"   # set to "ald" after `npx wrangler r2 bucket create ald`
+
+[triggers]
+crons = ["*/5 * * * *"]   # reclaim expired leases
+
+[observability]
+enabled = true

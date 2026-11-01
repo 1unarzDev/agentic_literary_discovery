@@ -1,0 +1,8 @@
+{
+  "timeline_rows": 38,
+  "regex_patterns_compiled": 17,
+  "listed_forms_with_a_match": 223,
+  "chat_rows": 252,
+  "chat_sha256": "d121dc2b3ecfac670d5973ee355c49e14eb27ae82696386760db0783a5012d7d",
+  "checks": "schema, identifiers, dates, HTTPS URL syntax, source-pair distinctness, YAML parse, regex compilation and seed-form matches; not a historical accuracy or corpus precision test"
+}

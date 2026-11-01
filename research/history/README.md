@@ -1,0 +1,31 @@
+# Historical hinges and retrieval vocabulary
+
+Prepared 2026-10-31. All outputs are confined to `research/history/`.
+
+- [timeline.csv](timeline.csv): 38 rows, covering every requested event family. Each row has two different source publications, with date/scope disagreements in `event` or `confidence`. The 1796 optical-telegraph row is an explicitly marked precedent; 1800 is a baseline anchor, not a dated reform.
+- [diffusion_sources.md](diffusion_sources.md): exact CHAT columns, observed-year coverage, units, gaps, source lineage and alternatives. Small UK/US extracts are in [data/](data/); no full dataset retained.
+- [lexicon.yaml](lexicon.yaml): 17 regex groups, 223 listed retrieval forms, period hints and ambiguity guidance. Earliest attestations and corpus-level retrieval quality remain **UNVERIFIED**.
+
+**Recommended analysis:** use hinges as contextual annotations and sensitivity windows. Use country-specific diffusion cautiously; do not interpret an invention/opening as universal access or infer that the predicted literary change occurred. Every `significance_for_fiction` entry is explicitly an inference. Keep the random-passage design independent of lexical retrieval, especially when evaluating H3.
+
+## Source and date conventions
+
+`year` is a numeric anchor; blank `month` means deliberately unspecified, not January. Multi-year episodes are described in `event`. Country `both` means relevant to UK/US communication or travel; it does not place the cable's Canadian landing in the US. Publication year, fictional setting year and local infrastructure availability must be kept separate.
+
+Confidence describes historical dating/scope, **not** confidence in an effect on fiction. High confidence can coexist with unresolved finer detail. Two publications are corroboration, not necessarily independent underlying measurements: the 1920 telephone penetration estimate explicitly flags possible common Census/FCC ancestry; CHAT and its NBER original are one lineage. For the event rows, source pairs use different institutions or separately authored publications. Exhaustive independence of every publication's underlying evidence is **UNVERIFIED**.
+
+Verification used web search and page/PDF inspection where accessible. Some publishers reject direct requests; a search-index excerpt is weaker than inspected full text. The Postal Museum's current site returned 403 and its indexed staging pages required login. Relevant BPMA material was readable on the explicitly identified [legacy-site mirror](https://www.postoffice.alectritton.co.uk/page/rowlandhill/), and corroborated with London Museum, UPU or the digitized 1911 Britannica. The mirror is not a separate independent source from BPMA. No source publication dates were inferred from search-engine “published” timestamps.
+
+## Consequential qualifications
+
+- Penny Post starts **10 January 1840**; the Penny Black went on sale **1 May** and became valid **6 May**. UPU's “issued” terminology compresses these dates. Free parliamentary franking was abolished in the reform; older local penny posts existed long before it. BPMA explains distance/sheet charging, recipient payment and patron-mediated franking before reform; it gives a typical Dublin–London single-letter charge of **1s 3d**, but this example is not a complete rate schedule.
+- The 1837 Cooke–Wheatstone patent and 1839 GWR line are distinct. [London Museum's cable record](https://www.londonmuseum.org.uk/collections/v/object-730101/cable-telegraph-cable/) describes five-needle adoption in 1839; its four-needle instrument record and Liffen's reappraisal describe four-needle instruments. Do not settle the equipment detail by majority vote.
+- The **1858 Atlantic cable failed**; durable service dates to **1866**. The UK **1870** takeover concerns inland networks, not every international cable business. Sixpenny telegrams are **1885**, not the earlier parliamentary proposal dates.
+- London's first exchange opens in **August 1879**. The [BT phone-books leaflet](https://www.bt.com/bt-plc/assets/documents/about-bt/our-history/bt-archives/major-collections/bt-archives-british-phone-books.pdf) says seven initial subscribers; the architectural study says eight. The January 1912 takeover should not erase surviving municipal exceptions.
+- Liverpool–Manchester's ceremony, regular passenger opening and goods opening differ. Railway Mania authorisations precede actual construction. The 1838 steamship row intentionally avoids a disputed arrival day: [Nature's retrospective](https://www.nature.com/articles/141759a0) says both arrived 23 April, whereas the Mariners' Museum and IEEE describe Sirius arriving 22 April. Earlier steam-assisted crossings prevent a blanket “first steam crossing” claim.
+- Pall Mall's **1807** demonstrations are not the same event as the **1812 charter / 1813 gasworks**. Sources describe different demonstrations; exact month is deliberately unset. The often-repeated January date appears in [Wired's retrospective](https://www.wired.com/2008/01/dayintech-0128), while the museum and industry histories emphasize the King's birthday demonstration. Baltimore's **1816 company authorisation** is distinct from its **1817 street lamp**.
+- Edison's practical incandescent lamp work in **October 1879**, public demonstration in **December**, and **1882 Pearl Street** service are separate. **Godalming 1881 was not the first electric street lighting anywhere**: its museum identifies the public-and-private supply scheme as the relevant distinction. [Godalming Town Council](https://godalming-tc.gov.uk/the-pepperpot-history/) uses a broader first-town formulation, which should not be repeated without qualification.
+
+## Validation
+
+[validation.json](validation.json) records successful CSV/YAML structural checks, all 17 compiled regex groups, matches for every listed seed form and the CHAT extract's hash. [verify_outputs.py](verify_outputs.py) reruns those checks; [build_timeline.py](build_timeline.py) reproduces the CSV from reviewed entries. No historical claim is validated merely by passing these checks. Regex precision/recall and a complete annual UK **letters-only** 1839–1925 series remain **UNVERIFIED**; CHAT is a broader-mail series with documented gaps.

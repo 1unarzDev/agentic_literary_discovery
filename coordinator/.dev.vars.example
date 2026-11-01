@@ -1,0 +1,2 @@
+# Copy to .dev.vars for `npm run dev` (local only; never commit .dev.vars).
+ADMIN_TOKEN=local-dev-admin-token
