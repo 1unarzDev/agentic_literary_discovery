@@ -48,9 +48,17 @@ def ns_basis(x: np.ndarray, knots: np.ndarray) -> np.ndarray:
     return np.column_stack(cols)
 
 
-def default_knots(years: np.ndarray, df: int = 4) -> np.ndarray:
-    qs = np.linspace(0, 1, df + 1)[1:-1]
-    return np.r_[np.min(years), np.quantile(years, qs), np.max(years)].astype(float)
+PREREG_KNOTS = (1800, 1850, 1885, 1905, 1929)   # boundary + era boundaries + late-era median
+
+
+def default_knots(years: np.ndarray, df: int = 4, quantile: bool = False) -> np.ndarray:
+    """Pre-registered fixed knots (df = 4). Quantile knots are a poor choice for PG: the work-year
+    distribution is so late-heavy that quartiles fall at ~1891/1906/1917, leaving 1800-1890 as one
+    cubic piece and an ill-conditioned basis."""
+    if quantile or df != 4:
+        qs = np.linspace(0, 1, df + 1)[1:-1]
+        return np.r_[np.min(years), np.quantile(years, qs), np.max(years)].astype(float)
+    return np.asarray(PREREG_KNOTS, float)
 
 
 @dataclass
@@ -140,18 +148,20 @@ def fit_target(wd: WorkData, target: str, design: Design, cluster: str = "author
 
 def standardized_share(tf: TargetFit, ref_cov: pd.DataFrame, years: np.ndarray, num: list[int],
                        den: list[int] | None) -> tuple[float, np.ndarray]:
-    """g-computation: average fitted category probabilities over ref works x years, then
+    """g-computation: average fitted category probabilities over ref works x years (years may repeat:
+    the era's empirical work-year distribution), then
     share = sum_num A / sum_den A (den None -> prevalence sum_num A). Returns (share, d share / d vec(beta))."""
     p, Km1 = tf.fit.beta.shape
     A = np.zeros(Km1 + 1)
     dA = np.zeros((Km1 + 1, Km1 * p))
     M = 0
-    for y in np.atleast_1d(years):
+    yrs, cnt = np.unique(np.atleast_1d(years), return_counts=True)
+    for y, k in zip(yrs, cnt):                 # repeated years weight by their counts
         X = tf.Xk(ref_cov, y)
         a, da = tf.fit.mean_and_grad(X)
-        A += a
-        dA += da
-        M += len(X)
+        A += k * a
+        dA += k * da
+        M += k * len(X)
     A /= M
     dA /= M
     Nn = A[num].sum()
@@ -210,10 +220,21 @@ class Effect:
                               "p_two_sided": c.p_two} for c in self.components])
 
 
-def _contrast_components(tf: TargetFit, ref: pd.DataFrame, specs: list[tuple], early, late) -> tuple[list, np.ndarray, dict]:
-    """specs: (label, num, den, expected_sign). Returns components, influence matrix, era shares."""
-    ye = np.arange(early[0], early[1] + 1)
-    yl = np.arange(late[0], late[1] + 1)
+def era_years(cov: pd.DataFrame, era: tuple) -> np.ndarray:
+    """The era's empirical work-year distribution (the estimand weights years as the corpus does;
+    uniform years would give the near-empty 1800s as much weight as the 1840s)."""
+    y = cov.year.values
+    y = y[(y >= era[0]) & (y <= era[1])]
+    return y if len(y) else np.arange(era[0], era[1] + 1)
+
+
+def _contrast_components(tf: TargetFit, ref: pd.DataFrame, specs: list[tuple], early, late,
+                         cov: pd.DataFrame | None = None) -> tuple[list, np.ndarray, dict]:
+    """specs: (label, num, den, expected_sign). Returns components, influence matrix, era shares.
+    Era years: empirical distribution in `cov` (default ref) - see era_years."""
+    yc = ref if cov is None else cov
+    ye = era_years(yc, early)
+    yl = era_years(yc, late)
     comps, grads, shares = [], [], {}
     for label, num, den, sign in specs:
         se_, ge = standardized_share(tf, ref, ye, num, den)
@@ -241,14 +262,15 @@ def h1(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, la
     tf = fit_target(wd, "locus", design)
     specs = [("material share", [1], [1, 2, 3], -1), ("internal share", [3], [1, 2, 3], +1),
              ("social share", [2], [1, 2, 3], 0)]
-    comps, infl, shares = _contrast_components(tf, _ref(wd, ref_cov), specs, early, late)
+    comps, infl, shares = _contrast_components(tf, _ref(wd, ref_cov), specs, early, late, wd.cov)
     return Effect("H1 inward turn", comps, infl, {"era_shares": shares, "converged": tf.fit.converged, "link": tf.fit.link, "fit": tf})
 
 
 def h2a(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE) -> Effect:
     design = design or Design.from_data(wd)
     tf = fit_target(wd, "comm_cause", design)
-    comps, infl, shares = _contrast_components(tf, _ref(wd, ref_cov), [("withholding share", [1], [1, 2], +1)], early, late)
+    comps, infl, shares = _contrast_components(tf, _ref(wd, ref_cov), [("withholding share", [1], [1, 2], +1)],
+                                               early, late, wd.cov)
     return Effect("H2a communication", comps, infl, {"era_shares": shares, "converged": tf.fit.converged})
 
 
@@ -279,9 +301,10 @@ def h2c(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, l
     design = design or Design.from_data(wd)
     ref = _ref(wd, ref_cov)
     tf1 = fit_target(wd, "darkness", design)
-    c1, i1, s1 = _contrast_components(tf1, ref, [("DARKNESS prevalence", [1], None, -1)], early, late)
+    c1, i1, s1 = _contrast_components(tf1, ref, [("DARKNESS prevalence", [1], None, -1)], early, late, wd.cov)
     tf2 = fit_target(wd, "night", design)
-    c2, i2, s2 = _contrast_components(tf2, ref, [("night danger+concealment share", [1], [1, 2], -1)], early, late)
+    c2, i2, s2 = _contrast_components(tf2, ref, [("night danger+concealment share", [1], [1, 2], -1)], early, late,
+                                      wd.cov)
     # influence matrices share the author cluster ordering only if factorised identically: they are
     # (same wd.cov[cluster] order), so stack
     return Effect("H2c darkness", c1 + c2, np.column_stack([i1, i2]),

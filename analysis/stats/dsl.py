@@ -533,8 +533,12 @@ def fit_mnlogit(X: np.ndarray, Y: np.ndarray, weights: np.ndarray | None = None,
             converged = True
             break
     g, H, P = grad_hess(beta)
-    if np.max(np.abs(beta)) > 25:
+    # divergence (MLE does not exist, e.g. negative pseudo-outcome totals in a sparse cell): fitted
+    # linear predictors run off to +-inf or the score is not ~0 at the end
+    if np.max(np.abs(X @ beta)) > 30 or np.max(np.abs(g)) > 1e-6 * max(w.sum(), 1):
         converged = False
+    else:
+        converged = True
     Hinv = np.linalg.pinv(H)
     R = Y[:, 1:] - P
     scores = np.concatenate([(X * (w * R[:, j])[:, None]) for j in range(K - 1)], axis=1)

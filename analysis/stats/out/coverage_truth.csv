@@ -1,21 +1,21 @@
 quantity,truth
-material share [early],0.483031780256867
-material share [late],0.3399854914762423
-material share [mid],0.40822754401511835
-material raw contrast late-early,-0.1430462887806247
-internal share [early],0.0748101621824318
-internal share [late],0.15756982227058397
-internal share [mid],0.11424178686966827
-internal raw contrast late-early,0.08275966008815216
-prevalence share [early],0.4424672307947569
-prevalence share [late],0.4609011394639705
-prevalence share [mid],0.4553192937424649
-prevalence raw contrast late-early,0.018433908669213572
-darkness share [early],0.0584245893479343
-darkness share [late],0.028606965174129355
-darkness share [mid],0.04049508030957103
-darkness raw contrast late-early,-0.029817624173804944
-H1 material share contrast [identity],-0.13974668777412697
-H1 internal share contrast [identity],0.08422356166151786
-H1 material share contrast [logit],-0.1422700740404907
-H1 internal share contrast [logit],0.08459833474211655
+material share [early],0.45928099779897286
+material share [late],0.32567296522378514
+material share [mid],0.39609866599546945
+material raw contrast late-early,-0.13360803257518772
+internal share [early],0.08669601369528002
+internal share [late],0.16717208853076693
+internal share [mid],0.11907878177699471
+internal raw contrast late-early,0.08047607483548691
+prevalence share [early],0.4456190061028771
+prevalence share [late],0.46516725223839517
+prevalence share [mid],0.4538289317371836
+prevalence raw contrast late-early,0.019548246135518088
+darkness share [early],0.05574324324324324
+darkness share [late],0.027516474264527305
+darkness share [mid],0.03746687380060312
+darkness raw contrast late-early,-0.028226768978715937
+H1 material share contrast [identity],-0.1396438184734114
+H1 internal share contrast [identity],0.0842025238557904
+H1 material share contrast [logit],-0.14274584698819587
+H1 internal share contrast [logit],0.08590435309898731
