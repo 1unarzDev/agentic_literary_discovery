@@ -238,8 +238,8 @@ def install(run: Runner = _run, platform: str = sys.platform, extra: list[str] |
         for c in (["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "--now", UNIT]):
             r = run(c)
             msgs.append(f"$ {' '.join(c)} -> {r.returncode} {r.stderr.strip()}")
-        msgs.append("To keep it running without an open login session (start at boot): "
-                    "`loginctl enable-linger $USER` (may ask for your password).")
+        if run(["loginctl", "show-user", os.environ.get("USER", ""), "-p", "Linger", "--value"]).stdout.strip() != "yes":
+            msgs.append("To run at boot without an open login session: `loginctl enable-linger $USER`.")
     elif platform == "darwin":
         p = _plist_path()
         p.parent.mkdir(parents=True, exist_ok=True)

@@ -174,15 +174,18 @@ fi
 SERVICE_OK=0
 if [ "$DO_SERVICE" = 1 ]; then
   say "Installing (or rewriting) the background service and starting it"
-  if [ -n "$EXTRA" ]; then run ald service install --args "$EXTRA" || true; else run ald service install || true; fi
+  SVC_RC=0
+  if [ -n "$EXTRA" ]; then run ald service install --args "$EXTRA" || SVC_RC=$?; else run ald service install || SVC_RC=$?; fi
   if [ "$OS" != "Darwin" ] && systemctl --user is-enabled --quiet ald-worker.service 2>/dev/null; then
     # Start at boot without an open login session. --no-ask-password: never prompts (polkit may refuse).
     loginctl --no-ask-password enable-linger "$(id -un)" >/dev/null 2>&1 \
       || [ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" = yes ] \
       || warn "could not enable lingering: the service runs only while you are logged in (fix: sudo loginctl enable-linger $(id -un))"
   fi
-  say "Waiting for the worker to start and reach the coordinator (up to 3 min)"
-  run ald service verify --wait 180 && SERVICE_OK=1
+  if [ "$SVC_RC" = 0 ]; then
+    say "Waiting for the worker to start and reach the coordinator (up to 3 min)"
+    run ald service verify --wait 180 && SERVICE_OK=1
+  fi
 fi
 
 run ald status || true

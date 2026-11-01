@@ -121,9 +121,11 @@ function Install-Ald {
         Say "Installing (or rewriting) the Scheduled Task 'ald-worker' and starting it"
         $rc = Native "ald" @("service", "install")
         if ($rc -ne 0) { Warn "service install failed (see above)"; $ok = $false }
-        Say "Waiting for the worker to start and reach the coordinator (up to 3 min)"
-        $rc = Native "ald" @("service", "verify", "--wait", "180")
-        if ($rc -ne 0) { $ok = $false }
+        else {
+            Say "Waiting for the worker to start and reach the coordinator (up to 3 min)"
+            $rc = Native "ald" @("service", "verify", "--wait", "180")
+            if ($rc -ne 0) { $ok = $false }
+        }
     }
     Native "ald" @("status") | Out-Null
     if (-not $NoService) {
