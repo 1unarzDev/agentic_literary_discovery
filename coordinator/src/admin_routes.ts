@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { AppEnv, requireAdmin } from "./auth";
+import { GATE_SETS, certFor, validateReference } from "./annotate_routes";
 import { CFG, getConfig, sealState, setConfigStmt } from "./db";
 import { REGISTRY_KEY } from "./registry";
 import {
@@ -428,7 +429,7 @@ adminRoutes.post("/v1/admin/annotators", async (c) => {
   return json({ token, annotator_id: id });
 });
 
-const ITEM_KEYS = new Set(["item_id", "passage_id", "text", "ctx_before", "ctx_after", "set", "assign"]);
+const ITEM_KEYS = new Set(["item_id", "passage_id", "text", "ctx_before", "ctx_after", "set", "assign", "reference"]);
 
 adminRoutes.post("/v1/admin/ann_items", async (c) => {
   const b = await readJson<{ items?: unknown }>(c.req.raw);
@@ -449,7 +450,16 @@ adminRoutes.post("/v1/admin/ann_items", async (c) => {
     if (it.item_id.includes(it.passage_id)) return err("item_id must be opaque (must not contain passage_id)");
     if (typeof it.text !== "string" || !it.text.trim()) return err("text required");
     for (const k of ["ctx_before", "ctx_after"]) if (it[k] !== undefined && typeof it[k] !== "string") return err(`${k} must be a string`);
-    if (it.set !== "teaching" && it.set !== "audit") return err("set must be teaching|audit");
+    if (!["practice", "cert", "retake", "teaching", "audit"].includes(it.set as string))
+      return err("set must be practice|cert|retake|teaching|audit");
+    // A reference answer exists only for practice and check items (never sent before the annotator answers).
+    if ((GATE_SETS as readonly unknown[]).includes(it.set)) {
+      try {
+        it.reference = validateReference(it.reference);
+      } catch (e) {
+        return err(`practice reference: ${e instanceof HttpError ? e.message : String(e)}`);
+      }
+    } else if (it.reference !== undefined) return err("reference is only allowed on practice/cert/retake items");
     if (!isStringArray(it.assign)) return err("assign must be an array of annotator names");
     const unknown = it.assign.filter((n) => !byName.has(n));
     if (unknown.length) return err(`unknown annotator(s): ${unknown.join(",")}`);
@@ -459,8 +469,11 @@ adminRoutes.post("/v1/admin/ann_items", async (c) => {
   const itemRows: unknown[] = [];
   const assignRows: unknown[] = [];
   for (const raw of items) {
-    const it = raw as { item_id: string; passage_id: string; text: string; ctx_before?: string; ctx_after?: string; set: string; assign: string[] };
-    itemRows.push({ item_id: it.item_id, passage_id: it.passage_id, text: it.text, ctx_before: it.ctx_before ?? "", ctx_after: it.ctx_after ?? "", set: it.set });
+    const it = raw as { item_id: string; passage_id: string; text: string; ctx_before?: string; ctx_after?: string; set: string; assign: string[]; reference?: unknown };
+    itemRows.push({
+      item_id: it.item_id, passage_id: it.passage_id, text: it.text, ctx_before: it.ctx_before ?? "", ctx_after: it.ctx_after ?? "", set: it.set,
+      ref_json: it.reference === undefined ? null : JSON.stringify(it.reference),
+    });
     for (const name of new Set(it.assign)) {
       const a = byName.get(name)!;
       assignRows.push({ annotator_id: a.id, item_id: it.item_id, ord: await hash48(`${a.seed}:${it.item_id}`) });
@@ -468,9 +481,10 @@ adminRoutes.post("/v1/admin/ann_items", async (c) => {
   }
   const [r1, r2] = await c.env.DB.batch([
     c.env.DB.prepare(
-      `INSERT INTO ann_items(item_id, passage_id, text, ctx_before, ctx_after, set_name, created)
+      `INSERT INTO ann_items(item_id, passage_id, text, ctx_before, ctx_after, set_name, ref_json, created)
        SELECT json_extract(value, '$.item_id'), json_extract(value, '$.passage_id'), json_extract(value, '$.text'),
-              json_extract(value, '$.ctx_before'), json_extract(value, '$.ctx_after'), json_extract(value, '$.set'), ?2
+              json_extract(value, '$.ctx_before'), json_extract(value, '$.ctx_after'), json_extract(value, '$.set'),
+              json_extract(value, '$.ref_json'), ?2
          FROM json_each(?1) WHERE true
        ON CONFLICT(item_id) DO NOTHING`,
     ).bind(JSON.stringify(itemRows), now),
@@ -496,6 +510,55 @@ adminRoutes.get("/v1/admin/ann_labels", async (c) => {
       ORDER BY l.id`,
   ).all<Record<string, unknown>>();
   return json({
-    labels: results.map(({ label_json, undone, ...r }) => ({ ...r, label: parseJsonField(String(label_json)), undone: undone === 1 })),
+    labels: results.map(({ label_json, undone, ...r }) => ({
+      ...r,
+      label: parseJsonField(String(label_json)),
+      undone: undone === 1,
+      practice: (GATE_SETS as readonly unknown[]).includes(r.set), // training/certification only, never analysed as data
+    })),
   });
+});
+
+/** Per-annotator, per-queue progress (done = active labels) and whether practice is complete. */
+adminRoutes.get("/v1/admin/ann_status", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT a.id, a.name, i.set_name AS queue, COUNT(s.item_id) AS total,
+            SUM(CASE WHEN EXISTS (SELECT 1 FROM ann_labels l WHERE l.annotator_id = s.annotator_id
+                                   AND l.item_id = s.item_id AND l.undone = 0) THEN 1 ELSE 0 END) AS done,
+            MAX((SELECT MAX(l.created) FROM ann_labels l WHERE l.annotator_id = s.annotator_id AND l.item_id = s.item_id)) AS last_label
+       FROM annotators a LEFT JOIN ann_assignments s ON s.annotator_id = a.id LEFT JOIN ann_items i ON i.item_id = s.item_id
+      GROUP BY a.id, a.name, i.set_name ORDER BY a.name`,
+  ).all<{ id: string; name: string; queue: string | null; total: number; done: number | null; last_label: string | null }>();
+  const by = new Map<string, { id: string; name: string; queues: { queue: string; done: number; total: number }[]; last_label: string | null }>();
+  for (const r of results) {
+    const e = by.get(r.name) ?? { id: r.id, name: r.name, queues: [], last_label: null };
+    if (r.queue) e.queues.push({ queue: r.queue, done: r.done ?? 0, total: r.total });
+    if (r.last_label && (!e.last_label || r.last_label > e.last_label)) e.last_label = r.last_label;
+    by.set(r.name, e);
+  }
+  const annotators = [];
+  for (const { id, ...e } of by.values()) {
+    const p = e.queues.find((q) => q.queue === "practice");
+    annotators.push({ ...e, practice_complete: !p || p.done >= p.total, cert: await certFor(c.env, id) });
+  }
+  return json({ annotators });
+});
+
+/** Override the computed certification: pass (after review), revoke (lock out), or clear. */
+adminRoutes.post("/v1/admin/ann_cert", async (c) => {
+  const b = await readJson<{ name?: unknown; decision?: unknown; note?: unknown }>(c.req.raw);
+  if (typeof b.name !== "string") throw new HttpError(400, "name required");
+  if (b.decision !== "pass" && b.decision !== "revoke" && b.decision !== "clear") throw new HttpError(400, "decision must be pass|revoke|clear");
+  const note = typeof b.note === "string" ? b.note.slice(0, 1000) : "";
+  const a = await c.env.DB.prepare("SELECT id FROM annotators WHERE name = ?").bind(b.name).first<{ id: string }>();
+  if (!a) throw new HttpError(404, "unknown annotator");
+  if (b.decision === "clear") await c.env.DB.prepare("DELETE FROM ann_cert_override WHERE annotator_id = ?").bind(a.id).run();
+  else
+    await c.env.DB.prepare(
+      `INSERT INTO ann_cert_override(annotator_id, decision, note, created) VALUES (?, ?, ?, ?)
+       ON CONFLICT(annotator_id) DO UPDATE SET decision = excluded.decision, note = excluded.note, created = excluded.created`,
+    )
+      .bind(a.id, b.decision, note, nowIso())
+      .run();
+  return json({ name: b.name, cert: await certFor(c.env, a.id) });
 });

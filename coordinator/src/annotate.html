@@ -19,6 +19,7 @@
   --mark: #f6e3a1;
   --focus: #2f5d8a;
   --ok: #2f6b3a;
+  --ok-soft: #dcebd9;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, Cambria, serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -26,27 +27,30 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --paper: #1b1915; --paper-2: #24211c; --card: #211e19; --ink: #ebe4d6; --ink-2: #c9bfae;
-    --muted: #8f8676; --rule: #3a352d; --red: #e0685c; --red-soft: #3d2420; --mark: #5a4a1c; --focus: #7fb0e0; --ok: #7cc28a;
+    --muted: #8f8676; --rule: #3a352d; --red: #e0685c; --red-soft: #3d2420; --mark: #5a4a1c; --focus: #7fb0e0; --ok: #7cc28a; --ok-soft: #1f3322;
   }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--paper); color: var(--ink); }
 body { font-family: var(--sans); font-size: 15px; line-height: 1.45; }
-header {
-  position: sticky; top: 0; z-index: 5; background: var(--paper);
-  border-bottom: 1px solid var(--rule); padding: 10px 20px 8px;
-}
-.hrow { display: flex; align-items: center; gap: 16px; max-width: 1180px; margin: 0 auto; }
-.brand { font-family: var(--serif); font-size: 17px; letter-spacing: .02em; }
+header { position: sticky; top: 0; z-index: 5; background: var(--paper); border-bottom: 1px solid var(--rule); padding: 8px 16px 6px; }
+.hrow { display: flex; align-items: center; gap: 12px; max-width: 1180px; margin: 0 auto; flex-wrap: wrap; }
+.brand { font-family: var(--serif); font-size: 17px; letter-spacing: .02em; white-space: nowrap; }
 .brand b { color: var(--red); font-weight: 600; }
-.progress { flex: 1; display: flex; align-items: center; gap: 10px; }
+.tabs { display: flex; gap: 4px; }
+.tab { border: 1px solid var(--rule); background: var(--card); color: var(--ink-2); border-radius: 14px; padding: 2px 10px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.tab[aria-current="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.tab.locked { opacity: .55; }
+.progress { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 160px; }
 .bar { flex: 1; height: 6px; background: var(--paper-2); border-radius: 3px; overflow: hidden; border: 1px solid var(--rule); }
 .bar > i { display: block; height: 100%; width: 0; background: var(--red); transition: width .3s ease; }
-.count { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13px; min-width: 7em; text-align: right; }
-button.link { background: none; border: 0; color: var(--ink-2); cursor: pointer; font: inherit; padding: 4px 6px; border-radius: 4px; }
-button.link:hover { color: var(--ink); background: var(--paper-2); }
-main { max-width: 1180px; margin: 0 auto; padding: 22px 20px 80px; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 36px; }
-@media (max-width: 900px) { main { grid-template-columns: 1fr; } aside { position: static !important; } }
+.count { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13px; text-align: right; white-space: nowrap; }
+.tools { display: flex; gap: 2px; }
+.tabs { overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.tabs::-webkit-scrollbar { display: none; }
+button.link, a.link { background: none; border: 0; color: var(--ink-2); cursor: pointer; font: inherit; font-size: 14px; padding: 4px 6px; border-radius: 4px; text-decoration: none; white-space: nowrap; }
+button.link:hover, a.link:hover { color: var(--ink); background: var(--paper-2); }
+main { max-width: 1180px; margin: 0 auto; padding: 18px 16px 90px; display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 32px; }
 
 /* ---- passage */
 article { font-family: var(--serif); color: var(--ink); max-width: 40em; }
@@ -54,149 +58,236 @@ article { font-family: var(--serif); color: var(--ink); max-width: 40em; }
 .ctx p { margin: 0 0 .7em; }
 .ctx.before { border-bottom: 1px dashed var(--rule); padding-bottom: .6em; margin-bottom: 1.1em; }
 .ctx.after { border-top: 1px dashed var(--rule); padding-top: .6em; margin-top: 1.1em; }
+.ctx-body { max-height: 6.5em; overflow: hidden; }
+.ctx.before .ctx-body { display: flex; flex-direction: column; justify-content: flex-end; }
+.ctx.open .ctx-body { max-height: none; display: block; }
+.ctx-toggle { background: none; border: 0; padding: 0 0 0 8px; color: var(--ink-2); font: inherit; font-size: 11px; text-decoration: underline; cursor: pointer; text-transform: none; letter-spacing: 0; }
 .ctx-label { font-family: var(--sans); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: .4em; }
-#text { font-size: 20px; line-height: 1.7; hyphens: auto; -webkit-hyphens: auto; text-align: left; }
+#text { font-size: 19px; line-height: 1.7; hyphens: auto; -webkit-hyphens: auto; text-align: left; }
 #text p { margin: 0 0 .85em; }
 #text p + p { text-indent: 1.4em; margin-top: -.5em; }
 #text::selection, #text *::selection { background: var(--red-soft); }
 mark { background: var(--mark); color: inherit; padding: 0 .05em; border-radius: 2px; }
-.passage-box { background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--red); padding: 18px 22px 8px; border-radius: 2px; }
-.done-box { font-family: var(--serif); font-size: 22px; padding: 60px 0; text-align: center; color: var(--ink-2); }
+.passage-box { background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--red); padding: 16px 20px 6px; border-radius: 2px; }
+.passage-label { font-family: var(--sans); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--red); margin-bottom: .5em; }
+.panel { font-family: var(--serif); font-size: 19px; padding: 36px 8px; color: var(--ink-2); max-width: 36em; }
+.panel h2 { font-weight: 600; color: var(--ink); margin: 0 0 10px; font-size: 26px; }
+.panel p { margin: 8px 0; }
+.panel .primary { font-family: var(--sans); font-size: 15px; margin-top: 12px; }
 
 /* ---- form */
-aside { position: sticky; top: 64px; align-self: start; display: flex; flex-direction: column; gap: 16px; }
+aside { position: sticky; top: 64px; align-self: start; display: flex; flex-direction: column; gap: 14px; }
 fieldset { border: 0; margin: 0; padding: 0; }
-legend, .flabel { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin-bottom: 6px; padding: 0; display: flex; justify-content: space-between; width: 100%; }
-legend .hint, .flabel .hint { text-transform: none; letter-spacing: 0; color: var(--muted); }
+legend, .flabel { font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 6px; padding: 0; display: flex; justify-content: space-between; gap: 8px; width: 100%; }
+legend .hint, .flabel .hint { font-weight: 400; color: var(--muted); white-space: nowrap; }
+.q { font-size: 13.5px; color: var(--ink-2); font-weight: 400; display: block; margin-top: 1px; }
 .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg .opt { flex: 1 1 0; justify-content: center; }
 .opt {
-  display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none;
-  border: 1px solid var(--rule); background: var(--card); color: var(--ink); border-radius: 4px;
-  padding: 5px 9px; font: inherit; font-size: 13.5px; text-align: left;
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; -webkit-user-select: none;
+  border: 1px solid var(--rule); background: var(--card); color: var(--ink); border-radius: 5px;
+  padding: 7px 9px; min-height: 38px; font: inherit; font-size: 13.5px; text-align: left; touch-action: manipulation;
 }
 .opt:hover { border-color: var(--ink-2); }
 .opt[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .opt[aria-pressed="true"] kbd { background: transparent; color: var(--paper); border-color: var(--paper); }
-.opt[disabled] { opacity: .4; cursor: not-allowed; }
+.opt .sub { display: block; font-size: 11.5px; opacity: .75; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .grid .opt { width: 100%; }
+.dim { opacity: .45; }
 kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; min-width: 1.5em; text-align: center; color: var(--ink-2); background: var(--paper); }
 .hidden { display: none !important; }
-textarea { width: 100%; min-height: 58px; resize: vertical; font: inherit; font-size: 14px; color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 7px 9px; }
-textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-.ev-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.usual { font-size: 12.5px; color: var(--muted); margin-top: 4px; min-height: 1em; }
+textarea { width: 100%; min-height: 48px; resize: vertical; font: inherit; font-size: 14px; color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 7px 9px; }
+textarea:focus, .opt:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+details summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+details[open] summary { margin-bottom: 6px; }
+.ev-list { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ev-list li { font-family: var(--serif); font-size: 14px; background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 4px 28px 4px 8px; position: relative; }
 .ev-list li button { position: absolute; right: 4px; top: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; }
 .ev-empty { color: var(--muted); font-size: 13px; }
-.actions { display: flex; gap: 8px; align-items: center; }
-.primary { background: var(--red); color: #fff; border: 0; border-radius: 4px; padding: 8px 16px; font: inherit; font-weight: 600; cursor: pointer; }
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.primary { background: var(--red); color: #fff; border: 0; border-radius: 5px; padding: 9px 18px; min-height: 40px; font: inherit; font-weight: 600; cursor: pointer; }
 .primary:hover { filter: brightness(1.08); }
-.secondary { background: none; border: 1px solid var(--rule); color: var(--ink-2); border-radius: 4px; padding: 7px 12px; font: inherit; cursor: pointer; }
+.primary kbd { color: #fff; border-color: #fff8; background: transparent; }
+.secondary { background: none; border: 1px solid var(--rule); color: var(--ink-2); border-radius: 5px; padding: 8px 12px; min-height: 40px; font: inherit; cursor: pointer; }
+.small { font-size: 12.5px; padding: 4px 8px; min-height: 0; }
 #msg { min-height: 1.3em; font-size: 13px; color: var(--red); }
 #msg.ok { color: var(--ok); }
 
-/* ---- help */
-#help { position: fixed; inset: 0; background: rgba(20, 16, 12, .45); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; z-index: 20; }
-#help .sheet { background: var(--card); color: var(--ink); max-width: 760px; width: 100%; max-height: 86vh; overflow: auto; border-radius: 6px; padding: 22px 26px; border: 1px solid var(--rule); box-shadow: 0 10px 40px rgba(0, 0, 0, .25); }
-#help h2 { font-family: var(--serif); font-weight: 600; margin: 0 0 6px; font-size: 22px; }
-#help h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--red); margin: 18px 0 6px; }
-#help dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 0; font-size: 14px; }
-#help dt { font-family: var(--mono); font-size: 12px; color: var(--ink-2); padding-top: 2px; }
-#help dd { margin: 0; }
-#help p { margin: 4px 0; font-size: 14px; }
+/* ---- practice feedback */
+#feedback { display: flex; flex-direction: column; gap: 12px; }
+#feedback h3 { margin: 0; font-family: var(--serif); font-size: 20px; font-weight: 600; }
+.cmp { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.cmp th, .cmp td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.cmp th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.cmp td.same { background: var(--ok-soft); }
+.cmp td.diff { background: var(--red-soft); }
+.verdict { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.verdict.same { color: var(--ok); } .verdict.diff { color: var(--red); }
+.rationale { font-family: var(--serif); font-size: 16px; line-height: 1.55; background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; }
+.miss { border-top: 1px solid var(--rule); padding-top: 12px; margin-top: 14px; font-size: 15px; }
+.miss .ex { font-size: 15.5px; line-height: 1.55; color: var(--ink); }
+.miss .cmp { margin: 8px 0; font-family: var(--sans); }
+.miss .cmp th { width: 7em; }
+.rationale b { font-family: var(--sans); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--red); display: block; margin-bottom: 4px; }
+
+/* ---- overlays */
+.overlay { position: fixed; inset: 0; background: rgba(20, 16, 12, .5); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 12px; z-index: 20; }
+.sheet { background: var(--card); color: var(--ink); max-width: 760px; width: 100%; max-height: 86vh; overflow: auto; border-radius: 8px; padding: 20px 22px; border: 1px solid var(--rule); box-shadow: 0 10px 40px rgba(0, 0, 0, .25); }
+.sheet h2 { font-family: var(--serif); font-weight: 600; margin: 0 0 8px; font-size: 22px; }
+.sheet h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--red); margin: 16px 0 6px; }
+.sheet dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; font-size: 14px; }
+.sheet dt { font-family: var(--mono); font-size: 12px; color: var(--ink-2); padding-top: 2px; }
+.sheet dd { margin: 0; }
+.sheet p { margin: 6px 0; font-size: 15px; }
+.sheet .actions { margin-top: 14px; }
+
+/* ---- narrow screens: passage first, then the form; sticky submit bar */
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; gap: 20px; padding-bottom: 110px; }
+  aside { position: static; }
+  article { max-width: none; }
+}
+@media (max-width: 640px) {
+  header { padding: 6px 10px 4px; }
+  .hrow { gap: 6px 8px; }
+  .brand { font-size: 15px; }
+  .progress { order: 5; flex-basis: 100%; }
+  header { position: static; }
+  .tabs { order: 4; flex-basis: 100%; }
+  .tab { font-size: 12.5px; padding: 3px 9px; }
+  .tools { margin-left: auto; }
+  button.link, a.link { font-size: 13px; padding: 4px 5px; }
+  main { padding: 12px 12px 110px; }
+  #text { font-size: 18px; }
+  .passage-box { padding: 12px 14px 4px; }
+  .ctx { font-size: 15px; }
+  kbd { display: none; }
+  .opt { min-height: 44px; font-size: 14.5px; }
+  .actions.main { position: fixed; left: 0; right: 0; bottom: 0; background: var(--paper); border-top: 1px solid var(--rule); padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); z-index: 6; }
+  .actions.main .primary { flex: 1; }
+}
 </style>
 </head>
 <body>
 <header>
   <div class="hrow">
     <div class="brand">What <b>Stands</b> in the Way</div>
+    <nav class="tabs" id="tabs" aria-label="sets"></nav>
     <div class="progress" aria-label="progress">
       <div class="bar"><i id="bar"></i></div>
       <div class="count" id="count">&nbsp;</div>
     </div>
-    <button class="link" id="helpBtn" title="Help (?)">Help <kbd>?</kbd></button>
+    <div class="tools">
+      <a class="link" id="guideLink" href="/annotate/guide" target="_blank" rel="noopener noreferrer" title="Open the guide (g)"><span class="lbl">Guide</span> <kbd>g</kbd></a>
+      <button class="link" id="breakBtn" title="Save &amp; take a break (b)"><span class="lbl">Break</span> <kbd>b</kbd></button>
+      <button class="link" id="helpBtn" title="Help (?)"><span class="lbl">Help</span> <kbd>?</kbd></button>
+    </div>
   </div>
 </header>
 
 <main id="main">
   <section>
-    <div class="done-box hidden" id="doneBox">All assigned passages are labelled. Thank you.<br><small>(Press u to reopen the last one.)</small></div>
+    <div class="panel hidden" id="panel"></div>
     <article id="article">
-      <div class="ctx before" id="ctxBeforeWrap"><div class="ctx-label">Before</div><div id="ctxBefore"></div></div>
-      <div class="passage-box"><div id="text">Loading&hellip;</div></div>
-      <div class="ctx after" id="ctxAfterWrap"><div class="ctx-label">After</div><div id="ctxAfter"></div></div>
+      <div class="ctx before" id="ctxBeforeWrap"><div class="ctx-label">Before (for context only)<button type="button" class="ctx-toggle" data-for="ctxBeforeWrap">show all</button></div><div class="ctx-body" id="ctxBefore"></div></div>
+      <div class="passage-box"><div class="passage-label" id="plabel">Judge this passage</div><div id="text">Loading&hellip;</div></div>
+      <div class="ctx after" id="ctxAfterWrap"><div class="ctx-label">After (for context only)<button type="button" class="ctx-toggle" data-for="ctxAfterWrap">show all</button></div><div class="ctx-body" id="ctxAfter"></div></div>
     </article>
   </section>
 
-  <aside id="form">
-    <fieldset>
-      <legend>Plot obstacle? <span class="hint">y / 0 / i</span></legend>
-      <div class="seg" id="hasObstacle"></div>
-    </fieldset>
+  <aside id="side">
+    <div id="form">
+      <fieldset>
+        <legend><span>1. Is there a plot obstacle?<span class="q">A character wants something, something is in the way, and it matters for what happens next.</span></span><span class="hint">y / n / c</span></legend>
+        <div class="seg" id="hasObstacle"></div>
+      </fieldset>
 
-    <fieldset id="domainSet">
-      <legend>Domain <span class="hint"><span id="domainCount">0</span>/2 &middot; 1&ndash;9, o</span></legend>
-      <div class="grid" id="domains"></div>
-    </fieldset>
+      <fieldset id="domainSet" style="margin-top:14px">
+        <legend><span>2. What kind of thing is in the way?<span class="q">Pick the one that, if removed, would let the character go ahead.</span></span><span class="hint">1&ndash;9, o</span></legend>
+        <div class="grid" id="domains"></div>
+      </fieldset>
 
-    <fieldset id="locusSet">
-      <legend>Locus <span class="hint">m / s / p</span></legend>
-      <div class="seg" id="loci"></div>
-    </fieldset>
+      <fieldset id="fcSet" class="hidden" style="margin-top:14px">
+        <legend><span>2b. Why does the communication fail?</span><span class="hint">Shift+1&ndash;6</span></legend>
+        <div class="grid" id="fcs"></div>
+      </fieldset>
 
-    <fieldset id="fcSet" class="hidden">
-      <legend>Communication failure cause <span class="hint">Shift+1&ndash;5</span></legend>
-      <div class="seg" id="fcs"></div>
-    </fieldset>
+      <fieldset id="locusSet" style="margin-top:14px">
+        <legend><span>3. Where does the resistance come from?</span><span class="hint">m / s / i</span></legend>
+        <div class="seg" id="loci"></div>
+        <div class="usual" id="usual"></div>
+      </fieldset>
 
-    <fieldset>
-      <div class="flabel">Evidence <span class="hint">select text, press e</span></div>
-      <ul class="ev-list" id="evList"></ul>
-    </fieldset>
+      <details id="extras" style="margin-top:14px">
+        <summary>Optional: evidence and note</summary>
+        <div class="flabel">Evidence <span class="hint">select words in the passage, then e</span></div>
+        <ul class="ev-list" id="evList"></ul>
+        <button type="button" class="secondary small" id="evBtn">Add selected text</button>
+        <div class="flabel" style="margin-top:10px">Note <span class="hint">t to type, Esc to leave</span></div>
+        <textarea id="note" maxlength="4000" placeholder="Anything odd about this passage?"></textarea>
+      </details>
 
-    <fieldset>
-      <div class="flabel">Note <span class="hint">t to type, Esc to leave</span></div>
-      <textarea id="note" maxlength="4000" placeholder="Optional"></textarea>
-    </fieldset>
-
-    <div class="actions">
-      <button class="primary" id="submitBtn">Submit <kbd style="color:#fff;border-color:#fff8;background:transparent">Enter</kbd></button>
-      <button class="secondary" id="undoBtn">Undo last <kbd>u</kbd></button>
+      <div class="actions main" style="margin-top:14px">
+        <button class="primary" id="submitBtn">Submit <kbd>Enter</kbd></button>
+        <button class="secondary" id="undoBtn">Undo last <kbd>u</kbd></button>
+      </div>
+      <div id="msg" role="status" aria-live="polite"></div>
     </div>
-    <div id="msg" role="status" aria-live="polite"></div>
+
+    <div id="feedback" class="hidden" aria-live="polite">
+      <h3>Practice: how did you do?</h3>
+      <table class="cmp"><thead><tr><th></th><th>You</th><th>Reference</th></tr></thead><tbody id="cmpBody"></tbody></table>
+      <div class="rationale"><b>Why</b><span id="rationale"></span></div>
+      <div class="actions main"><button class="primary" id="nextBtn">Next passage <kbd>Enter</kbd></button></div>
+    </div>
   </aside>
 </main>
 
-<div id="help" class="hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+<div id="help" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
   <div class="sheet">
-    <h2 id="helpTitle">Codebook, in one line each</h2>
-    <p><b>Plot obstacle</b>: something in the passage that blocks, delays or endangers a character&rsquo;s goal <i>and</i> plausibly affects what happens next. Atmosphere or a mere mention does not count.</p>
-    <p>Judge only the bordered passage; the muted context is there to help you read it. You may choose at most two domains.</p>
-    <h3>Plot obstacle?</h3>
-    <dl>
-      <dt>yes</dt><dd>An obstacle as defined above is present in the passage.</dd>
-      <dt>no</dt><dd>No obstacle, or only atmosphere or a passing mention.</dd>
-      <dt>insufficient</dt><dd>The passage and context are not enough to decide.</dd>
-    </dl>
-    <h3>Domain</h3>
+    <h2 id="helpTitle">Quick reference</h2>
+    <p><b>Plot obstacle</b> = a character <b>wants</b> something + something is <b>in the way</b> + it <b>matters</b> for what happens next. Scenery, a passing mention, or a general complaint is not enough. Judge only the bordered passage; the grey text around it is context. <b>When unsure, choose &ldquo;Can&rsquo;t tell&rdquo;.</b> The full <a href="/annotate/guide" target="_blank" rel="noopener noreferrer">guide</a> has examples.</p>
+    <h3>What kind of thing is in the way?</h3>
     <dl id="helpDomains"></dl>
-    <h3>Locus</h3>
+    <h3>Where does the resistance come from?</h3>
     <dl id="helpLoci"></dl>
-    <h3>Communication failure cause (only with COMMUNICATION_INFORMATION)</h3>
+    <h3>Why does the communication fail?</h3>
     <dl id="helpFcs"></dl>
     <h3>Keys</h3>
     <dl>
-      <dt>1&ndash;9, o</dt><dd>Toggle a domain (picking one also sets &ldquo;yes&rdquo;).</dd>
-      <dt>0</dt><dd>None: no obstacle (clears domain, locus and cause).</dd>
-      <dt>y / i</dt><dd>Obstacle yes / insufficient context.</dd>
-      <dt>m s p</dt><dd>Locus: material, social, psychological.</dd>
-      <dt>Shift+1&ndash;5</dt><dd>Communication failure cause.</dd>
-      <dt>e</dt><dd>Add the current text selection as evidence.</dd>
+      <dt>y / n / c</dt><dd>Obstacle: yes / no / can&rsquo;t tell.</dd>
+      <dt>1&ndash;9, o</dt><dd>The kind of obstacle (choosing one also sets &ldquo;yes&rdquo;).</dd>
+      <dt>Shift+1&ndash;6</dt><dd>Why communication fails (only for Communication).</dd>
+      <dt>m / s / i</dt><dd>Where it comes from: material, social, inner.</dd>
+      <dt>e</dt><dd>Add the selected words as evidence (optional).</dd>
       <dt>t</dt><dd>Write a note (Esc to leave the note field).</dd>
-      <dt>Enter</dt><dd>Submit and go to the next passage (Ctrl+Enter inside the note).</dd>
-      <dt>u</dt><dd>Undo your last submission and reopen it.</dd>
-      <dt>? / h</dt><dd>Show or hide this help.</dd>
+      <dt>Enter</dt><dd>Submit, or go on after practice feedback. Ctrl+Enter inside the note.</dd>
+      <dt>u</dt><dd>Undo your last submission in this set and reopen it (not for practice).</dd>
+      <dt>q</dt><dd>Switch to the next set (practice / main / teaching).</dd>
+      <dt>b</dt><dd>Save &amp; take a break. Everything you submitted is already saved.</dd>
+      <dt>g</dt><dd>Open the guide in a new tab.</dd>
+      <dt>? / h</dt><dd>Show or hide this help. Esc closes it.</dd>
     </dl>
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+  <div class="sheet" style="max-width:520px">
+    <h2 id="pauseTitle">Taking a break</h2>
+    <p>Everything you submitted is saved on the server. The passage you were working on is kept in this browser, and the timer is paused.</p>
+    <p>You can close this tab. To come back, open <b>the same personal link</b> again (bookmark it), on any device.</p>
+    <p id="pauseStats" style="color:var(--muted)"></p>
+    <div class="actions"><button class="primary" id="resumeBtn">Resume <kbd>Enter</kbd></button></div>
+  </div>
+</div>
+
+<div id="welcome" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+  <div class="sheet" style="max-width:600px">
+    <h2 id="welcomeTitle">Welcome, and thank you</h2>
+    <div id="welcomeBody"></div>
+    <div class="actions"><a class="secondary" href="/annotate/guide" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Read the guide</a><button class="primary" id="startBtn">Start <kbd>Enter</kbd></button></div>
   </div>
 </div>
 
@@ -204,62 +295,79 @@ textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid va
 (function () {
   "use strict";
   var BASE = location.pathname.replace(/\/+$/, "");
+  var SECONDS_PER_ITEM = 30;
 
   var HAS = [
     { v: "yes", label: "Yes", key: "y" },
-    { v: "no", label: "No", key: "0" },
-    { v: "insufficient_context", label: "Insufficient context", key: "i" }
+    { v: "no", label: "No", key: "n" },
+    { v: "insufficient_context", label: "Can’t tell", key: "c" }
   ];
   var DOMAINS = [
-    { v: "DISTANCE_TRAVEL", label: "Distance / travel", key: "1", def: "Physical distance, journeys, transport, being in the wrong place." },
-    { v: "COMMUNICATION_INFORMATION", label: "Communication / information", key: "2", def: "Messages, letters, news, secrets, identity: who knows what, and when." },
-    { v: "DARKNESS_VISIBILITY", label: "Darkness / visibility", key: "3", def: "Night, darkness, fog or concealment that prevents seeing or being seen." },
-    { v: "ILLNESS_BODY_DEATH", label: "Illness / body / death", key: "4", def: "Sickness, injury, bodily weakness, pregnancy, dying or death." },
-    { v: "MONEY_PROPERTY_LAW", label: "Money / property / law", key: "5", def: "Debt, poverty, inheritance, wills, contracts, courts and legal status." },
-    { v: "SOCIAL_RANK_CONVENTION", label: "Social rank / convention", key: "6", def: "Class, propriety, reputation, marriage and gender norms." },
-    { v: "INTERPERSONAL_CONFLICT", label: "Interpersonal conflict", key: "7", def: "Another person actively opposes, thwarts, threatens or deceives." },
-    { v: "INNER_STATE", label: "Inner state", key: "8", def: "The character's own doubt, fear, desire, pride or conscience." },
-    { v: "NATURE_WEATHER", label: "Nature / weather", key: "9", def: "Storms, floods, snow, terrain, animals, the natural world." },
-    { v: "OTHER", label: "Other", key: "o", def: "A real obstacle that fits none of the above (say what in the note)." }
+    { v: "DISTANCE_TRAVEL", label: "Distance / travel", key: "1", locus: "material_external", def: "Being far away, a slow or hard journey, a missed coach or train, a road that can't be used." },
+    { v: "COMMUNICATION_INFORMATION", label: "Communication / information", key: "2", locus: null, def: "A message that fails, is late, lost, hidden or misread; a secret; not knowing a key fact; mistaken identity." },
+    { v: "DARKNESS_VISIBILITY", label: "Darkness / can't see", key: "3", locus: "material_external", def: "Night, fog, no light, hiding in the dark: not being able to see or be seen." },
+    { v: "ILLNESS_BODY_DEATH", label: "Illness / body / death", key: "4", locus: "material_external", def: "Sickness, injury, weakness, pregnancy, dying or a death." },
+    { v: "MONEY_PROPERTY_LAW", label: "Money / property / law", key: "5", locus: "social_institutional", def: "Poverty, debt, wills and inheritance, contracts, courts, police." },
+    { v: "SOCIAL_RANK_CONVENTION", label: "Social rank / rules", key: "6", locus: "social_institutional", def: "Class, manners, reputation, marriage rules, what a woman or a servant 'may not' do, a parent's authority as a rule." },
+    { v: "INTERPERSONAL_CONFLICT", label: "A person opposing", key: "7", locus: "social_institutional", def: "A specific person actively blocks, tricks, threatens or fights the character." },
+    { v: "INNER_STATE", label: "Inner state (own mind)", key: "8", locus: "internal_psychological", def: "The character's own fear, doubt, pride, guilt, shyness or indecision." },
+    { v: "NATURE_WEATHER", label: "Nature / weather", key: "9", locus: "material_external", def: "Storms, floods, snow, the sea, wild land, animals." },
+    { v: "OTHER", label: "Other", key: "o", locus: null, def: "A real obstacle that fits none of these (add a short note)." }
   ];
   var LOCI = [
-    { v: "material_external", label: "Material / external", key: "m", def: "Rooted in the physical world: bodies, distance, objects, weather, light." },
-    { v: "social_institutional", label: "Social / institutional", key: "s", def: "Rooted in other people, institutions, law, money or social rules." },
-    { v: "internal_psychological", label: "Internal / psychological", key: "p", def: "Rooted in the character's own mind." }
+    { v: "material_external", label: "Material", sub: "things, bodies, places", key: "m", def: "The physical world: distance, darkness, weather, illness, objects, machines." },
+    { v: "social_institutional", label: "Social", sub: "people, rules, money", key: "s", def: "Other people and society: someone opposing, rules, class, law, money, deliberate deception." },
+    { v: "internal_psychological", label: "Inner", sub: "the character's own mind", key: "i", def: "The character's own mind: fear, doubt, pride, guilt, indecision." }
   ];
   var FCS = [
-    { v: "infrastructure", label: "Infrastructure", key: "1", def: "The channel itself fails or is too slow: no post, no road, too far." },
-    { v: "accidental_loss", label: "Accidental loss", key: "2", def: "A message is lost, misdelivered, delayed or destroyed by chance." },
-    { v: "intentional_withholding", label: "Intentional withholding", key: "3", def: "Someone keeps a secret, lies, intercepts or suppresses information." },
-    { v: "misinterpretation", label: "Misinterpretation", key: "4", def: "The information arrives but is misread or misunderstood." },
-    { v: "success_resolution", label: "Success as resolution", key: "5", def: "Communication succeeds and is what resolves (or turns) the obstacle." }
+    { v: "infrastructure", label: "No way to send it / too slow", key: "1", locus: "material_external", def: "Slow post, no telegraph, too far, the post hasn't come." },
+    { v: "accidental_loss", label: "Lost or mixed up by accident", key: "2", locus: "material_external", def: "Lost, sent to the wrong place, overlooked, arrives at the wrong time." },
+    { v: "intentional_withholding", label: "Kept back on purpose", key: "3", locus: "social_institutional", def: "A secret kept, a letter intercepted, burned or forged, a lie, a deliberate silence." },
+    { v: "misinterpretation", label: "Misunderstood", key: "4", locus: "social_institutional", def: "The message arrives but is misread, ambiguous, or someone is mistaken for someone else." },
+    { v: "success_resolution", label: "A message solves it", key: "5", locus: null, def: "Communication works and removes the obstacle (the happy counterpart)." },
+    { v: "none", label: "None of these / unclear", key: "6", locus: null, def: "It is about information, but none of the causes above fits." }
   ];
+  var byV = function (list, v) { for (var i = 0; i < list.length; i++) if (list[i].v === v) return list[i]; return null; };
+  var nameOf = function (list, v) { var o = byV(list, v); return o ? o.label : "—"; };
 
   var $ = function (id) { return document.getElementById(id); };
-  var state = null;      // current label state
-  var item = null;       // current item {item_id, text, ctx_before, ctx_after}
-  var busy = false;
+  var state = null;     // current label state
+  var item = null;      // current item {item_id, text, ctx_before, ctx_after}
+  var queue = null;     // current queue name
+  var queues = [];      // [{queue,title,done,total,locked}]
+  var busy = false, feedbackOn = false, paused = false;
   var activeMs = 0, visibleSince = null;
 
-  function blank() { return { has_obstacle: null, domain: [], locus: null, failure_cause: null, evidence: [] }; }
+  // ---- per-browser conveniences only (never required to work)
+  function lsGet(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
+  function lsSet(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } }
+  var LS = "ald-ann:" + BASE.split("/").pop().slice(0, 10) + ":";
 
-  // ---- timer: counts only time while the tab is visible
-  function timerStart() { activeMs = 0; visibleSince = document.hidden ? null : Date.now(); }
+  function blank() { return { has_obstacle: null, domain: null, locus: null, failure_cause: null, evidence: [] }; }
+
+  // ---- timer: counts only time while the tab is visible and not on a break
+  function timerStart(ms) { activeMs = ms || 0; visibleSince = document.hidden || paused ? null : Date.now(); }
+  function timerPause() { if (visibleSince) { activeMs += Date.now() - visibleSince; visibleSince = null; } }
+  function timerResume() { if (!visibleSince && !document.hidden && !paused) visibleSince = Date.now(); }
   function timerSeconds() { return (activeMs + (visibleSince ? Date.now() - visibleSince : 0)) / 1000; }
-  document.addEventListener("visibilitychange", function () {
-    if (document.hidden) { if (visibleSince) { activeMs += Date.now() - visibleSince; visibleSince = null; } }
-    else if (!visibleSince) visibleSince = Date.now();
-  });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) { timerPause(); saveDraft(); } else timerResume(); });
+  window.addEventListener("pagehide", saveDraft);
 
-  // ---- building the option buttons
-  function makeOpts(container, list, onClick, cls) {
+  function saveDraft() {
+    if (!item || !state || feedbackOn) return;
+    lsSet(LS + "draft", { item_id: item.item_id, state: state, note: $("note").value, ms: Math.round(timerSeconds() * 1000) });
+  }
+
+  // ---- option buttons
+  function makeOpts(container, list, onClick, keyPrefix) {
     list.forEach(function (o) {
       var b = document.createElement("button");
-      b.type = "button"; b.className = "opt" + (cls ? " " + cls : "");
+      b.type = "button"; b.className = "opt";
       b.dataset.v = o.v; b.setAttribute("aria-pressed", "false");
       if (o.def) b.title = o.def;
-      var k = document.createElement("kbd"); k.textContent = o.key;
+      var k = document.createElement("kbd"); k.textContent = (keyPrefix || "") + o.key;
       var s = document.createElement("span"); s.textContent = o.label;
+      if (o.sub) { var sub = document.createElement("span"); sub.className = "sub"; sub.textContent = o.sub; s.appendChild(sub); }
       b.appendChild(k); b.appendChild(s);
       b.addEventListener("click", function () { onClick(o.v); b.blur(); });
       container.appendChild(b);
@@ -267,15 +375,15 @@ textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid va
   }
   function helpList(dl, list) {
     list.forEach(function (o) {
-      var dt = document.createElement("dt"); dt.textContent = o.v;
+      var dt = document.createElement("dt"); dt.textContent = o.key + "  " + o.label;
       var dd = document.createElement("dd"); dd.textContent = o.def;
       dl.appendChild(dt); dl.appendChild(dd);
     });
   }
   makeOpts($("hasObstacle"), HAS, setHas);
-  makeOpts($("domains"), DOMAINS, toggleDomain);
+  makeOpts($("domains"), DOMAINS, setDomain);
   makeOpts($("loci"), LOCI, setLocus);
-  makeOpts($("fcs"), FCS, setFc);
+  makeOpts($("fcs"), FCS, setFc, "⇧");
   helpList($("helpDomains"), DOMAINS);
   helpList($("helpLoci"), LOCI);
   helpList($("helpFcs"), FCS);
@@ -283,44 +391,49 @@ textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid va
   // ---- state transitions
   function setHas(v) {
     state.has_obstacle = v;
-    if (v !== "yes") { state.domain = []; state.locus = null; state.failure_cause = null; }
+    if (v !== "yes") { state.domain = null; state.locus = null; state.failure_cause = null; }
     render();
   }
-  function toggleDomain(v) {
-    var i = state.domain.indexOf(v);
-    if (i >= 0) state.domain.splice(i, 1);
-    else {
-      if (state.domain.length >= 2) { say("At most two domains. Remove one first."); return; }
-      state.domain.push(v);
-      state.has_obstacle = "yes";
-    }
-    if (state.domain.indexOf("COMMUNICATION_INFORMATION") < 0) state.failure_cause = null;
+  function setDomain(v) {
+    state.domain = state.domain === v ? null : v;
+    if (state.domain) state.has_obstacle = "yes";
+    if (state.domain !== "COMMUNICATION_INFORMATION") state.failure_cause = null;
     render();
   }
   function setLocus(v) {
-    if (state.has_obstacle !== "yes") state.has_obstacle = "yes";
+    state.has_obstacle = "yes";
     state.locus = state.locus === v ? null : v; render();
   }
   function setFc(v) {
-    if (state.domain.indexOf("COMMUNICATION_INFORMATION") < 0) return;
+    if (state.domain !== "COMMUNICATION_INFORMATION") { say("The cause only applies to Communication / information."); return; }
     state.failure_cause = state.failure_cause === v ? null : v; render();
   }
 
   function press(container, pred) {
     Array.prototype.forEach.call(container.children, function (b) { b.setAttribute("aria-pressed", pred(b.dataset.v) ? "true" : "false"); });
   }
+  function usualLocus() {
+    if (!state.domain) return null;
+    if (state.domain === "COMMUNICATION_INFORMATION") { var f = byV(FCS, state.failure_cause); return f ? f.locus : null; }
+    return byV(DOMAINS, state.domain).locus;
+  }
   function render() {
     if (!state) return;
     press($("hasObstacle"), function (v) { return v === state.has_obstacle; });
-    press($("domains"), function (v) { return state.domain.indexOf(v) >= 0; });
+    press($("domains"), function (v) { return v === state.domain; });
     press($("loci"), function (v) { return v === state.locus; });
     press($("fcs"), function (v) { return v === state.failure_cause; });
-    $("domainCount").textContent = String(state.domain.length);
-    $("fcSet").classList.toggle("hidden", state.domain.indexOf("COMMUNICATION_INFORMATION") < 0);
+    var yes = state.has_obstacle === "yes";
+    var other = state.has_obstacle && !yes;
+    $("domainSet").classList.toggle("dim", !!other);
+    $("locusSet").classList.toggle("dim", !!other);
+    $("fcSet").classList.toggle("hidden", state.domain !== "COMMUNICATION_INFORMATION");
+    var u = usualLocus();
+    $("usual").textContent = u ? "Usually " + nameOf(LOCI, u).toLowerCase() + " for this kind, unless the passage says otherwise." : "";
     var ev = $("evList"); ev.innerHTML = "";
     if (!state.evidence.length) {
       var li0 = document.createElement("li"); li0.className = "ev-empty"; li0.style.border = "0"; li0.style.background = "none"; li0.style.padding = "0";
-      li0.textContent = "None yet."; ev.appendChild(li0);
+      li0.textContent = "None (optional)."; ev.appendChild(li0);
     }
     state.evidence.forEach(function (q, idx) {
       var li = document.createElement("li"); li.textContent = "“" + q + "”";
@@ -342,12 +455,8 @@ textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid va
   function renderText() {
     var el = $("text");
     if (!item) return;
-    var t = item.text;
-    var ranges = [];
-    state.evidence.forEach(function (q) {
-      var i = t.indexOf(q);
-      if (i >= 0) ranges.push([i, i + q.length]);
-    });
+    var t = item.text, ranges = [];
+    state.evidence.forEach(function (q) { var i = t.indexOf(q); if (i >= 0) ranges.push([i, i + q.length]); });
     ranges.sort(function (a, b) { return a[0] - b[0]; });
     var merged = [];
     ranges.forEach(function (r) {
@@ -355,7 +464,6 @@ textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid va
       if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]); else merged.push([r[0], r[1]]);
     });
     el.innerHTML = "";
-    // Split into paragraphs while keeping character offsets.
     var re = /\n\s*\n/g, start = 0, m, blocks = [];
     while ((m = re.exec(t)) !== null) { blocks.push([start, m.index]); start = m.index + m[0].length; }
     blocks.push([start, t.length]);
@@ -374,19 +482,25 @@ textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid va
     });
   }
 
-  // ---- evidence from selection
+  // ---- optional evidence from the current selection (keyboard e, or the button on touch screens)
+  var lastSel = "";
+  document.addEventListener("selectionchange", function () {
+    var sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.rangeCount) {
+      var node = sel.getRangeAt(0).commonAncestorContainer;
+      if ($("text").contains(node.nodeType === 1 ? node : node.parentNode)) lastSel = sel.toString();
+    }
+  });
   function addEvidence() {
     var sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.rangeCount) { say("Select some words in the passage first."); return; }
-    var node = sel.getRangeAt(0).commonAncestorContainer;
-    if (!$("text").contains(node.nodeType === 1 ? node : node.parentNode)) { say("Evidence must come from the bordered passage."); return; }
-    var q = sel.toString().replace(/\s+/g, " ").trim();
-    if (!q) return;
-    // Map the (whitespace-normalised) selection back to an exact substring of the source text.
+    var q = (sel && !sel.isCollapsed ? sel.toString() : lastSel).replace(/\s+/g, " ").trim();
+    if (!q) { say("Select some words in the bordered passage first."); return; }
     var exact = findExact(item.text, q);
-    if (exact === null) { say("Could not match that selection; try a shorter span."); return; }
+    if (exact === null) { say("Evidence must come from the bordered passage; try a shorter span."); return; }
     if (state.evidence.indexOf(exact) < 0) state.evidence.push(exact);
-    sel.removeAllRanges();
+    if (sel) sel.removeAllRanges();
+    lastSel = "";
+    $("extras").open = true;
     say("Evidence added.", true);
     render();
   }
@@ -401,7 +515,7 @@ textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid va
   var msgTimer = null;
   function say(t, ok) {
     var m = $("msg"); m.textContent = t; m.className = ok ? "ok" : "";
-    clearTimeout(msgTimer); msgTimer = setTimeout(function () { m.textContent = ""; }, 3500);
+    clearTimeout(msgTimer); msgTimer = setTimeout(function () { m.textContent = ""; }, 4000);
   }
 
   // ---- network
@@ -409,64 +523,183 @@ textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid va
     var opt = body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
     return fetch(BASE + path, opt).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
-        if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+        if (!r.ok) { var e = new Error(j.error || ("HTTP " + r.status)); e.status = r.status; throw e; }
         return j;
       });
+    });
+  }
+
+  // ---- header: set tabs and progress
+  function qState(q) { for (var i = 0; i < queues.length; i++) if (queues[i].queue === q) return queues[i]; return null; }
+  function renderTabs() {
+    var tabs = $("tabs"); tabs.innerHTML = "";
+    tabs.classList.toggle("hidden", queues.length < 2);
+    queues.forEach(function (s) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "tab" + (s.locked ? " locked" : "");
+      b.setAttribute("aria-current", s.queue === queue ? "true" : "false");
+      b.textContent = s.display + " " + s.done + "/" + s.total + (s.locked ? " (locked)" : "");
+      b.title = s.locked ? "Unlocks when you finish the practice items" : "Switch to " + s.display + " (q)";
+      b.addEventListener("click", function () { switchQueue(s.queue); b.blur(); });
+      tabs.appendChild(b);
     });
   }
   function setProgress(p) {
     if (!p) return;
     var pct = p.total ? Math.round(100 * p.done / p.total) : 0;
     $("bar").style.width = pct + "%";
-    $("count").textContent = p.done + " / " + p.total;
+    var left = p.total - p.done;
+    var mins = Math.max(1, Math.round(left * SECONDS_PER_ITEM / 60));
+    $("count").textContent = p.done + " / " + p.total + (left > 0 ? " · ~" + (mins >= 90 ? (Math.round(mins / 6) / 10) + " h" : mins + " min") + " left" : "");
+  }
+  function fmtMin(n) { var m = Math.max(1, Math.round(n * SECONDS_PER_ITEM / 60)); return m >= 90 ? (Math.round(m / 6) / 10) + " hours" : m + " minutes"; }
+
+  // ---- showing items and panels
+  function showPanel(html) {
+    item = null; state = null;
+    $("article").classList.add("hidden"); $("side").classList.add("hidden");
+    var p = $("panel"); p.innerHTML = html; p.classList.remove("hidden");
+    window.scrollTo(0, 0);
   }
   function showItem(j, prefill) {
+    queue = j.queue; queues = j.queues || queues;
+    lsSet(LS + "queue", queue);
+    renderTabs();
     setProgress(j.progress);
-    if (!j.item_id) {
-      item = null; state = null;
-      $("article").classList.add("hidden"); $("doneBox").classList.remove("hidden");
-      $("form").style.visibility = "hidden";
-      return;
-    }
-    $("article").classList.remove("hidden"); $("doneBox").classList.add("hidden");
-    $("form").style.visibility = "visible";
+    feedbackOn = false;
+    $("feedback").classList.add("hidden"); $("form").classList.remove("hidden");
+    if (!j.item_id) { finishedPanel(); return; }
+    $("panel").classList.add("hidden"); $("article").classList.remove("hidden"); $("side").classList.remove("hidden");
     item = { item_id: j.item_id, text: j.text || "", ctx_before: j.ctx_before || "", ctx_after: j.ctx_after || "" };
+    $("plabel").textContent = queue === "practice" ? "Practice \u00b7 judge this passage (you'll see the reference after)" :
+      (queue === "cert" || queue === "retake") ? "Check \u00b7 judge this passage (no feedback in this round)" : "Judge this passage";
     paras($("ctxBefore"), item.ctx_before);
     paras($("ctxAfter"), item.ctx_after);
+    ["ctxBeforeWrap", "ctxAfterWrap"].forEach(function (id) { $(id).classList.remove("open"); $(id).querySelector(".ctx-toggle").textContent = "show all"; });
     $("ctxBeforeWrap").classList.toggle("hidden", !item.ctx_before.trim());
     $("ctxAfterWrap").classList.toggle("hidden", !item.ctx_after.trim());
     state = blank();
     $("note").value = "";
+    var ms = 0;
+    var draft = lsGet(LS + "draft");
     if (prefill) {
       var L = prefill.label || {};
       state.has_obstacle = L.has_obstacle || null;
-      state.domain = (L.domain || []).slice(0, 2);
+      state.domain = Array.isArray(L.domain) ? (L.domain[0] || null) : (L.domain || null);
       state.locus = L.locus || null;
       state.failure_cause = L.failure_cause || null;
       state.evidence = prefill.evidence ? prefill.evidence.split("\n").filter(Boolean) : [];
       $("note").value = L.note || "";
+    } else if (draft && draft.item_id === item.item_id && draft.state) {
+      state = draft.state; state.evidence = state.evidence || [];
+      $("note").value = draft.note || ""; ms = draft.ms || 0;
     }
+    $("extras").open = !!(state.evidence.length || $("note").value);
     render();
     window.scrollTo(0, 0);
-    timerStart();
+    timerStart(ms);
   }
-  function loadNext(prefill) {
+  function finishedPanel() {
+    var next = null;
+    queues.forEach(function (s) { if (!next && !s.locked && s.done < s.total && s.queue !== queue) next = s; });
+    var cur = qState(queue);
+    if (queue === "practice") { practiceSummary(next); return; }
+    if (queue === "cert" || queue === "retake") { certPanel(queue); return; }
+    if (!cur) { showPanel("<h2>Nothing to do yet</h2><p>No passages have been assigned to this link yet. Please check back later.</p>"); return; }
+    showPanel("<h2>" + esc(cur.display) + " finished</h2><p>All " + cur.total + " passages in this set are labelled. Thank you!</p>" +
+      (next ? "<p>You still have <b>" + (next.total - next.done) + "</b> passages in the " + esc(next.display.toLowerCase()) + ".</p><button class='primary' id='goNext'>Go to " + esc(next.display) + " <kbd>Enter</kbd></button>" :
+        "<p>You can close this page. (Press u to reopen your last answer.)</p>"));
+    if (next) $("goNext").addEventListener("click", function () { switchQueue(next.queue); });
+  }
+  function nameRow(l) {
+    if (l.has_obstacle !== "yes") return nameOf(HAS, l.has_obstacle);
+    return nameOf(DOMAINS, l.domain) + " \u00b7 " + nameOf(LOCI, l.locus);
+  }
+  function certPanel(round) {
+    api("/cert_review?round=" + round).then(function (j) {
+      var n = j.n, okObs = Math.round(j.obs_agree * n);
+      var head = "<p>Obstacle yes/no matched the reference on <b>" + okObs + " of " + n + "</b>; agreement on where the resistance comes from (corrected for chance): <b>" + j.locus_kappa.toFixed(2) + "</b>. To pass you need at least 75% and 0.60.</p>";
+      var html;
+      if (j.passed || j.status === "passed" || j.status === "override") {
+        var main = qState("audit") || qState("teaching");
+        html = "<h2>You passed the check</h2>" + head + "<p>Thank you for reading carefully. The main set is now unlocked.</p>" +
+          (main ? "<button class='primary' id='goNext'>Start the " + esc(main.display.toLowerCase()) + " <kbd>Enter</kbd></button>" : "");
+        showPanel(html + missList(j.misses));
+        if (main) $("goNext").addEventListener("click", function () { switchQueue(main.queue); });
+        return;
+      }
+      if (j.status === "failed_retake_available" || j.status === "in_retake") {
+        html = "<h2>Not quite yet</h2>" + head + "<p>That is normal for a first try. Below are the passages where your answer differed from the reference, with the reasons. Read them, look again at the guide's tricky cases, then take the second check (20 new passages). There is no time limit.</p>" +
+          "<button class='primary' id='goNext'>Start the second check <kbd>Enter</kbd></button>";
+        showPanel(html + missList(j.misses));
+        $("goNext").addEventListener("click", function () { switchQueue("retake"); });
+        return;
+      }
+      showPanel("<h2>Thank you</h2>" + head + "<p>Your answers differed from the reference a bit too often for the main set this time. The study team will get in touch with you. Your work on these passages is still useful for training.</p>" + missList(j.misses));
+    }).catch(function (e) { showPanel("<h2>Round finished</h2><p>(" + esc(e.message) + ")</p>"); });
+  }
+  function missList(m) {
+    if (!m || !m.length) return "";
+    return "<h3 style='font-family:var(--sans);font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--red);margin-top:26px'>Where you differed (" + m.length + ")</h3>" +
+      m.map(function (x) {
+        return "<div class='miss'><p class='ex'>" + esc(x.excerpt) + "</p><table class='cmp'><tr><th>You</th><td class='diff'>" + esc(nameRow(x.label)) +
+          "</td></tr><tr><th>Reference</th><td class='same'>" + esc(nameRow(x.reference)) + "</td></tr></table><div class='rationale'><b>Why</b>" + esc(x.reference.rationale) + "</div></div>";
+      }).join("");
+  }
+  function practiceSummary(next) {
+    api("/practice_review").then(function (j) {
+      var n = j.items.length, h = 0, d = 0, nd = 0, l = 0;
+      j.items.forEach(function (r) {
+        if (r.label.has_obstacle === r.reference.has_obstacle) h++;
+        if (r.reference.has_obstacle === "yes" && r.label.has_obstacle === "yes") { nd++; if (r.label.domain === r.reference.domain) d++; if (r.label.locus === r.reference.locus) l++; }
+      });
+      showPanel("<h2>Practice finished</h2>" +
+        "<p>Obstacle yes/no: you matched the reference on <b>" + h + " of " + n + "</b>.</p>" +
+        (nd ? "<p>Where you both saw an obstacle: same kind on <b>" + d + " of " + nd + "</b>, same source on <b>" + l + " of " + nd + "</b>.</p>" : "") +
+        "<p>Experts disagree on some of these too; the point is to share the same rules. If a feedback note surprised you, have another look at the guide's tricky cases.</p>" +
+        (next ? "<p>The " + esc(next.display.toLowerCase()) + " is now unlocked: <b>" + (next.total - next.done) + "</b> passages, about " + fmtMin(next.total - next.done) + " in total. You do not need to do it in one sitting.</p><button class='primary' id='goNext'>Start the " + esc(next.display.toLowerCase()) + " <kbd>Enter</kbd></button>" : ""));
+      if (next) $("goNext").addEventListener("click", function () { switchQueue(next.queue); });
+    }).catch(function (e) { showPanel("<h2>Practice finished</h2><p>(" + esc(e.message) + ")</p>"); });
+  }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  function loadNext(q, prefill) {
     busy = true;
-    return api("/next").then(function (j) { showItem(j, prefill); })
-      .catch(function (e) { say("Could not load: " + e.message); })
+    var path = "/next" + (q ? "?queue=" + encodeURIComponent(q) : "");
+    return api(path).then(function (j) { showItem(j, prefill); })
+      .catch(function (e) {
+        if (e.status === 423 || e.status === 404) return loadNext(null, prefill);
+        say("Could not load: " + e.message);
+      })
       .then(function () { busy = false; });
+  }
+  function switchQueue(q) {
+    if (busy) return;
+    var s = qState(q);
+    if (!s) return;
+    if (s.locked) { say("Finish the practice items first; then this set unlocks."); return; }
+    saveDraft();
+    loadNext(q);
+  }
+  function cycleQueue() {
+    var open = queues.filter(function (s) { return !s.locked; });
+    if (open.length < 2) return;
+    var i = 0; for (; i < open.length; i++) if (open[i].queue === queue) break;
+    switchQueue(open[(i + 1) % open.length].queue);
   }
 
   function submit() {
-    if (busy || !state || !item) return;
-    if (!state.has_obstacle) { say("Choose yes, no (0) or insufficient context first."); return; }
-    if (state.has_obstacle === "yes" && !state.domain.length) { say("Pick at least one domain (1–9, o)."); return; }
-    if (state.has_obstacle === "yes" && !state.locus) { say("Pick a locus (m, s, p)."); return; }
+    if (busy || !state || !item || feedbackOn) return;
+    if (!state.has_obstacle) { say("Answer question 1 first: yes (y), no (n) or can’t tell (c)."); return; }
+    if (state.has_obstacle === "yes" && !state.domain) { say("Pick what kind of thing is in the way (1–9, o)."); return; }
+    if (state.domain === "COMMUNICATION_INFORMATION" && !state.failure_cause) { say("Pick why the communication fails (Shift+1–6)."); return; }
+    if (state.has_obstacle === "yes" && !state.locus) { say("Pick where the resistance comes from (m, s, i)."); return; }
+    var yes = state.has_obstacle === "yes";
     var label = {
       has_obstacle: state.has_obstacle,
-      domain: state.has_obstacle === "yes" ? state.domain : [],
-      locus: state.has_obstacle === "yes" ? state.locus : null,
-      failure_cause: state.domain.indexOf("COMMUNICATION_INFORMATION") >= 0 ? state.failure_cause : null,
+      domain: yes ? state.domain : null,
+      locus: yes ? state.locus : null,
+      failure_cause: yes && state.domain === "COMMUNICATION_INFORMATION" ? state.failure_cause : null,
       note: $("note").value.trim()
     };
     busy = true;
@@ -475,66 +708,158 @@ textarea:focus, .opt:focus-visible, button:focus-visible { outline: 2px solid va
       label_json: label,
       evidence_text: state.evidence.join("\n"),
       seconds_spent: Math.round(timerSeconds() * 10) / 10
-    }).then(function () { say("Saved.", true); busy = false; return loadNext(); })
-      .catch(function (e) { busy = false; say("Not saved: " + e.message); });
-  }
-  function undo() {
-    if (busy) return;
-    busy = true;
-    api("/undo", {}).then(function (j) {
+    }).then(function (j) {
       busy = false;
-      if (!j.undone) { setProgress(j.progress); say("Nothing to undo."); return; }
+      lsSet(LS + "draft", null);
+      queues = j.queues || queues;
+      renderTabs(); setProgress(j.progress);
+      if (j.feedback) { showFeedback(label, j.feedback); return; }
+      say("Saved.", true);
+      return loadNext(queue);
+    }).catch(function (e) {
+      busy = false;
+      if (e.status === 409) { say("Already saved."); return loadNext(queue); }
+      say("Not saved: " + e.message + ". Check your connection and press Enter again.");
+    });
+  }
+  function showFeedback(mine, ref) {
+    feedbackOn = true;
+    timerPause();
+    var rows = [["Obstacle?", nameOf(HAS, mine.has_obstacle), nameOf(HAS, ref.has_obstacle)]];
+    if (mine.has_obstacle === "yes" || ref.has_obstacle === "yes") {
+      rows.push(["Kind", nameOf(DOMAINS, mine.domain), nameOf(DOMAINS, ref.domain)]);
+      if (mine.domain === "COMMUNICATION_INFORMATION" || ref.domain === "COMMUNICATION_INFORMATION")
+        rows.push(["Why it fails", nameOf(FCS, mine.failure_cause), nameOf(FCS, ref.failure_cause)]);
+      rows.push(["Source", nameOf(LOCI, mine.locus), nameOf(LOCI, ref.locus)]);
+    }
+    var body = $("cmpBody"); body.innerHTML = "";
+    rows.forEach(function (r) {
+      var same = r[1] === r[2];
+      var tr = document.createElement("tr");
+      var th = document.createElement("td"); th.innerHTML = esc(r[0]) + "<br><span class='verdict " + (same ? "same" : "diff") + "'>" + (same ? "same" : "different") + "</span>";
+      var a = document.createElement("td"); a.textContent = r[1]; a.className = same ? "same" : "diff";
+      var b = document.createElement("td"); b.textContent = r[2]; b.className = same ? "same" : "diff";
+      tr.appendChild(th); tr.appendChild(a); tr.appendChild(b); body.appendChild(tr);
+    });
+    $("rationale").textContent = ref.rationale || "";
+    $("form").classList.add("hidden"); $("feedback").classList.remove("hidden");
+    if (window.matchMedia("(max-width: 900px)").matches) $("feedback").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function afterFeedback() { if (!busy) loadNext(queue); }
+
+  function undo() {
+    if (busy || feedbackOn) return;
+    if (queue === "practice" || queue === "cert" || queue === "retake") { say("Practice and check answers are final."); return; }
+    busy = true;
+    api("/undo", { queue: queue }).then(function (j) {
+      busy = false;
+      if (!j.undone) { setProgress(j.progress); say("Nothing to undo in this set."); return; }
+      lsSet(LS + "draft", null);
       say("Reopened your last submission.", true);
-      return loadNext({ label: j.previous_label, evidence: j.evidence_text });
+      return loadNext(queue, { label: j.previous_label, evidence: j.evidence_text });
     }).catch(function (e) { busy = false; say("Undo failed: " + e.message); });
   }
 
-  // ---- help
-  function toggleHelp(show) {
-    var h = $("help");
+  // ---- overlays
+  function toggle(id, show) {
+    var h = $(id);
     var on = show === undefined ? h.classList.contains("hidden") : show;
     h.classList.toggle("hidden", !on);
+    return on;
   }
-  $("helpBtn").addEventListener("click", function () { toggleHelp(); });
-  $("help").addEventListener("click", function (e) { if (e.target === $("help")) toggleHelp(false); });
+  function openBreak() {
+    saveDraft();
+    paused = true; timerPause();
+    var s = qState(queue);
+    $("pauseStats").textContent = s ? "So far in the " + s.display.toLowerCase() + ": " + s.done + " of " + s.total + " done." : "";
+    toggle("pause", true);
+  }
+  function closeBreak() { paused = false; toggle("pause", false); timerResume(); }
+  function openGuide() { window.open("/annotate/guide", "_blank", "noopener,noreferrer"); }
+
+  function welcome(j) {
+    var st = j.queues || [];
+    if (!st.length) return false;
+    var any = st.some(function (s) { return s.done > 0; });
+    if (any || lsGet(LS + "welcomed")) return false;
+    var pr = qState("practice"), main = qState("audit"), te = qState("teaching");
+    var html = "<p>You will read short passages (about 350 words) from novels and stories published 1800–1929 and answer three quick questions about each. Most take <b>25–35 seconds</b>.</p>";
+    var ce = qState("cert");
+    if (pr) html += "<p><b>Start with the guide</b> (about 10 minutes). Then do <b>" + pr.total + " practice passages</b>: after each one you will see a reference answer and a short explanation.</p>";
+    if (ce) html += "<p>Next comes a <b>check</b> of " + ce.total + " passages without feedback (about " + fmtMin(ce.total) + "). It unlocks the main set when your answers mostly agree with the reference. If not, you get to review your misses and take one second check.</p>";
+    if (main) html += "<p>The main set has <b>" + main.total + "</b> passages, about " + fmtMin(main.total) + " in total. Work in sessions of 20–30 minutes; use <b>Break</b> at the top (key <kbd>b</kbd>) to pause. Everything you submit is saved at once, and your personal link brings you back to where you stopped.</p>";
+    if (te) html += "<p>You also have a separate teaching set of " + te.total + " passages (tab at the top).</p>";
+    html += "<p><b>When you are unsure, choose “Can’t tell”.</b> That is a real answer, not a failure.</p><p style='color:var(--muted)'>You will never see which book a passage comes from. Please don’t look it up.</p>";
+    $("welcomeBody").innerHTML = html;
+    toggle("welcome", true);
+    return true;
+  }
+  function closeWelcome() { lsSet(LS + "welcomed", true); toggle("welcome", false); }
+
+  $("helpBtn").addEventListener("click", function () { toggle("help"); });
+  $("breakBtn").addEventListener("click", openBreak);
+  $("resumeBtn").addEventListener("click", closeBreak);
+  $("startBtn").addEventListener("click", closeWelcome);
+  ["help", "welcome"].forEach(function (id) { $(id).addEventListener("click", function (e) { if (e.target === $(id)) toggle(id, false); }); });
   $("submitBtn").addEventListener("click", submit);
   $("undoBtn").addEventListener("click", undo);
+  $("nextBtn").addEventListener("click", afterFeedback);
+  Array.prototype.forEach.call(document.querySelectorAll(".ctx-toggle"), function (b) {
+    b.addEventListener("click", function () {
+      var w = $(b.dataset.for), open = !w.classList.contains("open");
+      w.classList.toggle("open", open); b.textContent = open ? "show less" : "show all"; b.blur();
+    });
+  });
+  $("evBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
+  $("evBtn").addEventListener("click", function () { if (state && item) addEvidence(); });
 
   // ---- keyboard
   document.addEventListener("keydown", function (e) {
     var tag = (e.target && e.target.tagName) || "";
-    var typing = tag === "TEXTAREA" || tag === "INPUT";
-    if (typing) {
+    if (tag === "TEXTAREA" || tag === "INPUT") {
       if (e.key === "Escape") { e.target.blur(); e.preventDefault(); }
       else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.target.blur(); submit(); }
       return;
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    var helpOpen = !$("help").classList.contains("hidden");
-    if (e.key === "?" || e.key === "h") { toggleHelp(); e.preventDefault(); return; }
-    if (helpOpen) { if (e.key === "Escape") toggleHelp(false); return; }
+    if (!$("welcome").classList.contains("hidden")) { if (e.key === "Enter" || e.key === "Escape") { closeWelcome(); e.preventDefault(); } return; }
+    if (paused) { if (e.key === "Enter" || e.key === "b" || e.key === "Escape") { closeBreak(); e.preventDefault(); } return; }
+    if (e.key === "?" || e.key === "h") { toggle("help"); e.preventDefault(); return; }
+    if (!$("help").classList.contains("hidden")) { if (e.key === "Escape") toggle("help", false); return; }
+    if (e.key === "b") { openBreak(); e.preventDefault(); return; }
+    if (e.key === "g") { openGuide(); e.preventDefault(); return; }
+    if (e.key === "q") { cycleQueue(); e.preventDefault(); return; }
     if (e.key === "u") { undo(); e.preventDefault(); return; }
-    if (!state) return;
-    if (e.shiftKey && /^Digit[1-5]$/.test(e.code)) { setFc(FCS[+e.code.slice(5) - 1].v); e.preventDefault(); return; }
-    if (e.key === "Enter") { if (e.target && e.target.tagName === "BUTTON") return; submit(); e.preventDefault(); return; }
+    if (feedbackOn) { if (e.key === "Enter" || e.key === " ") { afterFeedback(); e.preventDefault(); } return; }
+    if (!state) { if (e.key === "Enter" && $("goNext")) { $("goNext").click(); e.preventDefault(); } return; }
+    if (e.shiftKey && /^Digit[1-6]$/.test(e.code)) { setFc(FCS[+e.code.slice(5) - 1].v); e.preventDefault(); return; }
+    if (e.key === "Enter") { if (e.target && e.target.tagName === "BUTTON" && e.target.id !== "submitBtn") return; submit(); e.preventDefault(); return; }
     if (e.shiftKey) return;
-    if (/^[1-9]$/.test(e.key)) { toggleDomain(DOMAINS[+e.key - 1].v); e.preventDefault(); return; }
+    if (/^[1-9]$/.test(e.key)) { setDomain(DOMAINS[+e.key - 1].v); e.preventDefault(); return; }
     switch (e.key) {
-      case "0": case "n": setHas("no"); break;
       case "y": setHas("yes"); break;
-      case "i": setHas("insufficient_context"); break;
-      case "o": toggleDomain("OTHER"); break;
+      case "n": setHas("no"); break;
+      case "c": setHas("insufficient_context"); break;
+      case "o": setDomain("OTHER"); break;
       case "m": setLocus("material_external"); break;
       case "s": setLocus("social_institutional"); break;
-      case "p": setLocus("internal_psychological"); break;
+      case "i": setLocus("internal_psychological"); break;
       case "e": addEvidence(); break;
-      case "t": $("note").focus(); break;
+      case "t": $("extras").open = true; $("note").focus(); break;
       default: return;
     }
     e.preventDefault();
   });
 
-  loadNext();
+  // ---- start: resume the set used last time (if still open), else the server's default
+  var startQ = lsGet(LS + "queue");
+  busy = true;
+  api("/state").then(function (st) {
+    var s = null;
+    (st.queues || []).forEach(function (x) { if (x.queue === startQ && !x.locked && x.done < x.total) s = x; });
+    return api("/next" + (s ? "?queue=" + encodeURIComponent(s.queue) : ""));
+  }).then(function (j) { busy = false; showItem(j); welcome(j); })
+    .catch(function (e) { busy = false; say("Could not load: " + e.message); });
 })();
 </script>
 </body>

@@ -92,3 +92,11 @@ npm run dev                                       # http://localhost:8787
 - **Endpoints:**
   - Admin-only: `PUT /v1/admin/dist/<file>`, `PUT /v1/admin/client_release`, `PUT /v1/admin/install/<install.sh|install.ps1>`.
   - Public (no auth): `/v1/ping`, `/v1/registry`, `/v1/bwtest`, `/dist/<file>`, `/install.sh`, `/install.ps1`.
+
+## Human annotation (blind UI at `/annotate/<token>`, guide at `/annotate/guide`)
+
+- Sets: `practice` (20 items, the reference + rationale are shown after each answer), `cert` (20, no feedback), `retake` (20, offered once if cert fails), `audit` (main set) and `teaching` (student only).
+- Gate: an annotator with practice/cert items must finish practice, then pass cert (locus kappa >= 0.60 on none/material/social/internal, and obstacle yes vs not-yes agreement >= 0.75), before `audit`/`teaching` unlock. Annotators without gate items (the expert) are never gated. Override with `POST /v1/admin/ann_cert {name, decision: pass|revoke|clear}`.
+- Admin: `POST /v1/admin/annotators`, `POST /v1/admin/ann_items` (<= 250 per call; `reference` is required on practice/cert/retake and refused elsewhere), `GET /v1/admin/ann_labels` (`practice: true` marks gate-set labels), `GET /v1/admin/ann_status` (per-queue progress + cert status and scores).
+- The guide page is rendered from `docs/annotator_guide.md` by `scripts/build-html.mjs` (run by test/dev/deploy).
+- Day-to-day use goes through `pipeline/annotators.py` (create / links / upload / export / progress) and `analysis/build_annotation_queues.py` (practice / build).
