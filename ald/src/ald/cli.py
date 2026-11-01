@@ -311,7 +311,7 @@ def setup(
     reg, src = load_registry(cfg, registry_path)
     tier = tier_override or cfg.tier or reg.select_tier(hw.usable_vram_gb)["name"]
     from . import ollama_env as oenv
-    want_env = oenv.tier_env(reg, tier, hw.accel)
+    want_env = oenv.tier_env(reg, tier, hw.accel, cfg.host_prompt_cache_mb)
     if not backend.available():
         started = start_ollama(hw.os, want_env if cfg.manage_ollama else None)
         if started and _wait_for_ollama(backend, 45):

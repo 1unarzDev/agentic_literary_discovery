@@ -17,8 +17,11 @@ def home(tmp_path, monkeypatch):
 
 def test_wanted_env():
     assert oe.wanted_env(2, "cuda") == {"OLLAMA_NUM_PARALLEL": "2", "OLLAMA_KEEP_ALIVE": "30m",
-                                        "OLLAMA_FLASH_ATTENTION": "1"}
-    assert oe.wanted_env(None, "cpu") == {"OLLAMA_NUM_PARALLEL": "1", "OLLAMA_KEEP_ALIVE": "30m"}
+                                        "OLLAMA_FLASH_ATTENTION": "1", "OLLAMA_MAX_LOADED_MODELS": "1",
+                                        "LLAMA_ARG_CACHE_RAM": "0"}
+    assert oe.wanted_env(None, "cpu") == {"OLLAMA_NUM_PARALLEL": "1", "OLLAMA_KEEP_ALIVE": "30m",
+                                          "OLLAMA_MAX_LOADED_MODELS": "1", "LLAMA_ARG_CACHE_RAM": "0"}
+    assert oe.wanted_env(2, "cuda", host_prompt_cache_mb=1024)["LLAMA_ARG_CACHE_RAM"] == "1024"
     assert oe.wanted_env(6, "metal")["OLLAMA_FLASH_ATTENTION"] == "1"
 
 
@@ -62,7 +65,7 @@ def test_linux_user_ollama_restarted_only_when_its_env_differs(home, monkeypatch
     rep = oe.ensure(env, url="http://x", log=lambda m: None)
     assert not rep["restarted"] and calls["stop"] == 0
     assert (home / "config" / "ollama.env").read_text() == \
-        "OLLAMA_FLASH_ATTENTION=1\nOLLAMA_KEEP_ALIVE=30m\nOLLAMA_NUM_PARALLEL=6\n"
+        "LLAMA_ARG_CACHE_RAM=0\nOLLAMA_FLASH_ATTENTION=1\nOLLAMA_KEEP_ALIVE=30m\nOLLAMA_MAX_LOADED_MODELS=1\nOLLAMA_NUM_PARALLEL=6\n"
     calls = _fake(monkeypatch, platform="linux", match=False)
     rep = oe.ensure(env, url="http://x", log=lambda m: None)
     assert rep["restarted"] and calls["stop"] == 1 and calls["start"][0][0] == env

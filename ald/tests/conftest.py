@@ -334,6 +334,7 @@ def env(tmp_path, registry_raw, hw16):
     e.run = FakeRun()
     e.reexec_calls = []
     e.logs = []
+    e.ram_avail = 64 * GB  # psutil available RAM (bytes)
     e.gpu_used = None  # VRAM in use (GB) as nvidia-smi would report it; None = unknown
 
     def make_worker(**kw: Any) -> Worker:
@@ -346,7 +347,8 @@ def env(tmp_path, registry_raw, hw16):
                           clock=clock.time, which=lambda n: "/usr/bin/uv", log=e.logs.append)
         defaults = dict(data_root=e.root, hw=hw16, clock=clock, storage=storage, updater=updater,
                         auto_update=False, background=False, exit_when_idle=True, max_concurrency=1,
-                        log=e.logs.append, rng=random.Random(0), gpu_used_fn=lambda: e.gpu_used)
+                        log=e.logs.append, rng=random.Random(0), gpu_used_fn=lambda: e.gpu_used,
+                        ram_available_fn=lambda: e.ram_avail)
         defaults.update(kw)
         return Worker(cfg, client, backend, **defaults)
 

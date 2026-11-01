@@ -125,6 +125,8 @@ class Config:
     gpu_lock: str | None = None          # flock(2) path shared with other GPU programs (Linux/macOS)
     auto_update: bool = True
     keep_awake: bool = True              # False = allow sleep while working
+    min_free_ram_gb: float = 8.0         # pause / hand back work when available system RAM drops below this
+    host_prompt_cache_mb: int = 0        # llama-server host-RAM prompt cache (LLAMA_ARG_CACHE_RAM); 0 = off
 
     @classmethod
     def load(cls) -> "Config":

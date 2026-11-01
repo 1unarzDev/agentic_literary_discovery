@@ -130,6 +130,7 @@ class Worker:
         manage_ollama: bool = False,
         active_hours: str | None = None,
         gpu_used_fn: Callable[[], float | None] | None = None,
+        ram_available_fn: Callable[[], float] | None = None,
     ):
         self.cfg = cfg
         self.client = client
@@ -195,6 +196,10 @@ class Worker:
             from .hw import gpu_memory_used_gb
             gpu_used_fn = gpu_memory_used_gb
         self.gpu_used_fn = gpu_used_fn
+        if ram_available_fn is None:
+            import psutil
+            ram_available_fn = lambda: float(psutil.virtual_memory().available)  # noqa: E731
+        self.ram_available_fn = ram_available_fn
         self.activity = "starting"
         self.last_quality: dict[str, Any] | None = None
         self.keep_awake: Any = None  # KeepAwake (set by `ald work`)
@@ -708,9 +713,21 @@ class Worker:
     # ------------------------------------------------------------------
     # Running one job
     # ------------------------------------------------------------------
+    _ram_avail_gb: float = 0.0
+
+    def ram_low(self, factor: float = 1.0) -> bool:
+        """Available system RAM below ``factor`` x min_free_ram_gb (default 8 GB, `ald config`)."""
+        limit = float(self.cfg.min_free_ram_gb or 0) * factor
+        if limit <= 0:
+            return False
+        try:
+            self._ram_avail_gb = self.ram_available_fn() / GB
+        except Exception:  # noqa: BLE001
+            return False
+        return self._ram_avail_gb < limit
+
     def paused(self) -> bool:
-        from .config import pause_marker
-        return pause_marker().exists()
+        return (self.root / "paused").exists()  # = config.pause_marker() for the real data dir
 
     def _interrupt_reason(self, hj: HeldJob) -> str | None:
         if self.stop.is_set():
@@ -720,6 +737,10 @@ class Worker:
             self._last_pause_check = now
             if self.paused():
                 return "paused"
+            # Hand the job back well before the host runs out of memory (other programs may be growing).
+            if self.ram_low(factor=0.75):
+                self.log(f"[ram] {self._ram_avail_gb:.1f} GB available: interrupting {hj.job_id}")
+                return "low_memory"
         if hj.revoked.is_set():
             return "revoked"
         if self.window.expired():
@@ -1107,8 +1128,8 @@ class Worker:
         try:
             reg = self._registry
             tier = self.tier or (reg.select_tier(self.hw.usable_vram_gb)["name"] if reg else None)
-            env = (ollama_env.tier_env(reg, tier, self.hw.accel) if (reg and tier)
-                   else ollama_env.wanted_env(None, self.hw.accel))
+            env = (ollama_env.tier_env(reg, tier, self.hw.accel, self.cfg.host_prompt_cache_mb) if (reg and tier)
+                   else ollama_env.wanted_env(None, self.hw.accel, host_prompt_cache_mb=self.cfg.host_prompt_cache_mb))
             if reg and tier:
                 self.measure_foreign_vram()
                 np_eff = self.effective_parallel(reg, tier)
@@ -1218,6 +1239,17 @@ class Worker:
                     self._release_gpu_lock()
                     self._save_state()
                     if self.exit_when_idle or self.clock.sleep(10.0, self.stop):
+                        break
+                    continue
+                if self.ram_low():
+                    if self.activity != "low_memory":
+                        self.log(f"[ram] only {self._ram_avail_gb:.1f} GB of system RAM available "
+                                 f"(< {self.cfg.min_free_ram_gb:g} GB): not leasing; freeing ours")
+                    self.activity = "low_memory"
+                    self._unload_stage_models("low system RAM")
+                    self._release_gpu_lock()
+                    self._save_state()
+                    if self.exit_when_idle or self.clock.sleep(60.0, self.stop):
                         break
                     continue
                 if not in_active_hours(self.active_hours, self.clock.time()):

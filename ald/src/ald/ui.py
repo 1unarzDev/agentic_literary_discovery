@@ -281,6 +281,8 @@ SETTINGS: list[tuple[str, str, str]] = [
     ("gpu_lock", "GPU lock file shared with other programs (Linux/macOS; empty = none)", "str"),
     ("auto_update", "Install updates automatically", "bool"),
     ("keep_awake", "Keep the computer awake while working (off = allow sleep)", "bool"),
+    ("min_free_ram_gb", "Keep at least this much system RAM available (GB; default 8)", "float"),
+    ("host_prompt_cache_mb", "Ollama host-RAM prompt cache in MB (default 0 = off)", "int0"),
 ]
 
 
@@ -294,6 +296,11 @@ def parse_setting(kind: str, raw: str) -> Any:
         raise ValueError("answer yes or no")
     if raw == "" or raw.lower() in ("none", "-"):
         return None
+    if kind == "int0":
+        v = int(raw)
+        if v < 0:
+            raise ValueError("must be >= 0")
+        return v
     if kind == "int":
         v = int(raw)
         if v < 1:

@@ -105,9 +105,7 @@ def test_lean_schema_flagging(reply, flagged):
 
 # --- 5. pause / resume ------------------------------------------------------------------------------------
 def test_pause_interrupts_job_uploads_partial_and_blocks_updates(env, monkeypatch, tmp_path):
-    from ald import config as cfgmod
-    marker = tmp_path / "paused"
-    monkeypatch.setattr(cfgmod, "pause_marker", lambda: marker)
+    marker = env.root / "paused"
     env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 6))
 
     def on_chat(body, n):
@@ -183,3 +181,42 @@ def test_our_own_resident_model_is_not_foreign(env):
     env.ollama.loaded["m"] = int(6.0 * 1024 ** 3)
     env.gpu_used = 6.8  # 6.0 GB our model + its CUDA context
     assert w.measure_foreign_vram() < 0.5
+
+
+# --- host RAM guard -------------------------------------------------------------------------------------
+def test_low_ram_pauses_leasing_and_frees_models(env):
+    from ald.scheduler import GB
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 2))
+    env.ram_avail = 6 * GB  # < 8 GB default reserve
+    env.ollama.loaded[env.registry.stages["label"].model_ref] = 1
+    w = env.make_worker()
+    w.run()  # exit_when_idle
+    assert env.coord.state == {"job-1": "queued"}  # nothing leased
+    assert env.registry.stages["label"].model_ref in env.ollama.unloads
+    assert any("[ram]" in m and "not leasing" in m for m in env.logs)
+
+
+def test_ram_drop_mid_job_hands_work_back(env):
+    from ald.scheduler import GB
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 6))
+
+    def on_chat(body, n):
+        if n == 2:
+            env.ram_avail = 3 * GB  # another program grew (e.g. a Unity build)
+            env.clock.advance(10)
+
+    env.ollama.on_chat = on_chat
+    w = env.make_worker()
+    w.run()
+    assert env.coord.state == {"job-1": "queued"} and [p["partial"] for p in env.coord.puts] == [True]
+    assert any("interrupting job-1" in m for m in env.logs)
+
+
+def test_ram_reserve_configurable(env):
+    from ald.scheduler import GB
+    env.ram_avail = 6 * GB
+    w = env.make_worker()
+    w.cfg.min_free_ram_gb = 4.0
+    assert w.ram_low() is False
+    w.cfg.min_free_ram_gb = 0
+    assert w.ram_low() is False

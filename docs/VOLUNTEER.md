@@ -129,6 +129,8 @@ After saving, the menu offers to restart the worker.
 | `gpu_lock` | share the GPU with other programs (Linux/macOS) |
 | `auto_update` | `yes` / `no` |
 | `keep_awake` | `no` lets the computer sleep while working |
+| `min_free_ram_gb` | ald stops taking work, hands back the current batch and frees its model when available system RAM falls below this (default 8 GB) |
+| `host_prompt_cache_mb` | Ollama's host-RAM prompt cache (default 0 = off; its built-in default of 8 GB can starve a 16-32 GB machine) |
 
 ## Stopping, pausing, uninstalling
 

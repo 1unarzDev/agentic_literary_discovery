@@ -35,8 +35,19 @@ DROPIN = Path("/etc/systemd/system/ollama.service.d/ald.conf")
 Log = Callable[[str], None]
 
 
-def wanted_env(num_parallel: int | None, accel: str, kv_cache_type: str | None = None) -> dict[str, str]:
-    env = {"OLLAMA_NUM_PARALLEL": str(max(1, int(num_parallel or 1))), "OLLAMA_KEEP_ALIVE": KEEP_ALIVE}
+HOST_PROMPT_CACHE_MB = 0  # llama-server's host-RAM prompt cache; its 8 GiB default nearly froze a 31 GB host
+
+
+def wanted_env(num_parallel: int | None, accel: str, kv_cache_type: str | None = None,
+               host_prompt_cache_mb: int | None = None) -> dict[str, str]:
+    env = {"OLLAMA_NUM_PARALLEL": str(max(1, int(num_parallel or 1))), "OLLAMA_KEEP_ALIVE": KEEP_ALIVE,
+           # One resident model: every loaded model has its own runner with host buffers and mapped weights.
+           "OLLAMA_MAX_LOADED_MODELS": "1",
+           # Ollama's llama-server runner inherits the server environment and reads LLAMA_ARG_* variables.
+           # Its prompt cache keeps finished slots' KV in system RAM (~1.4-1.7 GiB per 4096-token slot here,
+           # up to 8 GiB by default). Passages are never repeated and every slot keeps the shared system
+           # prefix in its own KV, so the cache buys little and costs a lot of RAM.
+           "LLAMA_ARG_CACHE_RAM": str(HOST_PROMPT_CACHE_MB if host_prompt_cache_mb is None else int(host_prompt_cache_mb))}
     if accel in ("cuda", "metal", "rocm") or kv_cache_type:
         env["OLLAMA_FLASH_ATTENTION"] = "1"  # a quantized KV cache requires flash attention
     if kv_cache_type:
@@ -44,8 +55,9 @@ def wanted_env(num_parallel: int | None, accel: str, kv_cache_type: str | None =
     return env
 
 
-def tier_env(registry: Any, tier: str, accel: str) -> dict[str, str]:
-    return wanted_env(registry.num_parallel_hint(tier), accel, registry.kv_cache_type_hint(tier))
+def tier_env(registry: Any, tier: str, accel: str, host_prompt_cache_mb: int | None = None) -> dict[str, str]:
+    return wanted_env(registry.num_parallel_hint(tier), accel, registry.kv_cache_type_hint(tier),
+                      host_prompt_cache_mb)
 
 
 def _marker() -> Path:
