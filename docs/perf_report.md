@@ -58,6 +58,33 @@ Two fixes, released in ald 0.1.5:
 
 With both fixes the worker can reach c=4..8, where the plateau is flat; it starts from the benchmark's best level.
 
+## Re-run with production-like bench passages (ald 0.1.7+): the decisive table
+
+Same machine (COLLIN, RTX 3060 12 GB) and same v0.8 label pin (num_ctx 8192, f16 KV cache, flash attention).
+The bench used 48 distinct passages of ~330 words plus context (prompt ≈ 2,380 tokens, as in production).
+100% on GPU throughout.
+
+| c | NP=2 | NP=4 |
+|---|---|---|
+| 1 | **1,182** (49 tok/s, 3.0 s) | 848 (35 tok/s, 4.2 s) |
+| 2 | **1,349** (57, 5.3 s) | 922 (38, 7.8 s) |
+| 4 | 1,336 (59, 10.3 s) | 1,030 (45, 13.7 s) |
+| 6 | 1,358 (59, 14.8 s) | 1,013 (42, 20.1 s) |
+| 8 | **1,369** (58, 18.9 s) | 997 (42, 26.3 s) |
+| VRAM | 10.6 / 12.0 GB | 11.3 / 12.0 GB |
+
+- **With realistic prompts, NP=2 beats NP=4 by about 30% on 12 GB, at every c, even c=1.** The earlier NP=4
+  result came from the old bench, where cached repeated prompts hid prefill. Adding KV slots at num_ctx 8192
+  pushes the 3060 to 11.3 of 12 GB and slows every request.
+- So with the v0.8 settings, t12 should run NP=2 with c≈2-8 (flat), not NP=4.
+- The new bench predicts production: production shard `00127` ran at 998/h with NP=4/c=4; the bench says
+  1,030/h.
+- Auto-tuner at NP=4 from c=1: c=2 measured only 5% better than c=1 (879 vs 836/h, below the 5% gain rule), so it
+  settled at c=1. The c=4 optimum (1,030) is only 17% above, and that is within this regime's noise. Starting at
+  the tier hint (ald 0.1.9) avoids crawling up from c=1.
+- **v0.9** (num_ctx 4096, `kv_cache_type_hint` q8_0) is a different regime: per-slot KV is about 1/4 of v0.8. NP
+  must be re-measured there with this realistic bench before raising t12 above 2.
+
 ## Why production ran at about half (or less) of the bench
 
 From the result index (`/v1/admin/results` stats) for COLLIN's real label shards:
