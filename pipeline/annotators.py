@@ -11,7 +11,8 @@ printed, and only on explicit request (`links`, or `create --print-links`).
   uv run python -I pipeline/annotators.py upload data/work/annotation/ann_items.json
   uv run python -I pipeline/annotators.py export
   uv run python -I pipeline/annotators.py progress [--from-parquet data/work/annotation/human_labels.parquet]
-  uv run python -I pipeline/annotators.py adjudicate [--from-parquet ...]   # -> practice_ref_adjudicated.json
+  uv run python -I pipeline/annotators.py adjudicate [--from-parquet ... | --from-offline [PATH|GLOB]]
+                                                      # -> practice_ref_adjudicated.json
 
 progress: queue done/total, cert rounds (Worker status + local recompute vs practice_ref.json), median s/item,
 agreement with expert1 on expert_overlap items (overall + by era), with peer partners (+ pooled overlap kappa
@@ -357,16 +358,79 @@ def format_progress(rows: list[dict], ov: pd.DataFrame | None = None) -> str:
 
 # ---------------------------------------------------------------------------- adjudication of references
 def _norm(v):
-    return None if v is None or (isinstance(v, float) and np.isnan(v)) or v == "" else v
+    if v is None or v is pd.NA or (isinstance(v, float) and np.isnan(v)):
+        return None
+    return None if isinstance(v, str) and v in ("", "nan", "None") else v
 
 
-def adjudicate(ref: dict, labels: pd.DataFrame, expert_reader: str = "expert1") -> tuple[dict, pd.DataFrame]:
-    """practice_ref.json + expert1's active review labels -> adjudicated practice_ref (same format), where
-    reference = expert1's label; rationale += 'Expert correction: <note>' when it differs; per item
-    "review": {"verdict": agree|corrected|pending, "original": {...}}."""
-    from analysis.build_annotation_queues import review_item_id
+def review_decisions_online(labels: pd.DataFrame, ref: dict, expert_reader: str = "expert1") -> dict:
+    """passage_id -> {"label": {...}, "note", "decision": None} from expert1's active set=="review" Worker labels."""
+    from analysis.build_annotation_queues import parse_practice_ref, review_item_id
     act = active(labels)
     rev = act[(act.set == "review") & (act.annotator == expert_reader)].set_index("item_id")
+    out = {}
+    for pid in parse_practice_ref(ref).passage_id:
+        iid = review_item_id(pid)
+        if iid in rev.index:
+            r = rev.loc[iid]
+            out[pid] = {"label": {k: _norm(r[k]) for k in REF_KEYS}, "note": _norm(r.get("note")), "decision": None}
+    return out
+
+
+OFFLINE_HAS = {"cant_tell": "insufficient_context"}
+
+
+def load_offline_returns(spec: str, expert_reader: str | None = None) -> pd.DataFrame:
+    """Returned answer-key file(s) from pipeline/offline_annotation.py: imported parquet
+    (returned_key_*.parquet: KEY_COLS + passage_id + set) by path or glob; a raw CSV/JSONL return is
+    validated with offline_annotation.validate and mapped back with its private item map. Later files win."""
+    import glob as _glob
+    paths = sorted(_glob.glob(spec), key=lambda x: (Path(x).stat().st_mtime, x)) if any(ch in spec for ch in "*?[") else [spec]
+    if not paths:
+        raise SystemExit(f"no offline returns match {spec}")
+    frames = []
+    for p in map(Path, paths):
+        if p.suffix == ".parquet":
+            df = pd.read_parquet(p)
+        else:
+            from pipeline import offline_annotation as oa
+            df, errs = oa.validate(p)
+            if errs:
+                raise SystemExit(f"{p}: {len(errs)} problem(s):\n" + "\n".join(errs[:20]))
+            m = oa.load_map()
+            df["passage_id"] = df.item_id.map(lambda i: m[i]["passage_id"])
+            df["set"] = df.item_id.map(lambda i: m[i]["set"])
+        if "decision" not in df:
+            raise SystemExit(f"{p} is not an answer-key return (no decision column)")
+        frames.append(df.assign(_src=str(p)))
+    df = pd.concat(frames, ignore_index=True)
+    if expert_reader and "annotator" in df and (df.annotator == expert_reader).any():
+        df = df[df.annotator == expert_reader]
+    return df.drop_duplicates("passage_id", keep="last")
+
+
+def review_decisions_offline(df: pd.DataFrame) -> dict:
+    """passage_id -> {"label", "note", "decision"} from a returned answer key (decision agree|correct;
+    'agree' rows carry no answer fields; cant_tell -> insufficient_context)."""
+    out = {}
+    for r in df.itertuples():
+        dec = str(r.decision).strip()
+        lab = None
+        if dec == "correct":
+            h = _norm(str(r.has_obstacle).strip())
+            lab = {"has_obstacle": OFFLINE_HAS.get(h, h),
+                   **{k: _norm(str(getattr(r, k)).strip()) for k in ("domain", "locus", "failure_cause")}}
+        out[r.passage_id] = {"label": lab, "note": _norm(str(getattr(r, "note", "") or "").strip()), "decision": dec}
+    return out
+
+
+def adjudicate(ref: dict, labels: pd.DataFrame | None = None, expert_reader: str = "expert1",
+               decisions: dict | None = None) -> tuple[dict, pd.DataFrame]:
+    """practice_ref.json + expert1's review (Worker labels, or `decisions` from an offline return) ->
+    adjudicated practice_ref (same format): reference = expert1's answer; rationale += 'Expert correction:
+    <note>' when it differs; per item "review": {"verdict": agree|corrected|pending, "original": {...}}."""
+    if decisions is None:
+        decisions = review_decisions_online(labels, ref, expert_reader)
     out = {k: v for k, v in ref.items() if k not in ("items", *CERT_SETS)}
     out["version"] = f"{ref.get('version', '')}+adjudicated"
     lists = {s: ref.get(s, []) for s in CERT_SETS}
@@ -377,18 +441,17 @@ def adjudicate(ref: dict, labels: pd.DataFrame, expert_reader: str = "expert1") 
         new = []
         for it in entries:
             orig = {k: _norm(it["reference"].get(k)) for k in REF_KEYS}
-            iid = review_item_id(it["passage_id"])
             e = dict(it)
-            if iid not in rev.index:
+            d = decisions.get(it["passage_id"])
+            if d is None:
                 e["review"] = {"verdict": "pending", "original": orig}
             else:
-                r = rev.loc[iid]
-                lab = {k: _norm(r[k]) for k in REF_KEYS}
+                lab = orig if d["decision"] == "agree" or d["label"] is None else d["label"]
                 same = lab == orig
                 e["reference"] = lab
                 rat = it.get("rationale", "")
                 if not same:
-                    note = _norm(r.get("note"))
+                    note = d.get("note")
                     rat = (rat + " " if rat else "") + (f"Expert correction: {note}" if note else "Expert correction.")
                 e["rationale"] = rat
                 e["review"] = {"verdict": "agree" if same else "corrected", "original": orig}
@@ -472,8 +535,13 @@ def cmd_progress(a: argparse.Namespace) -> None:
 
 def cmd_adjudicate(a: argparse.Namespace) -> None:
     ref = json.loads(Path(a.practice_ref).read_text(encoding="utf-8"))
-    labels, _ = fetch_labels(a)
-    out, summ = adjudicate(ref, labels, a.expert_reader)
+    if a.from_offline:
+        dec = review_decisions_offline(load_offline_returns(a.from_offline, a.expert_reader))
+        out, summ = adjudicate(ref, None, a.expert_reader, decisions=dec)
+        print(f"source: offline return {a.from_offline} ({len(dec)} reviewed passages)")
+    else:
+        labels, _ = fetch_labels(a)
+        out, summ = adjudicate(ref, labels, a.expert_reader)
     p = Path(a.out)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -511,7 +579,11 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--teacher", default="teacher")
     p.set_defaults(fn=cmd_progress)
     p = sub.add_parser("adjudicate", help="expert1's review labels -> practice_ref_adjudicated.json")
-    p.add_argument("--from-parquet")
+    src = p.add_mutually_exclusive_group()
+    src.add_argument("--from-parquet", help="exported human_labels.parquet instead of the Worker")
+    src.add_argument("--from-offline", nargs="?", const=str(ANN / "offline/returned_key_*.parquet"),
+                     help="offline answer-key return(s): path or glob (default %(const)s); "
+                          "a raw CSV/JSONL is validated with pipeline/offline_annotation.py")
     p.add_argument("--practice-ref", default=str(ANN / "practice_ref.json"))
     p.add_argument("--out", default=str(ANN / "practice_ref_adjudicated.json"))
     p.add_argument("--expert-reader", default="expert1")

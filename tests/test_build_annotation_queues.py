@@ -25,7 +25,8 @@ ERAS = ["E_1800_1849", "M_1850_1884", "L_1885_1929"]
 def synth_meta(n_works=1200, per_work=12, seed=0):
     r = np.random.default_rng(seed)
     year = r.integers(1800, 1930, n_works)
-    works = pd.DataFrame({"work_id": [f"w{i}" for i in range(n_works)], "year": year.astype(float),
+    works = pd.DataFrame({"work_id": [f"w{i}" for i in range(n_works)], "pg_id": np.arange(n_works),
+                          "year": year.astype(float),
                           "decade": year // 10 * 10,
                           "split": np.where(np.arange(n_works) % 2, "discovery", "confirmation"),
                           "author_key": [f"a{i % 400}" for i in range(n_works)]})
@@ -61,12 +62,12 @@ def meta():
 @pytest.fixture(scope="module")
 def inputs(meta):
     works, genre, passages = meta
-    w, warn = baq.resolve_works(works, None)
-    pool = baq.confirmation_pool(passages, w, genre).merge(passages[["passage_id", *baq.TEXT_COLS]], on="passage_id")
+    sp = baq.resolve_works(works, None)
+    pool = baq.confirmation_pool(passages, sp, genre).merge(passages[["passage_id", *baq.TEXT_COLS]], on="passage_id")
     lab = synth_labels(works, passages)
     disc = baq.prepare_discovery(lab[lab.split == "discovery"].merge(
-        passages[["passage_id", *baq.TEXT_COLS]], on="passage_id"), w)
-    return pool, disc, warn
+        passages[["passage_id", *baq.TEXT_COLS]], on="passage_id"), sp)
+    return pool, disc, sp.warning
 
 
 @pytest.fixture(scope="module")
@@ -212,8 +213,11 @@ def test_cert_and_review_sets(design, practice):
         assert len(qs) == 20 * 4 and set(qs.annotator) == set(ANN)
         items = [i for i in design.items if i["set"] == st]
         assert len(items) == 20 and all(set(i["reference"]) == {*baq.REF_KEYS, "rationale"} for i in items)
-    rv = [i for i in design.items if i["set"] == "review"]
+    assert not [i for i in design.items if i["set"] == "review"]  # review only via practice_items.json
+    rv = baq.practice_items(practice, ANN, "expert1")
+    rv = [i for i in rv if i["set"] == "review"]
     assert len(rv) == 60 and all(i["assign"] == ["expert1"] for i in rv)
+    assert (q[q.set == "review"].annotator == "expert1").sum() == 60
     assert {i["passage_id"] for i in rv} == set(practice.passage_id)
     for i in rv:
         assert i["item_id"] == baq.review_item_id(i["passage_id"]) != item_id(i["passage_id"])
@@ -265,9 +269,11 @@ def test_deterministic(inputs, practice, design):
 
 
 # ------------------------------------------------------------------ file-level: seal + split_v2
-def _write(tmp_path, works, genre, passages, labels, works_v2=None, ref=None):
+def _write(tmp_path, works, genre, passages, labels, works_v2=None, ref=None, canon=None):
     works.to_parquet(tmp_path / "works.parquet")
     genre.to_parquet(tmp_path / "genre.parquet")
+    if canon is not None:
+        canon.to_parquet(tmp_path / "canon.parquet")
     passages.to_parquet(tmp_path / "passages.parquet")
     labels.to_parquet(tmp_path / "labels.parquet")
     if works_v2 is not None:
@@ -288,6 +294,7 @@ def _cli(tmp_path, out, extra=()):
     baq.main(["build", str(tmp_path / "labels.parquet"), "--out", str(tmp_path / out),
               "--works", str(tmp_path / "works.parquet"), "--works-v2", str(tmp_path / "works_v2.parquet"),
               "--genre", str(tmp_path / "genre.parquet"), "--passages", str(tmp_path / "passages.parquet"),
+              "--canon", str(tmp_path / "canon.parquet"),
               "--practice-ref", str(tmp_path / "ref.json"), "--n-target", "600", "--n-teaching", "20",
               "--expert-extra", "60", "--expert-overlap", "30", *extra])
 
@@ -340,29 +347,81 @@ def test_confirmation_labels_never_read(tmp_path, capsys):
         pd.testing.assert_frame_equal(pd.read_parquet(tmp_path / "o1" / f), pd.read_parquet(tmp_path / "o2" / f))
     assert (tmp_path / "o1/ann_items.json").read_text() == (tmp_path / "o2/ann_items.json").read_text()
     # and the reader really filters rows: no Confirmation row comes back
-    w, _ = baq.resolve_works(works, None)
-    got, dropped = baq.read_discovery_labels(tmp_path / "labels.parquet", set(w[w.split == "discovery"].work_id))
+    got, dropped = baq.read_discovery_labels(tmp_path / "labels.parquet", baq.resolve_works(works, None))
     assert dropped == conf.sum() and set(got.split) == {"discovery"}
 
 
-def test_split_v2(tmp_path):
+def test_split_v2_author_group_primary_canon(tmp_path):
     works, genre, passages = synth_meta(500, 10, seed=5)
-    # split_v2 flips every 5th work and re-keys authors
-    v2 = works[["work_id"]].assign(
-        split_v2=np.where((np.arange(len(works)) % 5 == 0) ^ (works.split == "discovery"), "discovery", "confirmation"),
-        author_key=[f"b{i % 150}" for i in range(len(works))])
+    n = len(works)
+    flip = np.arange(n) % 5 == 0
+    v2 = works[["work_id", "pg_id", "split"]].assign(
+        split_v2=np.where(flip ^ (works.split == "discovery"), "discovery", "confirmation"),
+        author_group=[f"ag{i % 150}" for i in range(n)],
+        primary_v2=pd.array(np.arange(n) % 7 != 0, dtype="boolean"))
+    # stale passage-level work ids: passages of w1 (discovery) claim to be w0's; reassignment by pg fixes it
+    passages = passages.copy()
+    stale = passages.work_id == "w1"
+    passages.loc[stale, "work_id"] = "w0"
+    canon = works[["work_id"]].assign(canonical=pd.array(np.arange(n) % 3 == 0, dtype="boolean"))
     lab = synth_labels(works, passages)
-    _write(tmp_path, works, genre, passages, lab, works_v2=v2, ref=_ref(passages, v2.rename(columns={"split_v2": "split"})))
+    _write(tmp_path, works, genre, passages, lab, works_v2=v2,
+           ref=_ref(passages, v2.drop(columns="split").rename(columns={"split_v2": "split"})), canon=canon)
     _cli(tmp_path, "out")
     out = tmp_path / "out"
     s = json.loads((out / "design_summary.json").read_text())
-    assert s["split_source"] == "works_v2.split_v2" and not any("works_v2" in w for w in s["warnings"])
+    assert s["split_source"].startswith("works_v2.split_v2") and not any("works_v2" in w for w in s["warnings"])
+    assert s["author_identity"] == "works_v2.author_group" and s["canonical_used"] is True
+    assert s["strata"].endswith("x canonical")
     v2s = dict(zip(v2.work_id, v2.split_v2))
-    pw = dict(zip(passages.passage_id, passages.work_id))
+    prim = dict(zip(v2.work_id, v2.primary_v2))
+    pw = {f"pg{pg}": w for pg, w in zip(v2.pg_id, v2.work_id)}
+    work_of = lambda pid: pw[pid.split("_")[0]]
     frame = pd.read_parquet(out / "audit_frame.parquet")
-    assert all(v2s[pw[p]] == "confirmation" for p in frame.passage_id)
+    assert all(v2s[work_of(p)] == "confirmation" and prim[work_of(p)] for p in frame.passage_id)
+    assert not set(passages[stale].passage_id) & set(frame.passage_id) or v2s["w1"] == "confirmation"
+    assert any(c.split("|")[2] in ("canon", "noncanon") for c in frame.audit_cell)
     teach = pd.read_parquet(out / "teaching.parquet")
-    assert all(v2s[pw[p]] == "discovery" for p in teach.passage_id)
-    assert teach.author_key.str.startswith("b").all()
+    assert all(v2s[work_of(p)] == "discovery" for p in teach.passage_id)
+    assert teach.author_key.str.startswith("ag").all()
     audit = pd.read_parquet(out / "audit.parquet")
-    assert audit.author_key.str.startswith("b").all() and not set(audit.author_key) & set(teach.author_key)
+    assert audit.author_key.str.startswith("ag").all() and not set(audit.author_key) & set(teach.author_key)
+    # teaching author GROUPS have no passage in the frame (pi = 0)
+    ag = dict(zip(v2.work_id, v2.author_group))
+    assert not {ag[work_of(p)] for p in frame.passage_id} & set(teach.author_key)
+    _cli(tmp_path, "out_nc", ["--no-canonical"])
+    s2 = json.loads((tmp_path / "out_nc/design_summary.json").read_text())
+    assert s2["canonical_used"] is False and not s2["strata"].endswith("canonical")
+
+
+def test_split_v2_map_moves_passages(meta):
+    works, genre, passages = meta
+    v2 = works[["work_id", "pg_id", "split"]].assign(
+        split_v2=np.where(works.work_id == "w0", "discovery", works.split),  # w0 (confirmation) -> Discovery
+        author_group=works.author_key, primary_v2=True)
+    sp = baq.resolve_works(works, v2)
+    pool = baq.confirmation_pool(passages, sp, genre)
+    assert works.set_index("work_id").split["w0"] == "confirmation"
+    assert not pool.work_id.eq("w0").any()
+    assert sp.assign(passages[passages.work_id == "w0"][["passage_id"]]).split.eq("discovery").all()
+
+
+def test_ann_items_offline_expert_export(design, tmp_path, monkeypatch):
+    """pipeline/offline_annotation.py export-expert reads ann_items.json items whose assign has expert1."""
+    from pipeline import offline_annotation as oa
+    (tmp_path / "ann_items.json").write_text(json.dumps({"items": design.items}))
+    monkeypatch.setattr(oa, "ANN", tmp_path)
+    monkeypatch.setattr(oa, "OFF", tmp_path / "offline")
+    monkeypatch.setattr(oa, "MAP", tmp_path / "offline" / "_map.json")
+    oa.export_expert("expert1")
+    rows = [json.loads(l) for l in (tmp_path / "offline/expert_items.jsonl").read_text().splitlines()]
+    q = design.queues
+    exp = q[q.annotator == "expert1"]
+    assert set(exp[exp.set == "audit"].role) == {"teacher", "expert_only", "expert_overlap"}
+    assert len(rows) == (exp.set == "audit").sum()  # exactly the audit items (no review items)
+    m = json.loads((tmp_path / "offline/_map.json").read_text())
+    assert {v["passage_id"] for v in m.values()} == set(exp[exp.set == "audit"].passage_id)
+    assert {v["set"] for v in m.values()} == {"audit"}
+    for it in design.items:
+        if "expert1" in it["assign"]:
+            assert {"item_id", "passage_id", "text", "ctx_before", "ctx_after", "set", "assign"} <= set(it)

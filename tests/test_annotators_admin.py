@@ -1,3 +1,4 @@
+import json
 import math
 
 import pandas as pd
@@ -199,3 +200,64 @@ def test_request_retries(monkeypatch):
     with httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(400, text="bad")), base_url="http://x") as c:
         with pytest.raises(SystemExit):
             an.request(c, "GET", "/x")
+
+
+def _key_ref():
+    ent = lambda p, ho, loc=None: {"passage_id": p, "reference": {"has_obstacle": ho, "domain": None if ho != "yes" else "INNER_STATE",
+                                   "locus": loc, "failure_cause": None}, "rationale": "orig"}
+    return {"version": "v1", "practice": [ent("pg1_p1", "no"), ent("pg1_p2", "yes", "internal_psychological")],
+            "cert": [ent("pg1_p3", "no")], "retake": [ent("pg1_p4", "no")]}
+
+
+def test_adjudicate_offline_parquet(tmp_path):
+    from pipeline.offline_annotation import KEY_COLS
+    rows = [
+        {"item_id": "kr_a", "annotator": "expert1", "decision": "agree", "has_obstacle": "", "domain": "",
+         "locus": "", "failure_cause": "", "evidence": "", "note": "", "seconds": "", "passage_id": "pg1_p1", "set": "key_practice"},
+        {"item_id": "kr_b", "annotator": "expert1", "decision": "correct", "has_obstacle": "yes",
+         "domain": "SOCIAL_RANK_CONVENTION", "locus": "social_institutional", "failure_cause": "", "evidence": "e",
+         "note": "rank forbids it", "seconds": "40", "passage_id": "pg1_p2", "set": "key_practice"},
+        {"item_id": "kr_c", "annotator": "expert1", "decision": "correct", "has_obstacle": "cant_tell", "domain": "",
+         "locus": "", "failure_cause": "", "evidence": "", "note": "too short", "seconds": "", "passage_id": "pg1_p3", "set": "key_cert"},
+    ]
+    df = pd.DataFrame(rows)
+    assert set(KEY_COLS) <= set(df.columns)
+    (tmp_path / "offline").mkdir()
+    df.to_parquet(tmp_path / "offline" / "returned_key_r1.parquet", index=False)
+    dec = an.review_decisions_offline(an.load_offline_returns(str(tmp_path / "offline" / "returned_key_*.parquet")))
+    out, summ = an.adjudicate(_key_ref(), None, decisions=dec)
+    pa, pb = out["practice"]
+    assert pa["review"]["verdict"] == "agree" and pa["reference"]["has_obstacle"] == "no" and pa["rationale"] == "orig"
+    assert pb["review"]["verdict"] == "corrected" and pb["reference"]["locus"] == "social_institutional"
+    assert pb["rationale"] == "orig Expert correction: rank forbids it"
+    c = out["cert"][0]
+    assert c["reference"] == {"has_obstacle": "insufficient_context", "domain": None, "locus": None, "failure_cause": None}
+    assert c["review"]["verdict"] == "corrected"
+    assert out["retake"][0]["review"]["verdict"] == "pending"
+    assert summ.verdict.value_counts().to_dict() == {"corrected": 2, "agree": 1, "pending": 1}
+    # CLI path writes the adjudicated file
+    (tmp_path / "ref.json").write_text(json.dumps(_key_ref()))
+    an.main(["adjudicate", "--from-offline", str(tmp_path / "offline" / "returned_key_*.parquet"),
+             "--practice-ref", str(tmp_path / "ref.json"), "--out", str(tmp_path / "adj.json")])
+    adj = json.loads((tmp_path / "adj.json").read_text())
+    assert adj["version"] == "v1+adjudicated" and adj["practice"][1]["review"]["verdict"] == "corrected"
+
+
+def test_adjudicate_offline_raw_csv(tmp_path, monkeypatch):
+    from pipeline import offline_annotation as oa
+    monkeypatch.setattr(oa, "OFF", tmp_path)
+    monkeypatch.setattr(oa, "MAP", tmp_path / "_map.json")
+    (tmp_path / "_map.json").write_text(json.dumps({"kr_a": {"passage_id": "pg1_p1", "set": "key_practice"},
+                                                    "kr_b": {"passage_id": "pg1_p2", "set": "key_practice"}}))
+    (tmp_path / "ret.csv").write_text(
+        "item_id,annotator,decision,has_obstacle,domain,locus,failure_cause,evidence,note,seconds\n"
+        "kr_a,expert1,agree,,,,,,,\n"
+        'kr_b,expert1,correct,no,,,,,"not an obstacle",30\n')
+    dec = an.review_decisions_offline(an.load_offline_returns(str(tmp_path / "ret.csv")))
+    out, _ = an.adjudicate(_key_ref(), None, decisions=dec)
+    assert out["practice"][1]["reference"]["has_obstacle"] == "no"
+    assert out["practice"][1]["review"]["verdict"] == "corrected"
+    (tmp_path / "bad.csv").write_text("item_id,annotator,decision,has_obstacle,domain,locus,failure_cause,evidence,note,seconds\n"
+                                      "kr_zz,expert1,maybe,,,,,,,\n")
+    with pytest.raises(SystemExit):
+        an.load_offline_returns(str(tmp_path / "bad.csv"))

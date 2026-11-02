@@ -7,12 +7,17 @@ genre.parquet) and drawn with select_annotation.draw_audit_metadata (prereg v0.5
 [x canonical when a `canonical` column is present in works / works_v2], metadata_only). N_cell is never
 printed or written to the summary; design_summary.json carries cell_table_hash(frame) instead.
 
-Split: data/work/works_v2.parquet (split_v2, author_key by work_id) when it exists, otherwise the
-current works.parquet split with a loud warning in the summary.
+Split: data/work/works_v2.parquet when it exists: split_v2, author identity = author_group (carried in
+the `author_key` column downstream), Confirmation pool restricted to primary_v2 works, and passages
+reassigned with pipeline.split_v2_map.SplitV2 (moved passages follow their work's split_v2). Otherwise
+the current works.parquet split with a loud warning in the summary. canonical comes from
+data/work/canon.parquet (strata era x genre x canonical; --no-canonical for era x genre).
 
 Roles / queues (parameters recorded in design_summary.json; final numbers fixed in prereg v0.5):
   REVIEW    the 60 practice/cert/retake passages for the expert reader (expert1) to review and
-            adjudicate (set "review", different opaque item ids: salt "review:").
+            adjudicate (set "review", different opaque item ids: salt "review:"). Emitted only by the
+            `practice` subcommand (practice_items.json); queues.parquet records them, ann_items.json does not,
+            so expert1's ann_items.json entries are exactly their audit items (offline export-expert).
   PRACTICE / CERT / RETAKE  20 + 20 + 20 Discovery items with references, for the peers only.
   TEACHING  ~60 Discovery items (model-label prototypes + boundary cases) for the teaching annotator.
   AUDIT     draw_audit_metadata(pool_conf minus teaching authors, rng, n_target) (legacy fallback:
@@ -36,7 +41,7 @@ usage:
         [--annotators student,peer1,peer2,peer3] [--expert-reader expert1] [--teacher teacher]
         [--n-target 1800] [--group-col COL (legacy)] [--overlap-frac 0.10] [--expert-overlap 100]
         [--expert-extra 350] [--n-teacher 8] [--n-teaching 60] [--teaching-annotator student]
-        [--works ...] [--works-v2 ...] [--genre ...] [--passages ...] [--out DIR]
+        [--works ...] [--works-v2 ...] [--genre ...] [--canon ...] [--no-canonical] [--passages ...] [--out DIR]
 
 Uploaded items carry ONLY item_id, passage_id, text, ctx_before, ctx_after, set, assign (+ reference
 for practice/cert/retake/review): never model labels, title, author, date or decade.
@@ -84,6 +89,7 @@ PASSAGES = ROOT / "data/work/passages.parquet"
 WORKS = ROOT / "data/work/works.parquet"
 WORKS_V2 = ROOT / "data/work/works_v2.parquet"
 GENRE = ROOT / "data/work/genre.parquet"
+CANON = ROOT / "data/work/canon.parquet"
 PRACTICE_REF = OUT / "practice_ref.json"
 DEFAULT_ANNOTATORS = ["student", "peer1", "peer2", "peer3"]
 ERA_ORDER = ["E_1800_1849", "M_1850_1884", "L_1885_1929", "early_1800_1849", "mid_1850_1884", "late_1885_1920"]
@@ -151,47 +157,95 @@ def read_text(passages_path: Path, ids: list[str]) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------ split / inputs (metadata only)
-def resolve_works(works: pd.DataFrame, works_v2: pd.DataFrame | None) -> tuple[pd.DataFrame, str | None]:
-    """work_id -> split, author_key, decade. Uses split_v2 (and its author_key) when works_v2 is given."""
-    w = works[[c for c in ("work_id", "decade", "year", "split", "author_key", "canonical") if c in works]].copy()
+@dataclass
+class SplitInfo:
+    """Resolved split + author identity per work, and the passage-level reassignment.
+
+    v2 (works_v2.parquet present): split = split_v2, author identity = author_group (stored in the
+    `author_key` column so every downstream use, including draw_audit's author filter, sees it),
+    primary = primary_v2; passages are reassigned with pipeline.split_v2_map.SplitV2 (by pg id), so
+    passages of moved works follow their work's split_v2. v1 fallback: works.parquet split/author_key."""
+    works: pd.DataFrame                      # work_id, decade, year, split, author_key, primary
+    mapper: object | None = None             # SplitV2 or None
+    warning: str | None = None
+    source: str = "works.split (OLD)"
+    author_source: str = "works.author_key (OLD)"
+
+    def assign(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Passage-level frame (passage_id [, work_id]) -> + work_id, split (resolved)."""
+        out = df.drop(columns=[c for c in ("split",) if c in df])
+        if self.mapper is not None:
+            r = self.mapper.reassign(out[["passage_id"]])
+            out = out.drop(columns=[c for c in ("work_id",) if c in out])
+            out["work_id"] = r.work_id_v2.values
+            out["split"] = r.split_v2.values
+            return out
+        if "work_id" not in out:
+            raise ValueError("v1 split needs a work_id column")
+        return out.merge(self.works[["work_id", "split"]], on="work_id", how="left")
+
+
+def resolve_works(works: pd.DataFrame, works_v2: pd.DataFrame | None, mapper=None) -> SplitInfo:
+    w = works[[c for c in ("work_id", "decade", "year", "split", "author_key") if c in works]].copy()
     if "year" not in w:
         w["year"] = w.decade + 5.0
     if works_v2 is None:
-        return w, ("WARNING: data/work/works_v2.parquet not found; using the OLD works.parquet split and "
-                   "author_key. Re-run once split_v2 exists.")
-    v2 = works_v2[["work_id", "split_v2", *[c for c in ("author_key", "canonical") if c in works_v2]]]
-    w = w.drop(columns=["split"] + [c for c in ("author_key", "canonical") if c in v2 and c in w])
-    w = w.merge(v2, on="work_id", how="inner")
-    return w.rename(columns={"split_v2": "split"}), None
+        return SplitInfo(w.assign(primary=True), None,
+                         "WARNING: data/work/works_v2.parquet not found; using the OLD works.parquet split and "
+                         "author_key. Re-run once split_v2 exists.")
+    need = {"work_id", "split_v2", "author_group"}
+    if need - set(works_v2):
+        raise SystemExit(f"works_v2 lacks {need - set(works_v2)}")
+    v2 = works_v2[["work_id", "split_v2", "author_group",
+                   *(["primary_v2"] if "primary_v2" in works_v2 else []),
+                   *[c for c in ("decade", "year") if c in works_v2]]]
+    w = w.drop(columns=[c for c in ("split", "author_key", "decade", "year") if c in w and (c in v2 or c in ("split", "author_key"))])
+    w = w.merge(v2, on="work_id", how="right")
+    if "year" not in w:
+        w["year"] = w.decade + 5.0
+    w = w.rename(columns={"split_v2": "split", "author_group": "author_key"})
+    w["primary"] = w.pop("primary_v2").fillna(False).astype(bool) if "primary_v2" in w else True
+    if mapper is None:
+        from pipeline.split_v2_map import SplitV2
+        cols = [c for c in ("pg_id", "work_id", "split", "split_v2") if c in works_v2]
+        mapper = SplitV2.from_frame(works_v2[cols]) if len(cols) == 4 else None
+    return SplitInfo(w, mapper, None, "works_v2.split_v2 (+ split_v2_map passage reassignment)"
+                     if mapper is not None else "works_v2.split_v2 (by work_id)", "works_v2.author_group")
 
 
-def confirmation_pool(passages: pd.DataFrame, works: pd.DataFrame, genre: pd.DataFrame | None,
-                      group_col: str = "genre") -> pd.DataFrame:
-    """Confirmation random-stratum pool from metadata only (no labels): passage_id, work_id,
-    author_key, decade, era, split, stratum, <group_col>."""
-    p = passages[["passage_id", "work_id", "stratum"]].merge(works, on="work_id", how="inner")
-    p = p[(p.split == "confirmation") & (p.stratum == "random")].copy()
+def confirmation_pool(passages: pd.DataFrame, split: SplitInfo, genre: pd.DataFrame | None,
+                      canon: pd.DataFrame | None = None, group_col: str = "genre") -> pd.DataFrame:
+    """Confirmation random-stratum pool from metadata only (no labels): resolved split == confirmation,
+    primary works only (primary_v2), stratum random. Columns: passage_id, work_id, author_key (=
+    author_group under v2), decade, year, era, split, stratum, genre [, canonical]."""
+    p = split.assign(passages[["passage_id", "work_id", "stratum"]])
+    p = p[(p.split == "confirmation") & (p.stratum == "random")]
+    p = p.drop(columns="split").merge(split.works, on="work_id", how="inner")
+    p = p[p.primary.astype(bool)].drop(columns="primary").copy()
     p["era"] = era_of_year(p.year.values)
     if genre is not None:
         p = p.merge(genre[["work_id", "genre"]], on="work_id", how="left")
         p["genre"] = p.genre.fillna("unknown")
+    if canon is not None:
+        p = p.merge(canon[["work_id", "canonical"]], on="work_id", how="left")
+        p["canonical"] = p.canonical.astype("boolean").fillna(False).astype(bool)
     if group_col not in p:
         raise SystemExit(f"--group-col {group_col!r} is not a metadata column of the pool ({list(p.columns)})")
     p[group_col] = p[group_col].astype(str)
     return p.reset_index(drop=True)
 
 
-def read_discovery_labels(path: Path, disc_works: set, passage_work: pd.DataFrame | None = None) -> tuple[pd.DataFrame, int]:
-    """Read ONLY Discovery rows of a labels file. Confirmation rows are dropped by id (passage_id /
-    work_id) via a parquet row filter, so their label columns are never loaded."""
+def read_discovery_labels(path: Path, split: SplitInfo, passage_work: pd.DataFrame | None = None) -> tuple[pd.DataFrame, int]:
+    """Read ONLY Discovery rows of a labels file. Rows are classified from passage_id / work_id alone
+    (resolved split), then read back with a parquet row filter, so Confirmation label columns are never loaded."""
     cols = pq.ParquetFile(path).schema_arrow.names
-    if "work_id" in cols:
-        ids = pd.read_parquet(path, columns=["passage_id", "work_id"])
-    else:
+    ids = pd.read_parquet(path, columns=[c for c in ("passage_id", "work_id") if c in cols])
+    if "work_id" not in ids and split.mapper is None:
         if passage_work is None:
             raise SystemExit("labels file has no work_id; pass passages to map passage_id -> work_id")
-        ids = pd.read_parquet(path, columns=["passage_id"]).merge(passage_work, on="passage_id", how="left")
-    keep = ids[ids.work_id.isin(disc_works)].passage_id
+        ids = ids.merge(passage_work, on="passage_id", how="left")
+    ids = split.assign(ids)
+    keep = ids[ids.split == "discovery"].passage_id
     dropped = len(ids) - len(keep)
     if len(keep):
         lab = pd.read_parquet(path, filters=[("passage_id", "in", list(keep))])
@@ -200,11 +254,12 @@ def read_discovery_labels(path: Path, disc_works: set, passage_work: pd.DataFram
     return lab, dropped
 
 
-def prepare_discovery(lab: pd.DataFrame, works: pd.DataFrame, alt: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Discovery labels with split / author_key / decade / era from the resolved works table."""
+def prepare_discovery(lab: pd.DataFrame, split: SplitInfo, alt: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Discovery labels with resolved split / author_key (author_group) / decade / era."""
     lab = lab.drop(columns=[c for c in ("split", "author_key", "decade", "year", "canonical") if c in lab])
-    lab = lab.merge(works, on="work_id", how="inner")
-    lab = lab[lab.split == "discovery"].copy()
+    lab = split.assign(lab)
+    lab = lab[lab.split == "discovery"].drop(columns="split")
+    lab = lab.merge(split.works.drop(columns="primary"), on="work_id", how="inner")
     lab["era"] = lab.decade.map(era)          # teaching prototypes (decade eras, as in select_annotation)
     lab["q_era"] = era_of_year(lab.year.values)  # audit-era label for queues.parquet
     if alt is not None:
@@ -358,14 +413,17 @@ class Design:
 
 
 def call_draw_audit(pool: pd.DataFrame, teaching_authors: set, rng: np.random.Generator, n_target: int,
-                    group_col: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame, str]:
+                    group_col: str | None = None, use_canon: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, str]:
     """Registered v0.5 draw (select_annotation.draw_audit_metadata: era(year) x genre [x canonical],
     metadata_only) when available and group_col is None; else draw_audit with a metadata group_col.
-    Teaching authors are removed from the pool first (pi = 0 for them)."""
+    Teaching authors (author_key = author_group under v2) are removed from the pool first (pi = 0)."""
     pool = pool[~pool.author_key.isin(teaching_authors)]
     if HAS_METADATA_DRAW and group_col is None:
-        canon = "canonical" in pool
-        a, f = sa.draw_audit_metadata(pool, rng, n_target)
+        canon = use_canon and "canonical" in pool
+        if not canon:
+            pool = pool.drop(columns=[c for c in ("canonical",) if c in pool])
+        kw = {"use_canon": canon} if "use_canon" in inspect.signature(sa.draw_audit_metadata).parameters else {}
+        a, f = sa.draw_audit_metadata(pool, rng, n_target, **kw)
         return a, f, "draw_audit_metadata: era(year) x genre" + (" x canonical" if canon else "")
     gc = group_col or "genre"
     kw = {"n_target": n_target}
@@ -383,6 +441,8 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
                  n_expert_extra: int = 350, n_teacher: int = 8, n_teaching: int = 60,
                  teaching_annotator: str = "student", practice: pd.DataFrame | None = None,
                  get_text: Callable[[list[str]], pd.DataFrame] | None = None, split_warning: str | None = None,
+                 use_canon: bool = True, split_source: str = "works.split (OLD)",
+                 author_source: str = "works.author_key (OLD)", extra_warnings: list[str] | None = None,
                  seed: int = SEED) -> Design:
     """Pure. `pool` = confirmation_pool() (metadata only), `disc` = prepare_discovery() (Discovery labels).
     `get_text(ids)` returns passage_id + text/ctx for audit items lacking text in `pool`."""
@@ -393,7 +453,7 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
     if (disc.split != "discovery").any():
         raise ValueError("teaching labels must be Discovery only")
     cert_ids = set(practice.passage_id) if practice is not None else set()
-    warnings = [split_warning] if split_warning else []
+    warnings = ([split_warning] if split_warning else []) + list(extra_warnings or [])
     leaked = cert_ids & set(pool.passage_id)
     if leaked:
         warnings.append(f"WARNING: {len(leaked)} practice/cert/retake passages are in the Confirmation pool "
@@ -404,7 +464,7 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
     teaching_authors = set(teaching.author_key)
 
     rng = np.random.default_rng(seed)
-    audit, frame, strata = call_draw_audit(pool, teaching_authors, rng, n_target, group_col)
+    audit, frame, strata = call_draw_audit(pool, teaching_authors, rng, n_target, group_col, use_canon)
     audit = audit.reset_index(drop=True)
     ERAS = eras_in(audit.era)
     if not {"text"} <= set(audit) and get_text is not None:
@@ -455,7 +515,9 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
     txt = txt.drop_duplicates("passage_id").set_index("passage_id")
     if txt.text.isna().any():
         raise ValueError("audit/teaching items without text")
-    items = practice_items(practice, annotators, expert_reader) if practice is not None else []
+    # review items live only in practice_items.json (`practice` subcommand), so that the expert's
+    # entries in ann_items.json are exactly their audit items (pipeline/offline_annotation.py export-expert)
+    items = practice_items(practice, annotators, None) if practice is not None else []
     for (pid, st), g in queues[queues.set.isin(["audit", "teaching"])].groupby(["passage_id", "set"], sort=False):
         t = txt.loc[pid]
         items.append({"item_id": item_id(pid), "passage_id": pid, "text": _s(t.text), "ctx_before": _s(t.ctx_before),
@@ -472,7 +534,8 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
     summary = {
         "seed": seed, "strata": strata, "group_col": group_col, "eras": ERAS,
         "n_cells": int(frame.audit_cell.nunique()), "cell_table_hash": cell_table_hash(frame),
-        "split_source": "works_v2.split_v2" if not split_warning else "works.split (OLD)",
+        "split_source": split_source, "author_identity": author_source,
+        "canonical_used": strata.endswith("x canonical"),
         "annotators": annotators, "expert_reader": expert_reader, "teacher": teacher,
         "teaching_annotator": teaching_annotator,
         "params": {"n_target": n_target, "overlap_frac": overlap_frac, "n_expert_overlap": n_expert_overlap,
@@ -512,7 +575,8 @@ def write_design(d: Design, out: Path) -> None:
 def print_summary(s: dict) -> None:
     for w in s["warnings"]:
         print(w)
-    print(f"seed={s['seed']} strata={s['strata']} split={s['split_source']} n_target={s['n_target']} "
+    print(f"split={s['split_source']} authors={s['author_identity']} canonical used={'yes' if s['canonical_used'] else 'no'}")
+    print(f"seed={s['seed']} strata={s['strata']} n_target={s['n_target']} "
           f"drawn={s['audit_drawn']} {s['audit_by_era']} pool={s['audit_pool']} cells={s['n_cells']} "
           f"teaching_authors={s['n_teaching_authors']}")
     print(f"teacher={s['n_teacher_items']} {s['teacher_by_era']}  expert_only={s['n_expert_only']} "
@@ -529,26 +593,46 @@ def print_summary(s: dict) -> None:
 
 
 # ------------------------------------------------------------------ CLI
-def load_inputs(a: argparse.Namespace) -> tuple[pd.DataFrame, pd.DataFrame, str | None]:
-    """(pool, discovery labels, split warning). Metadata from passages/works/genre; labels: Discovery rows only."""
+def load_inputs(a: argparse.Namespace) -> tuple[pd.DataFrame, pd.DataFrame, SplitInfo]:
+    """(pool, discovery labels, split). Metadata from passages / works(_v2) / genre / canon; labels:
+    Discovery rows only (resolved split, passage-level reassignment)."""
     wcols = pq.ParquetFile(a.works).schema_arrow.names
-    works = pd.read_parquet(a.works, columns=[c for c in ("work_id", "decade", "year", "split", "author_key", "canonical") if c in wcols])
-    v2 = pd.read_parquet(a.works_v2) if Path(a.works_v2).exists() else None
-    works, warn = resolve_works(works, v2)
+    works = pd.read_parquet(a.works, columns=[c for c in ("work_id", "decade", "year", "split", "author_key") if c in wcols])
+    v2 = None
+    if Path(a.works_v2).exists():
+        v2cols = pq.ParquetFile(a.works_v2).schema_arrow.names
+        v2 = pd.read_parquet(a.works_v2, columns=[c for c in ("pg_id", "work_id", "split", "split_v2", "author_group",
+                                                              "primary_v2", "decade", "year") if c in v2cols])
+    split = resolve_works(works, v2)
     passages = pd.read_parquet(a.passages, columns=["passage_id", "work_id", "stratum"])
     genre = pd.read_parquet(a.genre, columns=["work_id", "genre"]) if Path(a.genre).exists() else None
-    pool = confirmation_pool(passages, works, genre, a.group_col or "genre")
-    disc_works = set(works[works.split == "discovery"].work_id)
-    lab, dropped = read_discovery_labels(Path(a.labels), disc_works, passages[["passage_id", "work_id"]])
+    canon = None
+    if not a.no_canonical and Path(a.canon).exists():
+        canon = pd.read_parquet(a.canon, columns=["work_id", "canonical"])
+    pool = confirmation_pool(passages, split, genre, canon, a.group_col or "genre")
+    pw = passages[["passage_id", "work_id"]]
+    lab, dropped = read_discovery_labels(Path(a.labels), split, pw)
     if dropped:
         print(f"notice: dropped {dropped} non-Discovery rows from {a.labels} unread (labels sealed)")
     alt = None
     if a.alt:
-        alt, _ = read_discovery_labels(Path(a.alt), disc_works, passages[["passage_id", "work_id"]])
-    disc = prepare_discovery(lab, works, alt)
+        alt, _ = read_discovery_labels(Path(a.alt), split, pw)
+    disc = prepare_discovery(lab, split, alt)
     if not all(c in disc for c in TEXT_COLS):
         disc = disc.merge(read_text(Path(a.passages), disc.passage_id.tolist()), on="passage_id", how="left")
-    return pool, disc, warn
+    return pool, disc, split
+
+
+def practice_split_warnings(practice: pd.DataFrame | None, split: SplitInfo, passages: pd.DataFrame | None = None) -> list[str]:
+    if practice is None:
+        return []
+    df = practice[["passage_id"]]
+    if split.mapper is None and passages is not None:
+        df = df.merge(passages[["passage_id", "work_id"]], on="passage_id", how="left")
+    if split.mapper is None and "work_id" not in df:
+        return []
+    bad = split.assign(df).query("split != 'discovery'").passage_id.tolist()
+    return [f"WARNING: practice/cert/retake passages not in Discovery under the active split: {bad}"] if bad else []
 
 
 def cmd_practice(a: argparse.Namespace) -> None:
@@ -562,7 +646,7 @@ def cmd_practice(a: argparse.Namespace) -> None:
 
 
 def cmd_build(a: argparse.Namespace) -> None:
-    pool, disc, warn = load_inputs(a)
+    pool, disc, split = load_inputs(a)
     practice = None
     if not a.no_practice and Path(a.practice_ref).exists():
         practice = load_practice(Path(a.practice_ref), Path(a.passages))
@@ -570,7 +654,10 @@ def cmd_build(a: argparse.Namespace) -> None:
         print(f"note: {a.practice_ref} not found, building without practice/cert/retake/review items", file=sys.stderr)
     d = build_design(pool, disc, a.annotators.split(","), a.expert_reader, a.teacher, a.n_target, a.group_col,
                      a.overlap_frac, a.expert_overlap, a.expert_extra, a.n_teacher, a.n_teaching,
-                     a.teaching_annotator, practice, lambda ids: read_text(Path(a.passages), ids), warn)
+                     a.teaching_annotator, practice, lambda ids: read_text(Path(a.passages), ids), split.warning,
+                     not a.no_canonical, split.source, split.author_source,
+                     practice_split_warnings(practice, split, pd.read_parquet(a.passages, columns=["passage_id", "work_id"])
+                                             if split.mapper is None else None))
     write_design(d, Path(a.out))
     print_summary(d.summary)
     print(f"wrote teaching/audit/audit_frame/queues.parquet, ann_items.json ({len(d.items)} items), "
@@ -606,6 +693,8 @@ def main(argv: list[str] | None = None) -> None:
             p.add_argument("--works", default=str(WORKS))
             p.add_argument("--works-v2", default=str(WORKS_V2))
             p.add_argument("--genre", default=str(GENRE))
+            p.add_argument("--canon", default=str(CANON), help="work_id -> canonical (pre-declared canon measure)")
+            p.add_argument("--no-canonical", action="store_true", help="stratify era x genre only")
             p.add_argument("--practice-ref", default=str(PRACTICE_REF))
             p.add_argument("--no-practice", action="store_true")
             p.set_defaults(fn=cmd_build)
