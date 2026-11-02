@@ -124,6 +124,7 @@ After saving, the menu offers to restart the worker.
 | `name` | display name |
 | `disk_budget_gb` | disk ald may use (default 10 GB; it always leaves 20 GB free) |
 | `schedule` | weekly work windows in local time, e.g. `mon-fri 21:00-05:00,07:00-15:00; sat-sun 21:00-05:00` (a span may cross midnight: Friday 21:00-05:00 runs into Saturday). Outside a window ald finishes its current batch, then idles (and updates itself); `ald status` shows when the next window starts |
+| `awake_before_window_min` | outside the schedule, stay awake if the next window starts within this many minutes (default 120). For longer gaps the computer may sleep, and ald wakes it for the next window. On Windows a task `ald-wake` with "wake the computer" uses wake timers, which ald enables in the power plan when run from an Administrator PowerShell. On macOS ald uses `pmset schedule wake` and on Linux `rtcwake`; both need sudo without a password, otherwise ald warns |
 | `active_hours` | legacy daily window, e.g. `22:00-07:00` (ignored when `schedule` is set) |
 | `max_concurrency` | upper bound for the auto-tuned number of parallel requests (default 8) |
 | `stages` | only take these stages, e.g. `label,workcheck` |

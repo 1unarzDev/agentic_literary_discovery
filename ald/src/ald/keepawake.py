@@ -21,8 +21,13 @@ class KeepAwake:
         self.active = False  # True once sleep is actually inhibited
 
     def __enter__(self) -> "KeepAwake":
-        if not self.enabled:
-            return self
+        self.hold()
+        return self
+
+    def hold(self) -> None:
+        """Inhibit sleep (idempotent). On Windows this must run on the thread that later releases it."""
+        if not self.enabled or self.alive():
+            return
         try:
             if sys.platform == "win32":
                 import ctypes
@@ -48,14 +53,15 @@ class KeepAwake:
                     self.log("[keep-awake] systemd-inhibit not available; sleep is not inhibited")
         except Exception as e:  # noqa: BLE001
             self.log(f"[keep-awake] could not inhibit sleep: {e}")
-        return self
 
     def alive(self) -> bool:
         if self._proc is not None:
             return self._proc.poll() is None
         return self.active
 
-    def __exit__(self, *exc: Any) -> None:
+    def release(self) -> None:
+        """Allow sleep again (idempotent)."""
+        was = self.alive()
         self.active = False
         if self._win:
             try:
@@ -63,12 +69,19 @@ class KeepAwake:
                 ctypes.windll.kernel32.SetThreadExecutionState(self.ES_CONTINUOUS)
             except Exception:  # noqa: BLE001
                 pass
+            self._win = False
         if self._proc is not None:
             try:
                 self._proc.terminate()
                 self._proc.wait(timeout=5)
             except Exception:  # noqa: BLE001
                 pass
+            self._proc = None
+        if was:
+            self.log("[keep-awake] released: the computer may sleep")
+
+    def __exit__(self, *exc: Any) -> None:
+        self.release()
 
 
 def battery_ok(min_percent: int = 30) -> tuple[bool, str]:

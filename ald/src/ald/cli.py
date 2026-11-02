@@ -555,6 +555,10 @@ def config_set(key: str = typer.Argument(...), value: str = typer.Argument("", h
     setattr(cfg, key, v)
     cfg.save()
     console.print(f"{key} = {ui.fmt_setting(v)}")
+    if key in ("schedule", "active_hours"):
+        from .scheduler import legacy_hours_to_schedule
+        for m in svc.sync_wake(cfg.schedule or legacy_hours_to_schedule(cfg.active_hours)):
+            console.print(m, markup=False)
     if restart:
         for m in svc.restart():
             console.print(m, markup=False)
@@ -835,6 +839,9 @@ def _print_plan(p: Any, w: Any) -> None:
 def service_install(extra: Optional[str] = typer.Option(None, "--args", help="Extra args for `ald work`.")) -> None:
     """Install (or rewrite) and start the background service that runs `ald work`."""
     msgs = svc.install(extra=extra.split() if extra else None)
+    from .scheduler import legacy_hours_to_schedule
+    _c = Config.load()
+    msgs += svc.sync_wake(_c.schedule or legacy_hours_to_schedule(_c.active_hours))
     cfgmod.atomic_write_json(cfgmod.data_dir() / "service_def.json",
                              {"version": svc.SERVICE_DEF_VERSION, "client_version": CLIENT_VERSION})
     for m in msgs:

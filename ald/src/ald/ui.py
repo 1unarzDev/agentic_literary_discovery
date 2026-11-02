@@ -67,6 +67,16 @@ def ago(ts: float | str | None, now: float | None = None) -> str:
     return f"{s:.0f}s ago" if s < 120 else f"{s / 60:.0f}m ago" if s < 7200 else f"{s / 3600:.1f}h ago"
 
 
+def ago_until(ts: str | None, now: float) -> str:
+    if not ts:
+        return "?"
+    try:
+        t = _dt.datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return ts
+    return _dt.datetime.fromtimestamp(t).strftime("%a %H:%M")
+
+
 # --------------------------------------------------------------------------- ald status
 _PING_CACHE: dict[str, Any] = {}
 
@@ -181,9 +191,14 @@ def render_status(s: dict[str, Any]) -> Panel:
         inside = in_schedule(sched, now)
         nxt = next_schedule_change(sched, now)
         when = _dt.datetime.fromtimestamp(nxt).strftime("%a %Y-%m-%d %H:%M") if nxt else "never"
+        if inside:
+            label = ("inside window", "green")
+        elif s.get("keep_awake"):
+            label = ("idle (awake)", "yellow")
+        else:
+            label = (f"sleeping allowed until {when}", "blue")
         t.add_row("Schedule", Text.assemble(
-            (("inside" if inside else "outside") + " window", "green" if inside else "yellow"),
-            f"  {'window ends' if inside else 'next window starts'} {when}  ({sched})"))
+            label, f"  {'window ends' if inside else 'next window starts'} {when}  ({sched})"))
     extra = []
     if s["gpu_lock"]:
         extra.append(f"gpu-lock {s['gpu_lock']}")
@@ -218,10 +233,18 @@ def render_fleet(f: dict[str, Any]) -> Group:
         except ValueError:
             age = 1e9
         state = r.get("state") or "?"
-        if age > 900:
+        pres = x.get("presence")
+        if pres == "sleeping":
+            back = ago_until(x.get("expected_back"), now)
+            state, style = f"sleeping until {back}", "blue"
+        elif pres == "overdue":
+            state, style = f"OVERDUE (window {ago_until(x.get('expected_back'), now)})", "bold red"
+        elif age > 900:
             state, style = "silent", "red"
         else:
-            style = STATE_STYLE.get(state, "white")
+            if state == "outside_hours":
+                state = "idle (awake)" if r.get("keep_awake") else "idle"
+            style = STATE_STYLE.get(r.get("state") or "", "yellow")
         bp = r.get("battery_percent")
         power = "AC" if bp is None else f"{bp}%{'' if r.get('power_plugged') else ' bat'}"
         w.add_row(str(x.get("name")), str(x.get("os")), str(x.get("tier")), str(x.get("gpu") or "")[:28],
@@ -292,6 +315,7 @@ SETTINGS: list[tuple[str, str, str]] = [
     ("gpu_lock", "GPU lock file shared with other programs (Linux/macOS; empty = none)", "str"),
     ("auto_update", "Install updates automatically", "bool"),
     ("keep_awake", "Keep the computer awake while working (off = allow sleep)", "bool"),
+    ("awake_before_window_min", "Outside the schedule, stay awake if the next window starts within (min; default 120)", "int0"),
     ("min_free_ram_gb", "Keep at least this much system RAM available (GB; default 8)", "float"),
     ("host_prompt_cache_mb", "Ollama host-RAM prompt cache in MB (default 0 = off)", "int0"),
 ]
@@ -371,6 +395,10 @@ def config_menu(console: Console, ask: Callable[[str], str], restart: Callable[[
             if changed:
                 cfg.save()
                 console.print(f"[green]saved {cfgmod.config_path()}[/green]")
+                from . import service as svc
+                from .scheduler import legacy_hours_to_schedule
+                for m in svc.sync_wake(cfg.schedule or legacy_hours_to_schedule(cfg.active_hours)):
+                    console.print(m, markup=False)
                 if ask("Restart the background worker now so it uses them? [Y/n]").strip().lower() in ("", "y", "yes"):
                     for m in restart():
                         console.print(m, markup=False)

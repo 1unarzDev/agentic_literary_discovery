@@ -401,3 +401,143 @@ def refresh_definition(run: Runner = _run, platform: str = sys.platform) -> str:
                 pass
         return f"refreshed task {TASK} ({'S4U' if s4u else 'interactive'}) -> {r.returncode}"
     return ""
+
+
+# --------------------------------------------------------------------------- waking up for the schedule
+WAKE_TASK = "ald-wake"
+_XML_DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+def wake_starts(schedule: str | None) -> dict[int, list[int]]:
+    """{start minute of day: [weekdays]} for every window start in the schedule."""
+    from .scheduler import parse_schedule
+    out: dict[int, list[int]] = {}
+    if not schedule:
+        return out
+    try:
+        rules = parse_schedule(schedule)
+    except ValueError:
+        return out
+    for d, start, _end in rules:
+        out.setdefault(start, [])
+        if d not in out[start]:
+            out[start].append(d)
+    return out
+
+
+def windows_wake_task_xml(schedule: str, user: str, *, s4u: bool, python: str | None = None) -> str:
+    """A task that WAKES the computer at every window start and starts the worker task. Separate from
+    'ald-worker' because WakeToRun applies to all of a task's triggers (and that one repeats every 10 min)."""
+    py = Path(python or sys.executable)
+    pyw = py.with_name("pythonw.exe")
+    exe = str(pyw if pyw.exists() or python else py)
+    code = (f"import subprocess; subprocess.run(['schtasks', '/Run', '/TN', '{TASK}'], "
+            f"creationflags=0x08000000)")
+    triggers = []
+    for start, days in sorted(wake_starts(schedule).items()):
+        hh, mm = divmod(start % (24 * 60), 60)
+        dlist = "".join(f"<{_XML_DAYS[d]}/>" for d in sorted(days))
+        triggers.append(
+            f"    <CalendarTrigger><StartBoundary>2026-01-05T{hh:02d}:{mm:02d}:00</StartBoundary><Enabled>true</Enabled>"
+            f"<ScheduleByWeek><DaysOfWeek>{dlist}</DaysOfWeek><WeeksInterval>1</WeeksInterval></ScheduleByWeek>"
+            f"</CalendarTrigger>")
+    return f"""<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>ald: wake the computer when an ald work window starts ({_xml_escape(schedule)})</Description></RegistrationInfo>
+  <Triggers>
+{chr(10).join(triggers)}
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>{_xml_escape(user)}</UserId>
+      <LogonType>{"S4U" if s4u else "InteractiveToken"}</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <StartWhenAvailable>false</StartWhenAvailable>
+    <WakeToRun>true</WakeToRun>
+    <ExecutionTimeLimit>PT5M</ExecutionTimeLimit>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+  </Settings>
+  <Actions Context="Author">
+    <Exec><Command>{_xml_escape(exe)}</Command><Arguments>-c "{_xml_escape(code)}"</Arguments></Exec>
+  </Actions>
+</Task>
+"""
+
+
+RTCWAKE_RE = r"Current AC Power Setting Index:\s*0x([0-9a-fA-F]+)"
+
+
+def windows_wake_timers(run: Runner = _run) -> tuple[bool, str]:
+    """Make sure the active power plan allows wake timers on AC (RTCWAKE = 1; Windows' default is often
+    'important wake timers only', which ignores scheduled tasks). Setting it needs an Administrator shell."""
+    import re
+    q = run(["powercfg", "/QUERY", "SCHEME_CURRENT", "SUB_SLEEP", "RTCWAKE"])
+    m = re.search(RTCWAKE_RE, q.stdout or "")
+    if m and int(m.group(1), 16) == 1:
+        return True, "wake timers allowed on AC"
+    r = run(["powercfg", "/SETACVALUEINDEX", "SCHEME_CURRENT", "SUB_SLEEP", "RTCWAKE", "1"])
+    if r.returncode == 0:
+        run(["powercfg", "/SETACTIVE", "SCHEME_CURRENT"])
+        return True, "enabled wake timers on AC (powercfg RTCWAKE=1)"
+    return False, ("WARNING: wake timers are not enabled in the power plan, so a sleeping PC will not wake for "
+                   "its ald window. Run once in an Administrator PowerShell: powercfg /SETACVALUEINDEX "
+                   "SCHEME_CURRENT SUB_SLEEP RTCWAKE 1; powercfg /SETACTIVE SCHEME_CURRENT")
+
+
+def sync_wake(schedule: str | None, run: Runner = _run, platform: str = sys.platform) -> list[str]:
+    """Install / update / remove the OS wake-up for the schedule's window starts. Windows: the 'ald-wake'
+    task (+ power plan wake timers). macOS / Linux use one-shot alarms set before sleep (`schedule_wake_at`)."""
+    msgs: list[str] = []
+    if platform != "win32":
+        return msgs
+    import tempfile
+    if not schedule or not wake_starts(schedule):
+        r = run(["schtasks", "/Delete", "/TN", WAKE_TASK, "/F"])
+        if r.returncode == 0:
+            msgs.append(f"removed task {WAKE_TASK} (no schedule)")
+        return msgs
+    q = run(["schtasks", "/Query", "/TN", TASK, "/XML"])
+    s4u = "<LogonType>S4U</LogonType>" in (q.stdout or "")
+    for attempt_s4u in ((True, False) if s4u else (False,)):
+        fd, path = tempfile.mkstemp(suffix=".xml")
+        with os.fdopen(fd, "wb") as f:
+            f.write(windows_wake_task_xml(schedule, _windows_user(), s4u=attempt_s4u).encode("utf-16"))
+        try:
+            r = run(["schtasks", "/Create", "/TN", WAKE_TASK, "/XML", path, "/F"])
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        if r.returncode == 0:
+            msgs.append(f"task {WAKE_TASK}: wakes the PC at each window start ({schedule})")
+            break
+    else:
+        msgs.append(f"WARNING: could not create task {WAKE_TASK}: {(r.stderr or r.stdout).strip()}")
+    msgs.append(windows_wake_timers(run)[1])
+    return msgs
+
+
+def schedule_wake_at(epoch: float, run: Runner = _run, platform: str = sys.platform) -> str:
+    """macOS / Linux: arm a one-shot RTC wake-up for ``epoch`` before the machine may sleep. Needs root:
+    uses `sudo -n` (never prompts) and returns a warning when that is not possible."""
+    import datetime as _dtm
+    when = _dtm.datetime.fromtimestamp(epoch)
+    if platform == "darwin":
+        r = run(["sudo", "-n", "pmset", "schedule", "wake", when.strftime("%m/%d/%Y %H:%M:%S")])
+        return (f"pmset: wake scheduled for {when:%a %H:%M}" if r.returncode == 0 else
+                "WARNING: cannot schedule a wake-up without sudo (sudo pmset schedule wake ...); "
+                "the Mac may sleep through its next ald window")
+    if platform.startswith("linux"):
+        r = run(["sudo", "-n", "rtcwake", "-m", "no", "-t", str(int(epoch))])
+        return (f"rtcwake: wake scheduled for {when:%a %H:%M}" if r.returncode == 0 else
+                "WARNING: cannot arm the RTC wake alarm without sudo (sudo rtcwake -m no -t <epoch>); "
+                "the machine may sleep through its next ald window")
+    return ""

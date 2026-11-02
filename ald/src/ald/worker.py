@@ -21,6 +21,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import os
+import sys
 import random
 import threading
 import time
@@ -210,6 +211,7 @@ class Worker:
         self.ram_available_fn = ram_available_fn
         self.activity = "starting"
         self.last_quality: dict[str, Any] | None = None
+        self.next_window: float | None = None
         self.keep_awake: Any = None  # KeepAwake (set by `ald work`)
         self.last_contact: float | None = None
         self.gpu_fraction: dict[str, float] = {}
@@ -641,6 +643,10 @@ class Worker:
             "gpu_fraction": self.gpu_fraction.get(stage) if stage else None,
             "gpu": self.hw.gpu_summary[:120], "client_version": CLIENT_VERSION, "service": self.service_mode,
             "gpu_lock": bool(self.gpu_lock.enabled),
+            "next_window": (next_schedule_change(self.schedule, self.clock.time())
+                            if self.schedule and not in_schedule(self.schedule, self.clock.time()) else None),
+            "may_sleep": bool(self.keep_awake is not None and getattr(self.keep_awake, "enabled", False)
+                              and not self.keep_awake.alive()),
             "quality_stage": (self.last_quality or {}).get("stage"),
             "schema_fail_rate": (self.last_quality or {}).get("schema_fail_rate"),
             "evidence_fail_rate": (self.last_quality or {}).get("evidence_fail_rate"),
@@ -1093,9 +1099,63 @@ class Worker:
         self.check_for_update(force=True)
         self.ensure_ollama()
         self.refresh_service_definition()
+        self.sync_wake_triggers()
         self.resolve_stages()
         self.unload_non_pinned()
         self._save_state()
+
+    def keep_awake_policy(self) -> None:
+        """Hold keep-awake while working, inside the schedule, or when the next window starts within
+        awake_before_window_min (short gaps never sleep). For longer gaps (or while paused): report once,
+        arm a wake-up for the next window, and let the computer sleep."""
+        ka = self.keep_awake
+        if ka is None or not getattr(ka, "enabled", False):
+            return
+        now = self.clock.time()
+        nxt = None
+        if self.paused():
+            want = False
+        elif in_schedule(self.schedule, now):
+            want = True
+        else:
+            nxt = next_schedule_change(self.schedule, now)
+            want = nxt is not None and nxt - now <= 60.0 * float(self.cfg.awake_before_window_min or 0)
+        if want:
+            ka.hold()
+            return
+        if not ka.alive():
+            return
+        self.next_window = nxt
+        self.activity = "paused" if self.paused() else "outside_hours"
+        self._last_idle_hb = -1e18  # tell the fleet now: absence until the next window is expected
+        try:
+            self.heartbeat_once()
+        except Exception:  # noqa: BLE001
+            pass
+        if nxt and sys.platform != "win32":  # Windows: the ald-wake task (service.sync_wake) wakes the PC
+            from . import service as svc
+            msg = svc.schedule_wake_at(nxt)
+            if msg:
+                self.log(f"[wake] {msg}")
+        ka.release()
+        when = _dt.datetime.fromtimestamp(nxt).strftime("%a %H:%M") if nxt else "resume"
+        self.log(f"[keep-awake] next window {when} is more than {self.cfg.awake_before_window_min} min away: "
+                 f"the computer may sleep until then")
+
+    def sync_wake_triggers(self) -> None:
+        """Windows: (re)create the wake task whenever the schedule differs from the last one applied."""
+        if not self.service_mode or sys.platform != "win32":
+            return
+        from . import service as svc
+        marker = self.root / "wake_schedule.json"
+        if (read_json(marker, {}) or {}).get("schedule") == (self.schedule or ""):
+            return
+        try:
+            for m in svc.sync_wake(self.schedule):
+                self.log(f"[wake] {m}")
+            atomic_write_json(marker, {"schedule": self.schedule or ""})
+        except Exception as e:  # noqa: BLE001
+            self.log(f"[wake] could not set up wake-ups: {e}")
 
     def refresh_service_definition(self) -> None:
         """After an auto-update, bring the installed unit / plist / task up to the current definition."""
@@ -1275,6 +1335,7 @@ class Worker:
         idle = 0
         try:
             while not self.stop.is_set():
+                self.keep_awake_policy()
                 if self.window.expired():
                     self.log("[window] run window ended")
                     break

@@ -33,6 +33,24 @@ statusRoutes.get("/v1/status", async (c) => json(await fleetStatus(c.env, true))
 /** Read-only fleet view (viewer or admin token): /v1/status without worker ids. */
 statusRoutes.get("/v1/fleet", async (c) => json(await fleetStatus(c.env, false)));
 
+const ONLINE_MS = 15 * 60_000; // seen within this: online
+const OVERDUE_GRACE_MS = 15 * 60_000; // not back this long after its window started: overdue
+
+/**
+ * online | sleeping (absence expected: its last report said "may sleep until next_window") |
+ * overdue (next_window passed by more than 15 min and it has not been seen since) | silent (no schedule info).
+ */
+export function presence(lastSeen: unknown, report: Record<string, unknown> | null, now: number) {
+  const seen = typeof lastSeen === "string" ? Date.parse(lastSeen) : NaN;
+  if (!isNaN(seen) && now - seen < ONLINE_MS) return { presence: "online" as const, until: null };
+  const nw = report && typeof report.next_window === "number" ? report.next_window * 1000 : null;
+  if (nw !== null && (isNaN(seen) || seen < nw)) {
+    if (now < nw + OVERDUE_GRACE_MS) return { presence: "sleeping" as const, until: new Date(nw).toISOString() };
+    return { presence: "overdue" as const, until: new Date(nw).toISOString() };
+  }
+  return { presence: "silent" as const, until: null };
+}
+
 function parseStats(s: unknown): Record<string, unknown> | null {
   if (typeof s !== "string") return null;
   try {
@@ -148,6 +166,10 @@ async function fleetStatus(env: AppEnv["Bindings"], withIds: boolean) {
       passages_24h: tp.get(w.id as string)?.n_24h ?? 0,
       tok_s: w.tok_s,
       report: parseStats(w.stats_json),
+      ...(() => {
+        const p = presence(w.last_seen, parseStats(w.stats_json), now);
+        return { presence: p.presence, expected_back: p.until };
+      })(),
     })),
     waves: [...waveMap.values()],
     hourly_passages: hourlyOut,
