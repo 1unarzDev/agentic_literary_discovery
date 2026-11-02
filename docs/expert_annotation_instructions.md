@@ -10,8 +10,8 @@ There are two tasks.
 
 | Task | Items | Time | File you receive | File you return |
 |---|---|---|---|---|
-| **A. Answer-key review** (now) | 60 | ~45–60 min | `key_review_items.csv` (or `.jsonl`) | `key_review_RETURN.csv` |
-| **B. Expert labels** (from Nov 5) | ~450 | ~4 h, in sittings | `expert_items.csv` (or `.jsonl`) | `expert_RETURN.csv` |
+| **A. Answer-key review** (now) | 60 | ~45–60 min | `A_key_review_items.csv` (or `.jsonl`) | `A_key_review_RETURN.csv` |
+| **B. Expert labels** (from Nov 5) | ~900 | ~7–8 h, in sittings, return by Nov 8 | `C_main_items.csv` (or `.jsonl`) | `C_main_RETURN.csv` |
 
 Each item has `ctx_before`, `passage`, and `ctx_after`. **Judge only the `passage`.** The context is there to orient you.
 
@@ -83,7 +83,7 @@ The body is not the mind: illness is material, fear is internal.
 
 ## Return format
 
-Return **one CSV file** (UTF-8, comma-separated, header row, quote fields that contain commas). JSON Lines with the same field names also works. A template with every `item_id` pre-filled is provided: `*_RETURN_TEMPLATE.csv`.
+Return **one CSV file** (UTF-8, comma-separated, header row, quote fields that contain commas). JSON Lines with the same field names also works. The `*_RETURN.csv` file comes with every `item_id` and your annotator name already filled in.
 
 ### Task A: answer-key review
 Each item shows a draft answer (`draft_has_obstacle`, `draft_domain`, `draft_locus`, `draft_failure_cause`) and a `draft_rationale`. Your corrected answers become the official key used to train and certify the student annotators.
