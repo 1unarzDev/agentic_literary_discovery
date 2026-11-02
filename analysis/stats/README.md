@@ -47,6 +47,26 @@ Set `OMP_NUM_THREADS=1` for the multiprocess runs, because BLAS threads oversubs
 - Resolution: an `annotator == "adjudicated"` row wins. Otherwise the teacher's row wins, since the teacher adjudicates (plan §4.5). Otherwise the first row is used. Pass a different `prefer` order to `resolve_human` if needed.
 - `weight` = N_cell / n_cell exactly as `select_annotation.py` writes it.
 
+**Registered design, prereg v0.5. This supersedes the v0.3 notes below where they conflict.**
+
+- **Audit draw (seal-safe).** `select_annotation.draw_audit_metadata(meta_conf, rng, n_target=1820)` draws on metadata only.
+  - Strata are era (by year) × genre × canonical. The budget is balanced over era × canonical and proportional to N within.
+  - `meta_conf` needs `passage_id, work_id, author_key, year, split, stratum, genre, canonical`.
+  - `draw_audit(..., group_col=[...], balance_on=[...], metadata_only=True)` is the general form. It refuses label-derived strata.
+  - `cell_table_hash(frame)` gives the hash to deposit.
+- **Estimator.** The expert-anchored three-level DSL (`dsl.pseudo_outcomes_anchored`, `dsl.prepare_anchored`). The grad-student (`grad`) labels define the construct, and peers are the intermediate phase. The expert items are a stratified ~25% subsample within audit cells, all of them also peer-labelled. Teacher rows are descriptive only.
+- **Family.** `models.confirmatory(primaries=("TF",))` is the default: TF primary at 0.05. H1 and the within-canon contrasts are secondary (Holm). TF-genre, H1-ML and composition are descriptive. H2a–c and H3 are estimation only. `primaries=("TF", "H1")` gives co-primaries at 0.025.
+- **Models.** `models.two_fictions`. The symmetric `classify_h1` has the classes inward, outward, socialisation, de-socialisation and indeterminate. `models.attach_canon` reads `data/work/canon.parquet` (`work_id, canonical`).
+- **Battery.** `battery.canon_permutation` serves the TF null. Replication is optional (n/a when missing).
+- **Real-data CLI:**
+  ```
+  uv run python -m analysis.stats.battery labels.parquet human.parquet audit_frame.parquet \
+      --keywords kw.csv --canon data/work/canon.parquet --works data/work/works_v2.parquet
+  ```
+- **Power and levers.**
+  - `power_v05.py`, calibrated with `SimConfig.v05`; add `--expert-extra` for the expert-budget lever.
+  - `levers.py`: model accuracy, Neyman allocation, contrasts, confusion correction and label count.
+
 **Registered audit design (prereg v0.3)**:
 - `draw_audit(lab_conf, teaching_authors, rng, n_target=1800, group_col="dgroup")`, where `dgroup = select_annotation.domain_group(row)`. The new `group_col` keyword defaults to `"group"`, so existing calls are unchanged.
 - **Human label** = the mean one-hot over retained non-expert annotators (`dsl.human_soft`; `prepare(human_mode="mean")`).
