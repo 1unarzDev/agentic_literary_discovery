@@ -595,22 +595,27 @@ def holm(p: list[float] | np.ndarray) -> np.ndarray:
     return adj
 
 
+PRIMARIES = ("TF",)          # prereg v0.5 recommendation; ("TF", "H1") = the two-primary alternative
+
+
 def confirmatory(wd: WorkData, keywords: pd.DataFrame | None = None, alpha: float = 0.05,
-                 design: Design | None = None, n_boot: int = 2000,
-                 ref_cov: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict[str, Effect]]:
+                 design: Design | None = None, n_boot: int = 2000, ref_cov: pd.DataFrame | None = None,
+                 primaries: tuple = PRIMARIES) -> tuple[pd.DataFrame, dict[str, Effect]]:
     """Registered v0.5 family.
-      co-primary (Bonferroni, alpha/2 = 0.025 each): TF (two fictions), H1 (E vs L locus shift)
-      secondary (Holm at alpha over the two): H1 within canonical works, H1 within non-canonical works
+      primary (Bonferroni over the primaries: alpha / len(primaries)): default TF alone at 0.05;
+        primaries=("TF", "H1") gives the two-primary alternative at 0.025 each
+      secondary (Holm at alpha): H1 (if not primary), H1 within canonical, H1 within non-canonical
       descriptive (CIs, Wald p, no verdict): TF genre-adjusted, H1-ML, canon composition share
       estimation only (effect + CI, no test): H2a, H2b, H2c, H3."""
     design = design or Design.from_data(wd)
-    a1 = alpha / 2
-    effs: dict[str, Effect] = {"H1": h1(wd, design, ref_cov, alpha=a1)}
-    role = {"H1": "co-primary"}
+    a1 = alpha / len(primaries)
+    pr = "co-primary" if len(primaries) > 1 else "primary"
+    effs: dict[str, Effect] = {"H1": h1(wd, design, ref_cov, alpha=a1 if "H1" in primaries else alpha)}
+    role = {"H1": pr if "H1" in primaries else "secondary"}
     has_canon = "canonical" in wd.cov and wd.cov.canonical.nunique() == 2
     if has_canon:
-        effs["TF"] = two_fictions(wd, design, ref_cov, alpha=a1)
-        role["TF"] = "co-primary"
+        effs["TF"] = two_fictions(wd, design, ref_cov, alpha=a1 if "TF" in primaries else alpha)
+        role["TF"] = pr if "TF" in primaries else "secondary"
         for lev, nm in ((True, "H1|canonical"), (False, "H1|non-canonical")):
             sub = wd.subset(wd.cov.canonical.values.astype(bool) == lev)
             try:
@@ -633,7 +638,7 @@ def confirmatory(wd: WorkData, keywords: pd.DataFrame | None = None, alpha: floa
     rows = []
     for k, e in effs.items():
         r = role[k]
-        if r == "co-primary":
+        if r in ("co-primary", "primary"):
             p_adj, lev = e.p, a1
         elif r == "secondary":
             p_adj, lev = sec_adj[k], alpha

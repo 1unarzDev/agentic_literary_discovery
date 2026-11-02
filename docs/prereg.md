@@ -1,325 +1,304 @@
-# Pre-registration: What Stands in the Way (confirmatory analysis), DRAFT v0.4
+# Pre-registration: What Stands in the Way (confirmatory analysis), DRAFT v0.5
 
 **OSF registration hash:** `OSF-HASH-PLACEHOLDER` (fill in on registration; `ald sync` / `POST /v1/admin/unseal` refuse to unseal Confirmation results until this line holds the real hash)
 
-- **Registration date:** _TBD (planned Sun–Mon Nov 8–9, 2026, after codebook v1.0 freeze and before unsealing)_
+**Schedule and seal:**
+- **Registration date:** _TBD (planned Nov 8–9, 2026). Confirmation labels are unsealed about Nov 9–11, for the Nov 20 submissions._
 - **Template:** OSF Preregistration (secondary data / observational).
-- **Status of data at registration:**
-  - Discovery-half model labels, the human audit and teaching labels have been seen.
-  - Confirmation-half model labels sit sealed under the R2 `sealed/` prefix and have not been read by any analyst.
-  - The Confirmation human audit items are labeled blind: annotators see neither model labels nor metadata.
-- **Code:**
-  - `analysis/stats/` at commit _TBD_. Running `uv run python -m analysis.stats.battery` produces every number below.
-  - Simulation validation: `analysis/stats/validate.py`.
-  - Power: `analysis/stats/power.py`.
-- **Related documents:**
-  - `docs/plan/research_plan_v2.md` §3–4
-  - `docs/data_quality.md`
-  - `docs/codebook.md` (frozen at v1.0)
-  - `docs/gates.md` (G0 decisions, made before any labels were seen)
+
+**Status of data at registration:**
+- Discovery-half model labels (codebook v0.9 production, `v09lean_r2`, pin `41ca3c7d`), the QA references, the pilot and the reviews (`docs/review/*.md`) have been seen. The two-fictions hypothesis was **discovered on Discovery** (literary review P1) and is confirmed here on Confirmation.
+- Confirmation model labels sit sealed under the R2 `sealed/` prefix and have not been read by any analyst. The audit draw reads **metadata only** (§3.4). This fixes the v0.4 design, whose predicted-label strata would have exposed the naive answer (methods review P4).
+- **Raters and what they have seen:**
+
+  | Rater | What they have seen |
+  |---|---|
+  | Project lead (student, peer annotator) | knows the hypotheses and the Discovery results |
+  | Peers | the hypotheses at the level of the annotation guide |
+  | Graduate-student expert (anonymous) | the codebook and the guide only; **no** hypotheses, pilot, showcase or reviews (to be attested) |
+  | English teacher | the showcase (Nov 1); gives ~8 items and draft feedback, descriptive only |
+
+**Code:**
+- `analysis/stats/` at commit _TBD_. Running `uv run python -m analysis.stats.battery labels human frame --keywords …` produces every confirmatory number.
+- Power for this design: `analysis/stats/power_v05.py`. Levers: `levers.py`. Validation: `validate.py`.
+
+**Related documents:**
+- `docs/plan/research_plan_v2.md`
+- `docs/data_quality.md`
+- `docs/codebook.md` (v0.9 production; no v1.0 relabel)
+- `docs/gates.md`
+- `docs/canon_measure.md`
+- `docs/review/{methods,literary,feasibility}_review.md`
 
 ---
 
-## 1. Hypotheses (directions pre-declared)
+## 1. Hypotheses and family
 
-Every hypothesis is tested on the **Confirmation half** (authors hashed 50/50, stratified by decade × origin × genre).
+Eras use **year** cuts: E 1800–1849, M 1850–1884, L 1885–1929. The window is 1800–1929, and E effectively means about 1835–1849 (see §2).
 
-**Family.**
-- **H1 is the single primary confirmatory test**: two-sided, tested at α = 0.05 (v0.4, see below).
-- **H2a, H2b, H2c and H3 are secondary confirmatory tests**, Holm-corrected among themselves (§5.3). Each is reported with its registered MDE (§7.4), so a null is read against what the design could detect.
+| ID | Role | Hypothesis | Estimand (Confirmation half, primary set) | Test |
+|---|---|---|---|---|
+| **TF** two fictions | **PRIMARY** (α = 0.05; see the decision box) | Canonical and non-canonical works differ in where their obstacles' resistance comes from (locus mix) | Standardised locus shares, canonical vs non-canonical. (Δ_material, Δ_internal) = canonical − non-canonical, by g-computation over the standard population, each work at its own year. Genre is **not** adjusted: genre composition is part of what separates the two fields. | Two-sided 2-df Wald, then the symmetric classification |
+| **H1** locus shift | **SECONDARY** (Holm with H1\|canon and H1\|non-canon) | The locus mix of scene-level obstacles in PG-preserved fiction shifts between E and L, genre-standardised | v0.4 estimand: (Δ_material, Δ_internal), L − E | Two-sided 2-df Wald, then classification |
+| H1\|canon, H1\|non-canon | SECONDARY (Holm) | H1's era contrast within each canon stratum | as H1, in each stratum | as H1 |
+| TF-genre | descriptive | TF adjusted for genre | TF + genre fixed effects | CI and Wald p, no verdict |
+| Composition | descriptive | How much of the aggregate E → L locus change is canon composition | Bennet shift-share by canonical stratum (§5.4) | CI only |
+| H1-ML | descriptive | M vs L locus contrast | as H1 | CI and Wald p, no verdict |
+| H2a, H2b, H2c, H3 | **estimation only** | as in v0.4 | as in v0.4 | effect and CI, **no test, no verdict** (methods review P11: power 0.05–0.15) |
 
-Eras, revised at G0 because PG is thin before 1840:
+Wording follows methods review P1. H1 is "the locus mix of scene-level obstacles". It is *motivated by* the inward-turn literature, and the paper does not claim to test Kahler, whose thesis concerns narrative up to about 1800. TF speaks to Woolf's "materialists" charge and to the canon/mass divide (Bourdieu's restricted versus large-scale production; Moretti; Underwood).
 
-| Era | Years |
+> **DECISION (confirm with the user before registration): one primary or two?**
+>
+> The user leaned towards **two co-primaries (TF and H1) at α = 0.025 each**. §7.7 shows H1's E-vs-L power under this design is about **0.02–0.10** under every truth simulated, including a genuine within-stratum trend of +4.4 pp (MDE about 21 pp). The early era has about 95 works per half, and the audit budget is split across canon cells.
+>
+> Splitting α would cut TF's power from **0.59 to 0.47** (registered cell) to buy almost no chance of an H1 rejection.
+>
+> **Recommendation: TF as the single primary at α = 0.05, with H1 as the first secondary**, Holm-corrected with the two within-stratum contrasts and reported with its MDE.
+>
+> The code supports both: `models.confirmatory(primaries=("TF",))` is the default, and `primaries=("TF", "H1")` gives the split. The registered text must pick one.
+
+**Classification** (TF and H1; v0.5 makes it symmetric, following methods review P10). It is applied only when the 2-df Wald test rejects at the test's α. Each component is judged *up*, *down* or *flat* by its **Bonferroni-adjusted CI at level 1 − α/2**, which gives directional error control across the two components (`models.classify_h1`):
+
+| Class | Rule |
 |---|---|
-| E (early) | 1800–1849 |
-| M (mid) | 1850–1884 |
-| L (late) | 1885–1929 |
+| **inward** | material down and internal not down, **or** internal up and material not up |
+| **outward** | material up and internal not up, **or** internal down and material not down |
+| **socialisation** | material down and internal down (the social share rises) |
+| **de-socialisation** | material up and internal up (the social share falls) |
+| **indeterminate** | the joint test rejects but neither component's CI excludes 0 |
 
-The study window is 1800–1929.
+For TF, "inward" means canonical fiction locates resistance more in people and minds than the mass market does.
 
-| ID | Hypothesis | Direction | Estimand (Confirmation half) |
-|---|---|---|---|
-| **H1** locus shift (primary; two-sided since v0.4) | The locus mix of plot obstacles (material / social / internal) shifts between E and L, holding the registered genre × origin × length mix fixed. Kahler's inward turn (material falls, internal rises) is the named thesis tested. | two-sided; the result is classified (below) | Standardised era shares of locus among obstacles; (Δ_material, Δ_internal) = L − E. 2-df Wald test of (Δ_material, Δ_internal) = 0 |
-| **H2a** communication | Among communication failures, intentional withholding rises relative to infrastructure + accidental loss | Δ > 0 | Standardised share withholding / (withholding + infrastructure + accidental_loss), L − E |
-| **H2b** mobility | DISTANCE_TRAVEL obstacles become less prevalent after railway diffusion | Δ < 0 | Standardised prevalence per passage, 1850–1884 minus 1800–1849 (G0 window) |
-| **H2c** darkness | DARKNESS_VISIBILITY prevalence falls | Δ < 0 | Standardised prevalence per passage, L − E. The night-function part (danger + concealment share) is **exploratory**: humans do not label `night_function`, so it cannot be DSL-corrected (R4). |
-| **H3** mention ≠ function | Decade keyword rates for technology terms do **not** track the corresponding obstacle-function rates | excess divergence > 0 | D = mean over 3 pairs of (1 − r) between z-scored decade series; excess = D − E_H0[D] |
+## 2. Design and population
 
-**H1 classification** (pre-declared, applied only when the 2-df Wald test gives p < 0.05; `models.classify_h1`):
-- **inward (Kahler pattern):** Δ_material < 0 **and** Δ_internal > 0, with both 95% CIs excluding 0;
-- **outward / externalisation:** Δ_material > 0 with its 95% CI excluding 0, **and** Δ_internal ≤ 0 (point estimate);
-- **mixed:** any other significant pattern, e.g. material falls with internal flat, or both rise.
-
-The paper reports the class together with both component estimates and CIs. "Inward" confirms Kahler, "outward" contradicts him, and "mixed" is reported as such.
-
-**H1-ML, mid vs late (descriptive, v0.4).** The same estimand and 2-df Wald test for M (1850–1884) vs L (1885–1929), where most of the data lie and where the Discovery pilot shows a step in the 1880s. It is reported with CIs, Wald p and class. It is **not** part of any multiplicity family and carries no verdict.
-
-H3 pairs (keyword group → function rate per passage):
-
-| Keyword group | Terms | Function rate |
-|---|---|---|
-| comm | post / letter / telegram / telephone … | communication failures caused by infrastructure or accidental loss |
-| travel | coach / railway / train / carriage … | DISTANCE_TRAVEL |
-| dark | candle / lamp / gas / electric … | DARKNESS_VISIBILITY |
-
-Keyword rates come from HTRC EF 2.0 plus our corpus, per 10k words, using the lexicon frozen in `research/history/` on _TBD_.
-
-Not confirmatory, and reported descriptively only:
-- the H2b "barrier → setting" function shift (the schema has no travel-function field);
-- H2c's "earlier in urban settings" (there is no setting-location field);
-- the social share in H1;
-- night's function shares (exploratory, uncorrected model labels);
-- **the genre-split interaction** ("literary fiction turned inward, popular fiction turned outward"): era × genre-group locus shares and interaction contrasts, **exploratory only**. The pilot found no support: era × popular OR 0.86–0.88, CIs spanning 0.3–2.5. An interaction contrast would need about twice H1's MDE.
-
-## 2. Design
-
-- **Corpus.** English fiction 1800–1929 preserved in Project Gutenberg, after the `docs/data_quality.md` filters. At G0 that is 15,511 works, about 7,400–8,100 per half.
-- **Primary analysis set:**
-  - date confidence high or medium;
-  - contemporary setting (historical novels are analysed separately);
-  - at most 5 works per author per decade (seeded random choice);
-  - non-teaching authors.
-- **Unit.**
-  - The **work** is the unit. Passage-level labels are aggregated to within-work Hájek-weighted shares, using weights 1/inclusion_prob normalised within the work.
-  - Works are weighted equally, times the adaptive-stopping work weight (§3.3).
-  - Authors are the clustering unit for all SEs, since works nest in authors.
-- **Measurement.**
-  - The pinned Tier-2 model labels every sampled passage (codebook v1.0).
-  - Humans (student + teacher) label a probability sample (§3.4).
-  - Every estimate is DSL-corrected toward the **human-label** construct.
+- **Corpus:** English fiction 1800–1929 preserved in Project Gutenberg, after the `docs/data_quality.md` filters.
+- **Works table:** `works_v2.parquet`. Authors are re-keyed by **PG agent ID**, with aliases merged, and Stratemeyer Syndicate house names are merged into one cluster (methods review P8). The split was repaired so that no canonical author spans the halves, without reading any labels. Authors are the clustering unit, and the 5-per-author-per-decade cap is re-applied on the new keys.
+- **Primary set:**
+  - date resolved inside 1800–1929;
+  - `genre ≠ historical`, an implementable stand-in for "contemporary setting" (methods review P7);
+  - non-teaching authors;
+  - the author cap.
+- **Dates:**
+  - **Date variable:** the earliest documented book or serial publication. Composition dates are not used.
+  - **Early era:** every early-era work (year < 1850) and every work dated 1847–1853 is **hand-verified** against first-edition bibliographies (Garside/Raven/Schöwerling, ATCL, Wright). Agents prepare the evidence, and a human signs off. Works whose date cannot be resolved, or resolves outside the window, are **excluded**.
+  - **Round-year placeholders:** years exactly 1900 (and other round hundreds) count as unverified, and those works are excluded unless verified (methods review P3.5).
+  - **Tiers:** confidence tiers are redefined from the verified dates. Open Library agreement no longer defines "high".
+- **Canonicity:**
+  - `data/work/canon.parquet` (`docs/canon_measure.md`): a **metadata-only** binary `canonical` per work, built without labels and frozen at the registration commit.
+  - Canonical works are about 30% of E, 20% of M and 4% of L.
+- **Passages:** **12 random passages per work** (random backbone `rand_a`, k < 12). This replaces the unimplemented adaptive stopping (methods review P9). Early-era works may contribute up to 24 if those passages were labelled before the audit draw, and within-work Hájek weights handle this. Enrichment passages never enter a confirmatory estimate.
+- **Unit and SEs:** the work is the unit. SEs are author-clustered (CR1) on the new author keys.
+- **Model labels:** codebook v0.9 production (`v09lean_r2`, pinned). **There is no v1.0 relabel.** DSL is valid for any predictor; a better model buys efficiency, not validity (§7.6: model accuracy is a weak lever).
 
 ## 3. Sampling plan
 
-### 3.1 Passages
-- **Random backbone.** 24 random ~350-word passages per work (seeded), with offsets and sha256. All confirmatory estimates use the random backbone only.
-- **Enrichment.** Up to 24 extra passages per work from the comm / mobility / darkness lexicon strata (≤ 8 each), with union-of-frames inclusion probabilities recorded.
-  - Enrichment passages are used for exemplars and descriptive deep dives only.
-  - **Decision (v0.3): the enrichment strata are not in the audit frame.** No confirmatory estimate uses them, because DSL needs a positive audit probability for every analysed passage. The domain-stratified audit (§3.4) already over-samples predicted-communication passages. The binding constraint for H2a is human-label noise and volume, not the number of communication passages in the frame: §7.4 puts H2a's MDE at 35–200 pp under any audit allocation we can afford.
+### 3.1 Existing data
+- Discovery labels exist and have been analysed (pilot, reviews).
+- Confirmation labels are sealed.
+- Power used Discovery-calibrated simulation only (§7.7).
 
-### 3.2 Existing data
-- Model labels exist for the Discovery half.
-- The Confirmation half has been labelled but is sealed.
-- No Confirmation outcome has been viewed.
-- Power and design decisions used Discovery-half prevalences, the G0 work counts and simulation only.
+### 3.2 Human audit (seal-safe, registered)
+- **Population.** The audit is drawn from the Confirmation half (primary set, random backbone) **before registration, on metadata only**:
+  ```
+  draw_audit_metadata(meta_conf, rng(20261105), n_target=1820)
+    == draw_audit(meta, set(), rng, 1820,
+                  group_col=["genre", "canonical"],
+                  balance_on=["era", "canonical"],
+                  metadata_only=True)
+  ```
+  - `meta_conf` carries `passage_id, work_id, author_key, year, split, stratum, genre, canonical`, with `era = era_by_year(year)`.
+  - No label column is read. `metadata_only=True` refuses label-derived strata.
+- **Strata and allocation.**
+  - Strata are era (3) × genre (8) × canonical (2).
+  - The budget is split equally over the 6 era × canonical cells, then proportional to N within each cell. Each cell gets at least 2 items and at most N_cell.
+  - π = n_cell / N_cell is written for **every** pool passage in `audit_frame.parquet`.
+  - Canon balancing is what makes TF estimable: canonical works are 4% of L. Without canon strata, TF's MDE nearly doubles (§7.7).
+- **Hash deposit.** The frame's `cell_table_hash` is deposited (OSF addendum) before anyone opens it. The counts are metadata, so they are harmless, but they are not published before registration.
+- **If `canon.parquet` is not ready at draw time,** the fallback is `use_canon=False` (era × genre). §7.7 shows this costs TF most of its power, so **the draw waits for the canon measure** unless that would delay the schedule past Nov 6.
+- **Peers.**
+  - About 1,820 unique items, labelled by the student and about 3 peers, roughly 500 labels each: about 2,000 labels including 10% overlap.
+  - Assignment is random and balanced: every peer gets a random sample of every cell.
+  - Peers are **certified first**: κ ≥ 0.60 on a 20-item Discovery pre-test against the graduate student's key.
+- **Expert anchor (graduate student).**
+  - About 450 items: a **stratified 25% random subsample of the audit, drawn within audit cells**, so P(expert | audit) is known per cell.
+  - Every expert item is also peer-labelled (nested design). These items double as the overlap with peers for κ.
+- **Teacher.** About 8 items plus draft feedback. These are **descriptive only**: teacher–expert agreement is reported, and the teacher's labels never enter an estimate.
+- **Human schema:** `has_obstacle`, a single main domain, `locus`, and `failure_cause` (communication only).
+- **Teaching set:** about 60 Discovery items, labelled by the student only.
 
-### 3.3 Adaptive stopping rule (compute, not humans)
-- **Cells.** Labelling proceeds in seeded waves over cells = decade × stratum. Whole works are labelled in a seeded random order within each cell, so a cell's labelled works are a simple random sample of its works.
-- **Closing rule.** A cell closes when all of the following hold:
-  - the author-clustered 95% CI half-width for obstacle prevalence, computed from screen-stage labels, is ≤ 3.5 pp;
-  - at least 60 works are labelled;
-  - at least 30 authors are labelled.
+### 3.3 Sample size
+Primary-set Confirmation:
+- **Works:** about 4,000.
+  - E about 85–105, after excluding historical novels and unverifiable dates;
+  - M about 530;
+  - L about 3,400.
+- **Passages:** about 48k random passages.
+- **Audit:** about 1,820 items, of which about 450 are expert-labelled.
 
-  A cell also closes when it is exhausted.
-- **Stopping information.** The rule uses only screen-stage precision. It never uses locus, domain or any hypothesis quantity, so it is (approximately) ancillary to the estimands.
-- **Work weights.** In a closed decade d, each labelled work gets `work_weight = N_d / n_d` (works in the decade's primary set over works labelled), so decades are not under-weighted.
-- **Early era.** The cells 1800s–1840s are never closed early: the whole of every early work is labelled.
-
-### 3.4 Human audit (DSL / PPI), registered final design
-- **Population.** The Confirmation half only, random backbone, non-teaching authors.
-- **Draw.**
-  - `analysis/select_annotation.py::draw_audit(lab_conf, teaching_authors, rng, n_target=1800, group_col="dgroup")`, with seed 20261105.
-  - `lab_conf` is the Confirmation label table, with `era` and `dgroup = domain_group(row)`.
-- **Strata.** Era (3) × predicted primary-domain group (8: comm, distance, darkness, material_other, social, internal, other, no_obstacle).
-  - Allocation is equal, with `n_cell = min(per, N_cell)`.
-  - Items are drawn by simple random sampling within each cell.
-  - π = n_cell / N_cell.
-  - These are about 24 cells. Expected unique items: about 1,760, because a few early-era cells are smaller than the allocation.
-- **Records.** π is recorded for **every** pool passage in `audit_frame.parquet` at selection time (R5).
-- **Annotators.** The student plus about 3 non-expert peers, about 500 labels each.
-  - **Assignment** is random and balanced. The items are shuffled once, and annotator k receives items k, k+4, k+8, …, so every annotator gets a random sample of every cell.
-  - **Overlap.** About 10% of items are labelled by a second, randomly chosen annotator, for κ.
-  - **Blinding.** Annotators see only the passage and its context: no model label, no title, author or date, and the item order is random.
-- **Expert-reference items.** 30 items, 10 per era, are drawn **as a simple random subsample of the audit sample**. The English teacher (the expert) labels them, and so does every annotator. They are used for:
-  - **κ certification and the exclusion rule** (§5.1);
-  - the **expert-nested sensitivity analysis** (§5.1).
-
-  They are **not** weighted into the primary DSL estimate. The teacher's labels are excluded from the primary human label.
-- **Teaching set.** About 60 Discovery items, labelled by the student only. These authors are excluded from the audit pool. The set is used for training and for the codebook only.
-- **Human schema.** `has_obstacle`; a **single main domain**; `locus`; and `failure_cause` (only when the main domain is COMMUNICATION_INFORMATION). Humans do not label night_function.
-- **Relabelling.** After the v1.0 relabel, the strata stay defined by the selection-time labels. The DSL predictor is the v1.0 label. This is valid because π is known.
-
-### 3.5 Sample size
-Fixed by the corpus: about 7,750 works per half, of which the early era has about 200 works and about 90–100 authors (G0).
-
-Human audit: about 1,760 unique Confirmation items, about 2,000 labels including overlaps, plus 30 expert items.
-
-There is no optional stopping on hypothesis outcomes.
+There is no optional stopping.
 
 ## 4. Variables
-
-- **Model labels (per passage):**
-  - `has_obstacle`
-  - `domains` (≤ 2)
-  - `locus`
-  - `failure_cause`
-  - `night_function`
-  - `technology_named`
-  - `message_valence`
-  - `confidence`
-  - `quote_status`
-- **Human labels:** `has_obstacle`, a single main domain (stored as a one-element `domains` list), `locus`, and `failure_cause` (communication only). Humans do not label `night_function`.
-- **Estimand construct.** DSL targets the **human-label construct**: the mean label of the retained non-expert annotators. For H2b and H2c this means prevalence as the *main* domain. The model's second domain enters only through the calibration g.
-- **Derived outcome categories** (`analysis/stats/dsl.py::TARGETS`). Category 0 means "not counted"; `insufficient_context` counts as no obstacle.
-
-| Target | Categories |
-|---|---|
-| locus | none, material, social, internal |
-| comm_cause | none, withholding, infrastructure+accidental (only when has_obstacle = yes and COMMUNICATION_INFORMATION ∈ domains) |
-| distance | DISTANCE_TRAVEL ∈ domains and obstacle |
-| darkness | DARKNESS_VISIBILITY ∈ domains and obstacle |
-| night | danger+concealment, intimacy+labor+leisure |
-| comm_infra | for H3 |
-
-- **Covariates (work level):**
-  - year (natural cubic spline, df = 4, with **fixed knots at 1800, 1850, 1885, 1905, 1929**: the boundaries, the era cut points and the late-era median). Quantile knots fall at about 1891/1906/1917 in this late-heavy corpus, which leaves 1800–1890 as one cubic piece.
-  - genre: **the registered 8-class variable from `pipeline/genre.py` → `data/work/genre.parquet`** (metadata only: LCSH, bookshelves, year), frozen at the registration commit. Classes: juvenile, domestic_realist, historical, adventure, sensation_mystery, collection, romance, other. Reference level: juvenile, the most common. It is attached with `models.attach_genre` and replaces any other genre field. Standardisation over genre is **necessary, not optional**: the juvenile share differs between the halves in the mid era (Discovery 25.4% vs Confirmation 37.0%, `docs/pilot_analysis_1.md` §1);
-  - origin (UK reference; US; unknown);
-  - log(n_words), centred.
-- **Battery variables:**
-  - `date_confidence`
-  - memorisation (name-cloze score)
-  - alternate-family labels on a 10% work subsample **plus every audit item**
-  - 250- and 500-word segmentation labels
-  - ELTeC-eng and Chicago labels
-
-### 4.1 Planned codebook v1.0 content (pending the QA A/B, `docs/qa/label_pass_2.md`)
-The changes below go into codebook v0.9 (variant `v09a`). Whatever passes QA's A/B gates is frozen as **v1.0 before the relabel and before registration**. Anything that fails is dropped and logged here. Both the model prompt and the human annotation guide use v1.0.
-
-| Change | Text in brief | Why (QA pass 2 / pilot) | Affects |
-|---|---|---|---|
-| **E1, three-part obstacle test** | Answer *yes* only if (a) WHO wants WHAT, (b) WHAT in the passage itself stands in the way (not in the context), and (c) it matters for what happens next. Plus an extended "not obstacles" list: mild discomfort, description or essay, banter, label taken from context. | Yes-precision is about 0.77; most false yeses are late popular fiction. | has_obstacle and every prevalence: H1 denominators, H2b, H2c |
-| **E3, narrower SOCIAL_RANK_CONVENTION** | Only a social *rule* that would stop anyone in the character's position. A specific person's opposition is INTERPERSONAL; money is MONEY_PROPERTY_LAW; pride is INNER_STATE. | 12 of 19 RANK codings were wrong; RANK is inflated about 2×. | H1 domain mix (social share) |
-| **E4, locus = proximate source** | Locus is the source of the resistance that, if removed, lets the character proceed. The default domain→locus mapping is a starting point. **`locus_reason` (≤ 10 words) is required whenever the locus differs from the default.** | The model followed the default mapping in 93–100% of cases, and `locus_reason` was filled in 0 / 1,361 rows. | H1 construct |
-
-The category sets (locus and domain) are **not** changed, and ILLNESS keeps its material default. The domain-mapped locus is reported as a sensitivity (§5.8). DSL targets the human construct under v1.0, so codebook changes alter what the model must predict, not what is estimated. Humans label without the default-mapping hint (annotation UI b280007).
+- **Model labels (v0.9):** `has_obstacle`, `domains`, `locus`, `locus_reason`, `failure_cause`, `night_function`, `technology_named`, `message_valence`, `confidence`, `quote_status`.
+- **Quote-rejected rows.** A row whose quote check failed keeps its model label and is flagged. It is **not recoded to "no"** (methods review P12). The flag enters the calibration g as its own category.
+- **Human labels:** the schema in §3.2.
+- **Estimand construct:** the **graduate-student expert's** labels.
+- **Targets** (`dsl.TARGETS`): locus (none / material / social / internal); comm_cause; distance; darkness; comm_infra. H2b and H2c count the main domain.
+- **Work covariates:**
+  - ns(year, df = 4), with knots at 1800 / 1850 / 1885 / 1905 / 1929;
+  - genre (`pipeline/genre.py`, 8 classes, reference juvenile);
+  - origin (65% unknown, disclosed);
+  - log length;
+  - `canonical`.
+- **Standard population:** a fixed-seed sample of 3,000 works from the primary set of **both** halves, metadata only (`models.reference_covariates`). Sensitivity analyses use the early-era mix and overlap weights (methods review P7).
 
 ## 5. Analysis plan
 
-### 5.1 DSL correction and human labels
-For each target and passage i, with Ŷᵢ the model one-hot, Yᵢ the human label, Rᵢ the audit indicator and πᵢ the audit probability:
+### 5.1 Measurement: expert-anchored DSL (registered estimator)
+The estimator has three levels (`dsl.pseudo_outcomes_anchored`, `dsl.prepare_anchored`):
 
-  Ỹᵢ = gᵢ + (Rᵢ / πᵢ)(Yᵢ − gᵢ)
+  Ỹ = g₁(model) + (R_audit/π_audit)·(g₂ − g₁) + (R_audit·R_expert)/(π_audit·π_expert|audit)·(expert − g₂)
 
-- gᵢ is a **cross-fitted** calibration P(Y | Ŷ). It is learned on audited passages in the other 4 of 5 author folds, with 1/π weights and +1 pseudo-count on the model's own label. Discovery teaching labels may also be used to fit g, since any g is valid.
-- E[Ỹᵢ] = Yᵢ for any g, so the estimates are design-unbiased for the human-label estimand.
-- Passages are aggregated to works (within-work Hájek weights).
-- Sensitivity: the raw model label as g, and an era-stratified g.
-- Cross-check: stratified PPI for era means (Angelopoulos et al. 2023).
+- **g₂** is a cross-fitted multinomial logit of the expert label on (the peer annotator-mean soft label, the model label). **g₁** is a cross-fitted calibration of g₂ on the model label, by era stratum. Five author folds are used.
+- **E[Ỹ] = the expert label for any g₁ and g₂.** So peer noise, peer bias (including the unblinded project lead), era-differential peer error and peer exclusions **cannot bias** the estimate. They change only its variance.
+- This settles review P4(c), P6 and the era-differential-error concern by construction. The remaining assumption is the expert's own blinding and consistency.
 
-**How annotators enter (registered rules):**
-1. **Human label = annotator mean.** Yᵢ is the **mean of the one-hot labels of all retained non-expert annotators** who labelled item i. An overlap pair that disagrees gives a soft label (0.5/0.5). There is no majority vote and no adjudication of overlaps: adjudicated items would be measured more accurately than single-coded ones, mixing two measurement processes within the sample. DSL is linear in Yᵢ, so soft labels are exact.
-2. **Annotator noise.**
-   - Non-expert error is treated as part of the construct being measured, and the inference is valid for it. Confirmatory p-values test H0: Δ = 0 for that construct.
-   - If annotator error does not depend on era, which balanced random assignment is designed to ensure, the human-label contrast is an *attenuated* version of the expert contrast with the same sign and the same null. The **test** of H1's direction is therefore valid for the expert construct too; only the effect size is shrunk.
-   - Simulation attenuation: × 0.62–0.66 at κ ≈ 0.6, × 0.82 at κ ≈ 0.75 (§7.4).
-   - Effect sizes are reported as human-construct estimates, next to an attenuation-corrected range (below).
-3. **Exclusion rule.**
-   - Before any model label of the Confirmation half is unsealed, compute each annotator's Cohen's κ against the expert on the 30 expert items, on the 4-category H1 construct `locus` (none / material / social / internal).
-   - **An annotator with κ < 0.40, or with fewer than 20 expert items, is excluded**, and all of their labels are dropped. Code: `annotators.expert_agreement` + `annotators.exclusions`.
-   - κ on 30 items has an SE of about 0.1. In simulation, annotators whose true κ was 0.59–0.68 were wrongly excluded in 15–35% of replicates, about one annotator in five or six.
-4. **π after exclusions or skipped items.**
-   - π is recomputed per cell as (pool passages in the cell with at least one retained label) / N_cell (`dsl.audit_design(labelled_ids=…)`).
-   - This is valid because items were randomly assigned to annotators.
-   - Skips are assumed random within cells. Skip rates are reported by cell, and a cell with > 10% skips is flagged.
-5. **Era-differential reliability check.**
-   - Report overlap κ by era (`annotators.overlap_agreement`), and expert κ by era: 10 items per era, descriptive only.
-   - Differential error can bias the contrast in either direction. In simulation, early-era error raised by 0.10 moved the H1 estimate by +27% of the contrast.
-   - **If overlap κ differs between E and L by more than 0.15, H1 is reported with the expert-nested sensitivity estimate (6) beside it, and the verdict carries the flag "differential annotator reliability".**
-6. **Expert-nested sensitivity (exploratory).** A two-phase DSL: annotator mean on the audit, and the expert on the 30-item probability subsample, with π_expert|audit = 10 / n_audit,era (`dsl.pseudo_outcomes_two_phase`). This targets the expert construct without bias, but its SE is about 17–30 pp. It is reported as a sensitivity range and never tested.
-7. **Attenuation-corrected range (descriptive).** The human-construct estimate is divided by the attenuation implied by the annotators' expert agreement (the share-level misclassification matrix on the 30 items). It is reported with an interval but not tested.
+**Annotator rules:**
+1. **Certification.** Peers need κ ≥ 0.60 on locus against the expert key on 20 Discovery items before labelling audit items.
+2. **Exclusion.** A peer whose locus κ against the expert, on their jointly labelled audit items (about 110 each, SE ≈ 0.06), is **below 0.40** is excluded. Their rows are dropped and π_audit is recomputed per cell (`annotators.exclusions`).
+3. **Reporting.** Overlap κ is reported overall and by era. Peer–expert κ is reported by era (about 150 expert items per era). The teacher–expert agreement on about 8 items is descriptive.
+4. **Sensitivity estimators.** Peers only (the v0.4 estimand, attenuated) and expert only (DSL with the about 450 expert labels).
 
 ### 5.2 Models
-- **H1, H2a.** Multinomial logit of the work-level DSL soft outcomes on ns(year, df = 4) + genre + origin + log length. Fitting solves the estimating equations Σ w xᵢ(Ỹᵢ − pᵢ(β)) = 0. Work weights are as in §3.3.
-- **H2b and H2c.** Binary logit with the same covariates. For H2b, the time term is the indicator year ≥ 1850, fitted on 1800–1884 works.
-- **Link fallback (pre-registered).** If the logit fails to converge, the same model is fitted with the identity link and that fit is reported (`fit_target`). DSL pseudo-outcome totals can be negative in sparse cells, and then the MLE does not exist. The fallback is flagged in output; see §7.2 for how often it happens.
-- **Estimand: g-computation.** For each era, average the fitted category probabilities over the **registered standard population** × **the era's empirical work-year distribution**. The standard population is a fixed-seed (seed 0) 3,000-work sample from the primary set of **both halves**: metadata only (registered genre, origin, log length), with nothing sealed. It is built by `models.reference_covariates(works, genre)`. Pooling both halves gives Discovery and Confirmation estimates the same standard, and the pooled genre mix is the standard. Uniform years would give the near-empty 1800s as much weight as the 1840s, which inflated the SE by about 1.7× in simulation. Then take the ratio of the relevant categories. The contrast is L − E (H2b: M-window − E).
-- **SEs.** Delta method with the author-clustered (CR1) sandwich.
-- **Tests.**
-  - **H1 (v0.4):** a two-sided 2-df Wald test of (Δ_material, Δ_internal) = 0. It uses the joint delta-method covariance of the two contrasts, from the same fit and the CR1 author sandwich (`models.h1`, `models.wald`), followed by the classification in §1. The v0.3 directional intersection-union test stays available as `h1(two_sided=False)` and is reported as a sensitivity.
-  - **Secondary tests:** two-sided z-tests; a claim requires the pre-declared sign.
-- **H3.**
-  - Decade series: DSL ratio estimates per decade. Decades with fewer than 30 works are dropped.
-  - D: the mean over pairs of 1 − Pearson r of z-scored series.
-  - p-value: a parametric bootstrap (B = 2000) under H0, "the true function series equals the keyword series in z-units (perfect positive tracking), observed with the estimated DSL sampling error".
-  - **Calibration.** In 140 simulated replicates of the registered design, this p-value had size about 0.15 at nominal 0.05, and nominal 0.005 gave size about 0.05. The registered H3 p-value is therefore **p_cal = min(1, 10 × p)** (`models.H3_P_INFLATE`), and p_cal enters Holm.
-  - CI for D: a circular moving-block bootstrap over decades (block = 3), with sampling error added.
+- **TF:** multinomial logit of the work-level DSL soft outcomes ~ canonical + ns(year) + origin + log length. Standardised over the standard population at each work's own year, with canonical set to 1 vs 0 (`models.two_fictions`).
+- **H1:** as in v0.4, with genre fixed effects and spline (`models.h1`).
+- **Shared rules:**
+  - logit with the registered identity-link fallback;
+  - author CR1 sandwich and delta method;
+  - 2-df Wald test;
+  - classification as in §1.
+- **H1-ML:** descriptive.
+- **The STEP-1880 and LINEAR-trend contrasts explored in §7.6 are not adopted** (forking paths, methods review P5).
 
 ### 5.3 Multiplicity
-- **Primary.** H1 is tested at α = 0.05: the two-sided 2-df Wald test, then the classification.
-- **Secondary.** Holm–Bonferroni across H2a, H2b, H2c and H3 at family-wise α = 0.05. They are reported whatever the H1 result.
-- Effect sizes with 95% CIs are the headline numbers. Every secondary result is printed with its registered MDE (§7.4).
-- At most 2 open-discovery promotions (plan §4.6) form a separate family, corrected with BH at q = 0.05.
+- **Primary:** TF at α = 0.05 (or TF and H1 at 0.025 each, per the decision box).
+- **Secondary:** Holm at 0.05 over {H1, H1|canon, H1|non-canon}. If H1 is made co-primary, the secondary set is the two within-stratum contrasts.
+- **Descriptive and estimation analyses:** CIs only.
+- **Open discovery:** BH-corrected, at most 2 promotions.
 
 ### 5.4 Composition
-- **Shift-share.** Every reported change, E→L and decade-to-decade, is decomposed into a within-genre part and a genre-composition part using the symmetric (Bennet) shift-share, which is exact. Composition is measured by each genre's share of the denominator mass.
-- **Fixed-composition trend.** Trends are post-stratified to the pooled 1840–1900 genre × origin mix. Every figure shows the trend next to the raw trend, with the number of works and authors per decade.
-- **CIs.** Author-cluster bootstrap (B = 200).
-- **Headline.** The within-genre component is the headline. These analyses are descriptive and are not part of the five tests.
+- **Shift-share by canonical stratum** (Bennet) of the E → L change in each locus share. It splits the change into a within-stratum part and a canon-composition part, with an author-bootstrap CI.
+- **Shift-share by genre** as before.
+- **Fixed-composition trend:** post-stratified to the pooled canon × genre mix.
 
 ### 5.5 Exclusions and missing data
-- **Excluded:** non-fiction, translations, quality failures, and works with conflicting dates (`docs/data_quality.md`).
-- **Rejected labels.** Passages whose label failed the deterministic gates (non-verbatim quote, schema failure) are treated as `has_obstacle = no` for the model label. The DSL correction handles any resulting bias because audited items keep their human label. The rejection rate is reported per decade.
-- **Humans.**
-  - A missing human label (a skipped item, or an excluded annotator's item with no other label) has R = 0.
-  - π is recomputed per cell from the retained labels (§5.1, rule 4).
-  - Counts are reported.
-- **No outlier removal.**
+As in v0.4, with these changes:
+- the population rules in §2;
+- quote-rejected rows keep their label and flag (§4);
+- π is recomputed after peer exclusions or skips;
+- a cell with more than 10% skips is flagged.
 
-### 5.6 Robustness battery (`analysis/stats/battery.py`)
-Each check is pass / fail.
-
-| # | Check | Method | Pass rule |
-|---|---|---|---|
-| 1 | Leave one author out | one-step influence jackknife | every directional component keeps its sign and ≥ 50% of the primary magnitude, for every author |
-| 2 | Leave one decade out | refit | same as 1 |
-| 3 | Drop each genre with ≥ 5% of works | refit | same as 1 |
-| 4 | High-confidence dates only | refit | same as 1 |
-| 5 | Drop the top-decile memorised works | refit | same as 1 |
-| 6 | Alternate model family | naive labels compared with the primary model's naive labels on the same works | same sign and ≥ 50% |
-| 7 | 250- and 500-word segmentation | naive, as 6 | same sign and ≥ 50% |
-| 8 | Date permutation | see below | one-sided permutation p < 0.05 for every directional component |
-| 9 | Replication (ELTeC-eng, Chicago) | see below | the declared sign |
-
-Battery notes:
-- **Check 8 (deviation from the plan's wording, see §8).** 200 permutations of **author-level date profiles among authors within genre**. Each author's mean year is reassigned within the genre, keeping the within-author spread and the genre's date mix.
-- **Check 9.**
-  - ELTeC begins in 1841, so its early era is 1841–1849 plus a slope check over 1841–1929.
-  - Chicago starts in 1880, so it cannot replicate H1 or H2b–c. It is used only for H2a and H3 trends over 1880–1923, and is otherwise reported as not run.
-- **H3.** The permutation check does not apply to H3. A check that cannot run because data are missing counts as **failed**.
-- **Two-sided H1: which components must hold (v0.4).** The battery re-checks the components that define the observed class: those whose 95% CI excludes 0 in the primary fit, each against its **observed** sign (`battery._ref`). For example, "outward" re-checks the material rise, and "inward" re-checks both. The permutation p is one-sided in the observed direction of each such component.
+### 5.6 Robustness battery
+Applied to the primary test(s), with the v0.4 checks. Changes in v0.5:
+- **TF permutation (check 8):** author-level canonical flags are permuted among authors within era (`battery.canon_permutation`).
+- **Replication (check 9) is optional:** it is reported when available and excluded from the denominator otherwise, never a failed check (methods review P9.5). ELTeC is optional.
+- **Two new sensitivities:**
+  - H1 and TF with every cross-half canonical author removed;
+  - standardisation to the early-era mix.
+- **Multiverse appendix** (Discovery only, exploratory): a specification curve of the TF and H1 estimates across model (Gemma vs Qwen), codebook version, date source, genre standard and clustering (methods review P5 and redirection D).
 
 ### 5.7 Verdict rule
-- **Supported:**
-  - for H1: Wald p < 0.05, and the verdict carries the class, e.g. "supported: outward";
-  - for a secondary test: Holm-significant among the secondary tests;
-  - **and** passes at least ⌈7/9 × number of applicable checks⌉;
-  - **and** has the same sign in replication.
-- **Unstable:** significant at its level, but fails the battery or replication.
-- **Null:** not significant at its level. A significant effect in the opposite direction is reported as "null (opposite sign)".
-- **Reporting nulls.** A null secondary result is reported as "not detected (registered MDE = X pp)", never as evidence of absence.
+- **Supported:** significant at the test's α, **and** passes at least ⌈7/9 × number of applicable checks⌉, **and** has the same sign in replication *if* replication is available.
+- **Unstable:** significant, but fails the battery or an available replication.
+- **Null:** not significant.
 
-The verdict is computed mechanically by `battery.verdict`.
+The verdict carries the class, e.g. "supported: inward". Nulls are reported with the registered MDE.
 
-### 5.8 Exploratory analyses (labelled as such)
-- uncapped authors;
-- the low-confidence-date sensitivity;
-- historical-setting novels;
-- the 1800s–1830s by decade;
-- UK vs US contrasts;
-- the naive (uncorrected) estimates, shown only to illustrate measurement bias;
-- (v0.4, from the pilot) locus shares **by decade**, including the 1880s step;
-- the residual "general fiction" bucket of domestic_realist, reported separately;
-- the domain-mapped locus (default mapping) as a construct sensitivity;
-- the genre-split interaction (§1);
-- the "romance revival" reading of the 1880s step, as at most one open-discovery promotion (§5.3).
+### 5.8 Exploratory
+- the decade curves;
+- the genre-split interaction;
+- the 1880s step;
+- the domain-mapped locus;
+- the residual-domestic bucket;
+- UK vs US (only if origin is resolved).
 
 ## 6. Inference criteria and validation gates
-- α = 0.05 family-wise (Holm).
-- **Benchmark gate** before trusting H1–H3: the pipeline recovers ≥ 8 of 10 injected shifts and claims ≤ 1 of 10 confounded nulls (plan §4.8).
-- **Simulation gate:** DSL 95% CI coverage within [0.92, 0.98] on synthetic corpora that match the registered design (§7.2). At ≥ 500 labels it was met for the human construct. Under the registered annotator noise, the model SE matched the empirical SD of the H1 estimate (6.3 vs 6.9 pp). If the gate fails at the registered audit size, the affected test is reported as underpowered or descriptive, never as confirmatory.
+- **Benchmark gate:** as before.
+- **Simulation gate:** expert-anchored DSL coverage of the expert-construct estimand. It was **0.92–1.00** (median 0.96–0.97) across the TF and H1 cells (§7.7).
+- **Construct-validity gate (methods review P1d):** the peer-mean vs expert locus κ, and the model vs expert κ by era, are reported. If the peer-mean vs expert κ is below 0.6, peers act only as the variance-reducing phase, which the estimator tolerates. If the model vs expert κ is below 0.4 in any era, TF and H1 are still estimated, but the paper flags weak model information.
 
-## 7. Power and validation (simulation, `analysis/stats/power.py`, `validate.py`)
+## 7. Power and validation
+
+### 7.7 Registered v0.5 design: power and MDE (`power_v05.py`; 60 replicates per cell, 120 for the registered cell)
+
+**Simulation inputs (methods review P2):**
+- Corpus `SimConfig.v05`, calibrated to v0.9 Discovery:
+  - true obstacle prevalence 0.70;
+  - non-canonical locus shares about 0.21 / 0.69 / 0.10;
+  - observed author ICC 0.10 and work ICC 0.15 for the material indicator, against the review's 0.096 / 0.146;
+  - Confirmation primary set about 4,000 works, with E about 95, 12 passages per work;
+  - canonical shares 31% / 22% / 4% by era.
+- Model labels at QA level: has_obstacle precision 0.77, recall 0.98, locus accuracy 0.85, with errors that over-call material in late adventure and juvenile fiction.
+- The registered human process (§3.2) with peers at κ about 0.6 or 0.75. The expert defines the construct.
+
+**Truths:**
+
+| Truth | TF Δ_material (expert construct) | Within-stratum trend | H1 E → L |
+|---|---|---|---|
+| tf_full | −9.6 pp | none | aggregate +2.2 pp, pure composition |
+| tf_half | −6.6 pp | none | — |
+| tf_trend | −10.9 pp | +4.4 pp material | +4.4 pp |
+| null | 0 | none | 0 |
+
+Power is P(Wald p < α). The Monte Carlo SE is about ±0.06 at 60 replicates and ±0.045 at 120.
+
+**Registered design: era × genre × canon strata, expert-anchored estimator, peers at κ ≈ 0.6, 450 expert labels**
+
+| Statistic | Truth | Estimate (truth) | SE (pp) | MDE (pp), α = 0.05 / 0.025 | **Power, α = 0.05 / 0.025** | Coverage |
+|---|---|---|---|---|---|---|
+| **TF** material | tf_full | −9.9 (−9.6) | 4.4 | **12.3 / 13.5** | **0.59 / 0.47** | 0.97 |
+| TF | tf_half | −7.2 (−6.6) | 4.4 | 12.3 / 13.5 | 0.32 / 0.17 | 0.95 |
+| TF | tf_trend | −10.8 (−10.9) | 4.5 | — | 0.60 / 0.53 | 0.93 |
+| TF | null | −0.7 (0) | 4.6 | — | **0.05 / 0.03** (size) | 0.97 |
+| **H1** material (E vs L) | tf_trend | +5.2 (+4.4) | 7.3 | **20.6 / 22.6** | **0.10 / 0.05** | 0.95 |
+| H1 | tf_full | +2.2 (+2.2) | 7.0 | — | 0.05 / 0.02 | 0.94 |
+| H1 | null | 0.0 (0.2) | 6.8 | — | 0.03 / 0.03 (size) | 0.97 |
+| H1-ML (M vs L) | tf_trend | — | 6.0 | 16.8 / — | 0.07 | — |
+| Composition share of the E → L material change | tf_full | +2.3 of +3.0 pp (truth +2.3 of +2.5) | — | — | — | — |
+
+**Levers on TF power** (tf_full truth, α = 0.05 / 0.025):
+
+| Change from the registered design | TF MDE (pp), α = 0.05 | TF power, α = 0.05 / 0.025 | Comment |
+|---|---|---|---|
+| Registered (450 expert, κ 0.6 peers, canon strata) | 12.3 | 0.59 / 0.47 | |
+| **Expert labels 450 → about 906** (grad student 4 h → about 8 h) | **9.0** | **0.70 / 0.60** | the strongest lever |
+| Expert labels 450 → about 226 | 17.9 | 0.32 / 0.25 | |
+| Peers κ 0.6 → 0.75 | 11.6 | 0.45 / 0.43 | within Monte Carlo error of the registered row; peers matter little once the expert anchors |
+| **No canon strata** (era × genre only) | 22.6 | 0.23 / 0.18 | canon balancing is essential for TF. It costs H1 some precision: H1's MDE is 15.2–16.2 pp without canon strata against 19.7–20.6 pp with them, but H1 is under-powered either way. |
+| Expert-only estimator (peers ignored) | 13.5 | 0.50 / 0.33 | peers add about 10–15 points of power through g₂ |
+| Peers-only estimator (the v0.4 estimand) | 9.3 | 0.35 / 0.28 | **biased** toward 0 (estimate −6.3 vs −9.6) with coverage **0.84**; invalid for the expert construct |
+| H1 with about 906 expert labels | 14.8 (H1) | 0.02 (tf_full) | H1 stays far below useful power |
+
+**Conclusions for the registration:**
+1. **TF is the only confirmatory test this design can power.** It reaches 0.59 at α = 0.05 for a 10 pp canon gap, and 0.70 with about 900 expert labels. Its size is ≤ 0.05.
+2. **H1 is untestable** at about 95 early works and this audit: its MDE is about 20 pp in every configuration. Hence the recommendation that H1 be secondary (decision box, §1).
+3. **Buy expert hours.** If the graduate student can label about 900 items (about 8 h), TF's power rises from 0.59 to 0.70 and the MDE falls from 12 to 9 pp. No other lever available before Nov 20 comes close.
+4. **The draw must use canon strata.** Without them, TF's MDE doubles.
+
+### 7.6 Levers explored before v0.5 (`levers.py`; pilot-like truth; 20 replicates per cell; for the record, none adopted unless stated)
+
+| Lever | Finding |
+|---|---|
+| L1 model accuracy (precision 0.77–0.95, locus accuracy 0.85–0.95) | E-vs-L MDE 13.9 → 11.7 pp at κ 0.6 (12.1 → 10.0 at κ 0.75). A weak lever; the v1.0 relabel was dropped. |
+| L2 Neyman allocation on predicted labels | ML MDE 10.4 → 8.9 pp, but EL 12.7 → 17.2 pp (labels drawn away from the thin early era). **It reads predicted Confirmation labels, so it is barred by the seal fix.** |
+| L3 contrast choice | STEP-1880 had the highest power (0.40–0.65) but was tuned to a pilot step that vanished under v0.9: **dropped** (forking paths, methods review P5). LIN had the lowest power. ML stays descriptive. |
+| L4 annotator-confusion correction (o·M⁻¹) | Removes attenuation (coverage against the expert 0.89 → 0.95) but adds variance. Per-annotator M from 30 items gives an MDE of 30 pp. **Superseded by the expert-anchored DSL**, which corrects without inverting M. |
+| L5 +1,000 peer labels | E-vs-L power 0.29 → 0.44 (κ 0.6). Peer κ 0.6 → 0.75 gives 0.29 → 0.47. |
+
+### 7.1–7.5 Earlier designs (v0.2–v0.4), kept as dated history
+_These sections describe superseded designs: the 200-item audit, the four-peer estimand, and predicted-label strata. Their numbers are not the registered power. Two things carry over: the DSL coverage validation (§7.2) and the logic of the earlier MDE tables._
+
+#### (history) Power and validation, v0.2–v0.4
 
 Simulation settings:
 - Corpora match G0: Confirmation decade counts from `docs/gates.md`; 7,750 works per half, or 5,700 after the author cap; heavy-tailed works per author (mean 3.7, median 1).
@@ -330,7 +309,7 @@ Simulation settings:
   - "good": 0.88–0.94 and 0.78–0.88. This is close to the pilot, which had has_obstacle accuracy 0.86 and locus agreement 0.88 against the Claude reference (`docs/model_selection.md`).
 - Simulated truth: Δ_material = −13 to −14 pp, Δ_internal = +8 pp.
 
-### 7.1 Minimum detectable effect, H1 material-share contrast (80% power, pp)
+#### 7.1 Minimum detectable effect, H1 material-share contrast (80% power, pp)
 
 **(a) Perfect labels on every passage** (the floor, set by works, authors and ICC; 2 replicates per cell, α = 0.05):
 
@@ -360,7 +339,7 @@ More findings from the power runs:
 - (ii) declare H1 the single primary test and H2a–c secondary (still Holm-corrected, but expected to be underpowered);
 - (iii) report the registered MDE alongside every result.
 
-### 7.2 CI coverage (validation, `validate.py`; 250 synthetic corpora per audit size, era-varying noise)
+#### 7.2 CI coverage (validation, `validate.py`; 250 synthetic corpora per audit size, era-varying noise)
 
 | Human labels (Confirmation) | DSL (calibrated g): range over 13 quantities | DSL (raw g) | Naive model labels |
 |---|---|---|---|
@@ -378,7 +357,7 @@ Further validation findings:
 
 Figure: `analysis/stats/figs/dsl_coverage.png`.
 
-### 7.3 Design recommendations from v0.2 (status in v0.3)
+#### 7.3 Design recommendations from v0.2 (status in v0.3)
 
 Status:
 - **R1:** adopted. 1,800 Confirmation items.
@@ -397,7 +376,7 @@ Status:
 - **R5. Audit frame.** Persist `audit_frame.parquet` (π for every pool passage) at selection time. This is now implemented in `select_annotation.py`. DSL cannot be computed after the v1.0 relabel without it.
 - **R6. Replication.** ELTeC (1841+) and Chicago (1880+) cannot replicate E-vs-L contrasts. The battery's replication item for H1 and H2b–c is therefore the ELTeC 1841–49 vs L contrast plus the slope sign. The verdict rule is unchanged.
 
-### 7.4 Registered final design (v0.3): MDEs and power (`power.py --final`, 20 replicates per scenario)
+#### 7.4 Registered final design (v0.3): MDEs and power (`power.py --final`, 20 replicates per scenario)
 
 Design simulated:
 - 7,750 Confirmation works.
@@ -441,7 +420,7 @@ Further findings:
 - **Recommended before the probability sample starts:** a training round on the Discovery teaching items with feedback, and a **certification pre-test: κ ≥ 0.60 on 20 Discovery items vs the student's adjudicated key**. Only certified peers then label audit items. The registered exclusion floor (κ < 0.40 on the expert items) stays as written.
 - **H2a, H2b, H2c** have MDEs of 35+ / 5 / 5 pp against plausible effects of about 1–2 pp in prevalence, so they are expected nulls at this design. They are registered as secondary, so that their estimates and CIs are reported honestly and not read as evidence of absence.
 
-### 7.5 Power of the two-sided H1 (v0.4; `power.py --final --v04`, 20 replicates per scenario)
+#### 7.5 Power of the two-sided H1 (v0.4; `power.py --final --v04`, 20 replicates per scenario)
 
 The design is §7.4's registered annotation design: about 1,760 Confirmation items, 4 annotators, 30 expert items, the exclusion rule, and "good" LLM noise unless stated. Three truths are simulated:
 - **inward:** the v0.3 simulated Kahler pattern;
@@ -497,7 +476,17 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
   12. **Registered genre variable (v0.4).** `pipeline/genre.py` 8 classes, plus a pooled two-half standard population.
   13. **H1-ML (v0.4).** The mid-vs-late contrast is added as a descriptive estimate.
   14. **Codebook (v0.4).** v1.0 is planned to contain the three-part obstacle test, a narrower SOCIAL_RANK_CONVENTION, and locus = proximate source with a required `locus_reason` (§4.1). These are pending the QA A/B; whatever passes is frozen in v1.0 before the relabel and before registration.
+  15. **v0.5, the seal fix.** The audit draw stratifies on metadata only (era × genre × canonical). The v0.4 predicted-label strata would have exposed the naive Confirmation answer before registration (methods review P4).
+  16. **v0.5, two fictions.** TF is the lead hypothesis. It was discovered on Discovery labels (literary review P1) and registered before Confirmation is unsealed. The canonicity measure is metadata-only (`docs/canon_measure.md`).
+  17. **v0.5, family.** TF is primary. H1 is secondary under the recommendation in §1; the alternative is co-primaries at 0.025, and the decision box must be resolved before registration. H2a–c and H3 are demoted to estimation (methods review P11).
+  18. **v0.5, measurement.** The estimand is the expert (graduate-student) construct, estimated with the expert-anchored three-level DSL. Peers enter as an intermediate phase. The teacher's items are descriptive. Exclusion uses κ against the expert. This replaces the v0.3–v0.4 peer-mean estimand.
+  19. **v0.5, population.** `works_v2` with PG-agent author keys and the split repair; primary set `genre ≠ historical`; hand-verified early-era dates; unresolved or out-of-window works excluded; round-year placeholders excluded unless verified; 12 passages per work, with adaptive stopping deleted.
+  20. **v0.5, classification.** The classification is symmetric, with Bonferroni-adjusted component CIs. The social patterns are named.
+  21. **v0.5, replication.** Replication is optional: it never counts as a failed check.
+  22. **v0.5, codebook.** No v1.0 relabel. The v0.9 production codebook (`v09lean_r2`) is registered as the model's codebook. The planned v1.0 content in former §4.1 is not adopted.
+  23. **v0.5, levers.** The STEP-1880 and LINEAR contrasts and Neyman allocation on predicted labels were explored (§7.6) and **not adopted**. They are logged here as forks (methods review P5).
 - **Unforeseen problems.** If an analysis cannot be run as registered (e.g., an era with no audited obstacles), the nearest pre-specified fallback is used: the identity link, then the raw DSL ratio contrast without covariates. The fallback is reported as such.
+
 
 ## 9. Change log
 - v0.1 (2026-10-31): first draft from plan v2 §3–4.
@@ -516,3 +505,13 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
   - Genre-split interaction is exploratory only.
   - Planned codebook v1.0 content (§4.1).
   - Power for the two-sided H1 (§7.5): size 0.05; power 0.55 for the inward truth and 0.15–0.25 for the pilot-like truth.
+- v0.5 (2026-11-01): responses to peer review and user decisions:
+  - seal-safe metadata audit draw (`draw_audit_metadata`);
+  - TWO FICTIONS as the lead hypothesis;
+  - expert-anchored three-level DSL (graduate student, about 450 items, plus peers);
+  - population and date rules; 12 passages per work;
+  - symmetric classification; optional replication; H2/H3 estimation-only;
+  - levers record (§7.6);
+  - registered-design power (§7.7): TF power 0.59 at α = 0.05 (0.70 with 900 expert labels), and H1 MDE about 20 pp;
+  - primaries decision box (§1).
+

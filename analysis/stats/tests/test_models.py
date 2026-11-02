@@ -140,3 +140,13 @@ def test_two_fictions_recovers_gap():
     assert e.components[0].estimate < -0.05 and e.p < 0.025 and e.extra["classification"] == "inward"
     ws = models.within_strata(models.h1, wd)
     assert set(ws) == {True, False}
+
+
+def test_confirmatory_primary_options():
+    from analysis.stats.simulate import LLMNoise, SimConfig, simulate
+    c = simulate(SimConfig.v05(n_works=3000, noise=LLMNoise.perfect(), seed=4), audit=False)
+    wd = dsl.prepare(c.labels, method="oracle", truth=c.truth, targets=("locus", "comm_cause", "distance", "darkness"))
+    t1, _ = models.confirmatory(wd)
+    assert set(t1[t1.role == "primary"].test) == {"TF"} and (t1[t1.role == "primary"].alpha == 0.05).all()
+    t2, _ = models.confirmatory(wd, primaries=("TF", "H1"))
+    assert set(t2[t2.role == "co-primary"].test) == {"TF", "H1"} and (t2[t2.role == "co-primary"].alpha == 0.025).all()

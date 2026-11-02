@@ -298,7 +298,7 @@ def run_all(labels_path: str, human_path: str, frame_path: str, keywords_path: s
             rep_human: str | None = None, rep_frame: str | None = None, split: str = "confirmation",
             n_perm: int = 200, out_dir: str = "analysis/stats/out/confirmatory",
             expert: str = "grad", teacher: str = "teacher", genre_path: str | None = None,
-            works_path: str | None = None, canon_path: str | None = None) -> pd.DataFrame:
+            works_path: str | None = None, canon_path: str | None = None, primaries: tuple | None = None) -> pd.DataFrame:
     """Registered v0.5 pipeline: attach genre + canon, annotator rules, expert-anchored DSL,
     confirmatory family (TF + H1 co-primary at 0.025), battery on the co-primaries, verdicts."""
     import functools
@@ -339,7 +339,7 @@ def run_all(labels_path: str, human_path: str, frame_path: str, keywords_path: s
             out / "teacher_vs_grad_descriptive.csv", index=False)
     wd = prepare_anchored(labels, human, frame, expert=expert, exclude_annotators={teacher} | excl, split=split)
     design = models.Design.from_data(wd)
-    tab, effs = models.confirmatory(wd, kw, design=design, ref_cov=ref_cov)
+    tab, effs = models.confirmatory(wd, kw, design=design, ref_cov=ref_cov, primaries=primaries or models.PRIMARIES)
     rej = tab.groupby("test").reject.first().to_dict()
     alt = [_naive_pair(pd.read_parquet(alt_path), labels, split)] if alt_path else None
     seg = [_naive_pair(pd.read_parquet(p), labels, split) for p in seg_paths] or None

@@ -96,7 +96,7 @@ def test_cli_run_all_on_simulated_files(tmp_path):
     assert set(bt.hypothesis) == {"H1", "TF"}
     assert all(v.split(":")[0] in {"supported", "unstable", "null"} for v in bt.verdict)
     tab = pd.read_csv(tmp_path / "out" / "confirmatory.csv")
-    assert set(tab[tab.role == "co-primary"].test) == {"H1", "TF"}
-    assert (tab[tab.role == "co-primary"].alpha == 0.025).all()
+    assert set(tab[tab.role == "primary"].test) == {"TF"} and (tab[tab.role == "primary"].alpha == 0.05).all()
+    assert "H1" in set(tab[tab.role == "secondary"].test)
     assert set(tab[tab.role == "estimation"].test) >= {"H2a", "H2b", "H2c", "H3"}
     assert (tmp_path / "out" / "teacher_vs_grad_descriptive.csv").exists()

@@ -80,7 +80,8 @@ def stats_for(wd, design, ref):
 
 
 def one_rep(args) -> list[dict]:
-    truth, kappa, seed, strata_variants = args
+    truth, kappa, seed, strata_variants = args[:4]
+    efrac = args[4] if len(args) > 4 else 0.25
     rng = np.random.default_rng(seed + 5)
     c = simulate(SimConfig.v05(seed=seed, noise=LLMNoise.perfect(), **TRUTHS[truth]), audit=False)
     lab = c.labels[(c.labels.split == "confirmation") & (c.labels.stratum == "random")].reset_index(drop=True)
@@ -95,7 +96,7 @@ def one_rep(args) -> list[dict]:
     design = models.Design.from_data(wo)
     ref = models._ref(wo, None).assign(canon_num=0.0)
     so = stats_for(wo, design, ref)
-    base = {"truth": truth, "kappa": kappa, "seed": seed, "n_works": len(wo),
+    base = {"efrac": efrac, "truth": truth, "kappa": kappa, "seed": seed, "n_works": len(wo),
             "early_works": int((wo.cov.year < 1850).sum()), "canon_share_L": float(wo.cov[wo.cov.year >= 1885].canonical.mean())}
     rows = []
     meta = lab[["passage_id", "work_id", "author_key", "year", "split", "stratum", "genre", "canonical"]]
@@ -109,7 +110,7 @@ def one_rep(args) -> list[dict]:
         Rh = np.zeros(len(lab), bool)
         pih = np.ones(len(lab))
         for cl, g in aud.groupby("audit_cell"):
-            k = int(round(0.25 * len(g)))
+            k = int(round(efrac * len(g)))
             idx = pos.loc[g.passage_id].values
             if k > 0:
                 Rh[rng.choice(idx, k, replace=False)] = True
@@ -165,7 +166,9 @@ def summarise(raw: pd.DataFrame) -> pd.DataFrame:
                                 ((raw.cls == "outward") & (raw.truth_cls == "inward"))).astype(float),
                      cover=((raw.est_mat - 1.96 * raw.se_mat <= raw.truth_mat) &
                             (raw.truth_mat <= raw.est_mat + 1.96 * raw.se_mat)).astype(float))
-    k = ["truth", "kappa", "strata", "estimator", "stat"]
+    if "efrac" not in raw:
+        raw["efrac"] = 0.25
+    k = ["efrac", "truth", "kappa", "strata", "estimator", "stat"]
     s = raw.groupby(k).agg(reps=("p", "size"), power_025=("rej025", "mean"), power_05=("rej05", "mean"),
                            cls_correct=("right_cls", "mean"), wrong_direction=("wrong_dir", "mean"),
                            truth_mat=("truth_mat", "mean"), est_mat=("est_mat", "mean"), sd_mat=("est_mat", "std"),
@@ -192,8 +195,13 @@ def jobs(reps: int) -> list:
     return out
 
 
-def main(reps: int = 60, procs: int = 7) -> pd.DataFrame:
+def main(reps: int = 60, procs: int = 7, expert_extra: bool = False) -> pd.DataFrame:
     js = jobs(reps)
+    tag = ""
+    if expert_extra:   # expert budget lever: ~900 expert labels (50% of the audit) and ~225 (12.5%)
+        js = [(t, 0.6, 1000 + r, ("era_genre_canon",), f) for t in ("tf_full", "null") for f in (0.5, 0.125)
+              for r in range(reps)]
+        tag = "_expert"
     OUT.mkdir(exist_ok=True)
     rows = []
     with mp.get_context("fork").Pool(procs) as pool:
@@ -201,11 +209,11 @@ def main(reps: int = 60, procs: int = 7) -> pd.DataFrame:
             rows.extend(r)
             if i % 40 == 0:
                 print(f"{i + 1}/{len(js)}", flush=True)
-                pd.DataFrame(rows).to_csv(OUT / "power_v05_raw.partial.csv", index=False)
+                pd.DataFrame(rows).to_csv(OUT / f"power_v05{tag}_raw.partial.csv", index=False)
     raw = pd.DataFrame(rows)
-    raw.to_csv(OUT / "power_v05_raw.csv", index=False)
+    raw.to_csv(OUT / f"power_v05{tag}_raw.csv", index=False)
     s = summarise(raw)
-    s.to_csv(OUT / "power_v05.csv", index=False)
+    s.to_csv(OUT / f"power_v05{tag}.csv", index=False)
     return s
 
 
@@ -213,5 +221,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--reps", type=int, default=60)
     ap.add_argument("--procs", type=int, default=7)
+    ap.add_argument("--expert-extra", action="store_true")
     a = ap.parse_args()
-    main(a.reps, a.procs)
+    main(a.reps, a.procs, a.expert_extra)
