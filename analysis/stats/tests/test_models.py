@@ -150,3 +150,14 @@ def test_confirmatory_primary_options():
     assert set(t1[t1.role == "primary"].test) == {"TF"} and (t1[t1.role == "primary"].alpha == 0.05).all()
     t2, _ = models.confirmatory(wd, primaries=("TF", "H1"))
     assert set(t2[t2.role == "co-primary"].test) == {"TF", "H1"} and (t2[t2.role == "co-primary"].alpha == 0.025).all()
+
+
+def test_apply_works_v2_and_canon(corpus):
+    w = corpus.works[["work_id"]].assign(author_group="pga:" + corpus.works.author_key.str[-3:],
+                                         split_v2=corpus.works.split, primary_v2=np.arange(len(corpus.works)) % 5 != 0)
+    lab = models.apply_works_v2(corpus.labels, w)
+    assert lab.author_key.str.startswith("pga:").all() and lab.work_id.isin(w.work_id[w.primary_v2]).all()
+    canon = w[["work_id"]].assign(canonical=pd.array([True, None] * (len(w) // 2) + [False] * (len(w) % 2), dtype="boolean"))
+    c2 = canon.copy(); c2["canonical"] = c2.canonical.fillna(False)
+    out = models.attach_canon(corpus.labels, c2)
+    assert out.canonical.dtype == bool

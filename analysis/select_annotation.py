@@ -1,4 +1,8 @@
-"""Select the two human-annotation sets from model labels (run Thu Nov 5).
+"""Audit-draw library (prereg v0.5): draw_audit / draw_audit_metadata / cell_table_hash.
+main() below is RETIRED and raises; the registered queues are built by analysis/build_annotation_queues.py.
+
+Historical docstring (v0.1 design, superseded):
+Select the two human-annotation sets from model labels (run Thu Nov 5).
 
 TEACHING (~100, Discovery only, authors then excluded from evaluation):
   - prototypes: per domain, the highest-confidence label+alt_label agreements with verified quotes (4/domain)
@@ -148,6 +152,11 @@ def cell_table_hash(frame: pd.DataFrame) -> str:
 
 
 def main(lab_path: str, alt_path: str | None = None) -> None:
+    """RETIRED (prereg v0.5, methods review P9.2): the 200-item / two-annotator / teacher-adjudication
+    design is superseded. The registered audit is built by analysis/build_annotation_queues.py using
+    draw_audit_metadata() (seal-safe metadata strata, era x genre x canonical)."""
+    raise SystemExit("select_annotation.main is retired (prereg v0.5). Use analysis/build_annotation_queues.py, "
+                     "which calls select_annotation.draw_audit_metadata(); see docs/prereg.md §3.2.")
     rng = np.random.default_rng(SEED)
     lab = pd.read_parquet(lab_path)  # columns: passage_id, work_id, author_key, decade, split, stratum, text, ctx_*, has_obstacle, domains, locus, confidence, quote_status
     lab["era"] = lab.decade.map(era)

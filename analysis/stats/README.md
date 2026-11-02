@@ -54,8 +54,13 @@ Set `OMP_NUM_THREADS=1` for the multiprocess runs, because BLAS threads oversubs
   - `meta_conf` needs `passage_id, work_id, author_key, year, split, stratum, genre, canonical`.
   - `draw_audit(..., group_col=[...], balance_on=[...], metadata_only=True)` is the general form. It refuses label-derived strata.
   - `cell_table_hash(frame)` gives the hash to deposit.
-- **Estimator.** The expert-anchored three-level DSL (`dsl.pseudo_outcomes_anchored`, `dsl.prepare_anchored`). The grad-student (`grad`) labels define the construct, and peers are the intermediate phase. The expert items are a stratified ~25% subsample within audit cells, all of them also peer-labelled. Teacher rows are descriptive only.
-- **Family.** `models.confirmatory(primaries=("TF",))` is the default: TF primary at 0.05. H1 and the within-canon contrasts are secondary (Holm). TF-genre, H1-ML and composition are descriptive. H2a–c and H3 are estimation only. `primaries=("TF", "H1")` gives co-primaries at 0.025.
+- **Estimator.** The expert-anchored three-level DSL (`dsl.pseudo_outcomes_anchored`, `dsl.prepare_anchored`). The grad-student (`grad`) labels define the construct, and peers are the intermediate phase.
+  - The expert items are a stratified **~50% subsample within audit cells (~900 of ~1,820)**, all of them also peer-labelled.
+  - Teacher rows are descriptive only.
+  - **Registered power: TF ≈ 0.70 at α = 0.05 (MDE ≈ 9 pp material, against a ~10 pp canon gap). H1 (secondary) has an MDE of ≈ 15 pp.** Source: `out/power_v05_expert.csv`, `efrac = 0.5`.
+- **Population.** `models.apply_works_v2` maps `author_key` ← `author_group` and `split` ← `split_v2`, and keeps `primary_v2_capv2`. The CLI applies it when `--works data/work/works_v2.parquet` exists.
+- **`select_annotation.main` is retired** and raises. Queues come from `analysis/build_annotation_queues.py` via `draw_audit_metadata`.
+- **Family (decided).** TF is the single primary at 0.05 (`models.confirmatory()` default). H1 and the within-canon contrasts are secondary (Holm). TF-genre, H1-ML and composition are descriptive. H2a–c and H3 are estimation only.
 - **Models.** `models.two_fictions`. The symmetric `classify_h1` has the classes inward, outward, socialisation, de-socialisation and indeterminate. `models.attach_canon` reads `data/work/canon.parquet` (`work_id, canonical`).
 - **Battery.** `battery.canon_permutation` serves the TF null. Replication is optional (n/a when missing).
 - **Real-data CLI:**

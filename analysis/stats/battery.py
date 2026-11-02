@@ -308,22 +308,29 @@ def run_all(labels_path: str, human_path: str, frame_path: str, keywords_path: s
     from analysis.stats import models
     from analysis.stats.dsl import prepare_anchored
     labels, human = pd.read_parquet(labels_path), pd.read_parquet(human_path)
+    works = pd.read_parquet(works_path) if works_path else None
+    if works is not None and "author_group" in works:
+        labels = models.apply_works_v2(labels, works)
     genre = pd.read_parquet(genre_path) if genre_path else None
     if genre is not None:
         labels = models.attach_genre(labels, genre)
     if canon_path:
         labels = models.attach_canon(labels, pd.read_parquet(canon_path))
     ref_cov = None
-    if works_path:
-        w = pd.read_parquet(works_path)
-        if "in_primary_cap" in w:
+    if works is not None:
+        w = works
+        pcol = next((c for c in ("primary_v2_capv2", "primary_v2") if c in w), None)
+        if pcol:
+            w = w[w[pcol].fillna(False).astype(bool)]
+        elif "in_primary_cap" in w:
             w = w[w.in_primary_cap & w.date_confidence.isin(["high", "medium"])]
         if "origin" not in w and "origin_locc" in w:
             w = w.assign(origin=w.origin_locc)
         ref_cov = models.reference_covariates(w, genre)
         if canon_path:
-            ref_cov = ref_cov.merge(pd.read_parquet(canon_path)[["work_id", "canonical"]], on="work_id", how="left")
-            ref_cov["canonical"] = ref_cov.canonical.fillna(False).astype(bool)
+            ref_cov = ref_cov.drop(columns=["canonical"], errors="ignore").merge(
+                pd.read_parquet(canon_path)[["work_id", "canonical"]], on="work_id", how="left")
+            ref_cov["canonical"] = ref_cov.canonical.astype("boolean").fillna(False).astype(bool)
     frame = pd.read_parquet(frame_path)
     kw = pd.read_csv(keywords_path) if keywords_path else None
     out = Path(out_dir)

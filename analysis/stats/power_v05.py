@@ -7,8 +7,8 @@ Model labels: QA-level noise (has_obstacle precision 0.77, recall 0.98, locus ac
 late adventure/juvenile errors over-call material), levers.model_codes.
 Audit: seal-safe draw_audit_metadata (era x genre x canonical, budget balanced over era x canonical;
 or era x genre only), ~1,820 unique items, 4 peers (~2,000 labels incl. 10% overlap), kappa ~0.6 or
-~0.75 vs expert. Expert (grad student) = the estimand's construct, labels a stratified 25% subsample
-of the audit (~450 items, all also peer-labelled). Peer exclusion: kappa vs expert < 0.40.
+~0.75 vs expert. Expert (grad student) = the estimand's construct, labels a stratified EXPERT_FRAC (registered 50%) subsample
+of the audit (~900 items, all also peer-labelled; 25% = the earlier ~450 design). Peer exclusion: kappa vs expert < 0.40.
 Estimators: P = peers only (v0.4), E = expert only, A = expert-anchored 3-level DSL (registered).
 Statistics: TF (two fictions, co-primary), H1 E-vs-L (co-primary), H1-ML (descriptive), H1 within
 non-canonical works (secondary), composition share of the aggregate E->L material change.
@@ -35,6 +35,7 @@ OUT = Path(__file__).resolve().parent / "out"
 T = dsl.TARGETS["locus"]
 K = 4
 ANN = {0.6: (0.25, 0.28, 0.31, 0.34), 0.75: (0.15, 0.15, 0.18, 0.18)}
+EXPERT_FRAC = 0.5        # registered (v0.5 final): ~900 expert labels = ~50% of the ~1,820-item audit
 TRUTHS = {"tf_full": dict(gap=-3.0, trend=0.0), "tf_half": dict(gap=-1.2, trend=0.0),
           "null": dict(gap=0.0, trend=0.0), "tf_trend": dict(gap=-3.0, trend=0.5)}
 
@@ -81,7 +82,7 @@ def stats_for(wd, design, ref):
 
 def one_rep(args) -> list[dict]:
     truth, kappa, seed, strata_variants = args[:4]
-    efrac = args[4] if len(args) > 4 else 0.25
+    efrac = args[4] if len(args) > 4 else EXPERT_FRAC
     rng = np.random.default_rng(seed + 5)
     c = simulate(SimConfig.v05(seed=seed, noise=LLMNoise.perfect(), **TRUTHS[truth]), audit=False)
     lab = c.labels[(c.labels.split == "confirmation") & (c.labels.stratum == "random")].reset_index(drop=True)
@@ -106,7 +107,7 @@ def one_rep(args) -> list[dict]:
         pi3 = frame.set_index("passage_id").pi_audit.loc[lab.passage_id].values
         R3 = np.zeros(len(lab), bool)
         R3[pos.loc[aud.passage_id].values] = True
-        # expert: stratified 25% subsample of the audit within audit cells
+        # expert: stratified EXPERT_FRAC subsample of the audit within audit cells
         Rh = np.zeros(len(lab), bool)
         pih = np.ones(len(lab))
         for cl, g in aud.groupby("audit_cell"):
@@ -201,6 +202,7 @@ def main(reps: int = 60, procs: int = 7, expert_extra: bool = False) -> pd.DataF
     if expert_extra:   # expert budget lever: ~900 expert labels (50% of the audit) and ~225 (12.5%)
         js = [(t, 0.6, 1000 + r, ("era_genre_canon",), f) for t in ("tf_full", "null") for f in (0.5, 0.125)
               for r in range(reps)]
+        js += [(t, 0.6, 1000 + r, ("era_genre_canon",), 0.5) for t in ("tf_half", "tf_trend") for r in range(reps)]
         tag = "_expert"
     OUT.mkdir(exist_ok=True)
     rows = []

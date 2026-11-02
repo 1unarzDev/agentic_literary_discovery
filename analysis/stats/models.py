@@ -653,13 +653,27 @@ def confirmatory(wd: WorkData, keywords: pd.DataFrame | None = None, alpha: floa
     return pd.DataFrame(rows), effs
 
 
+def apply_works_v2(labels: pd.DataFrame, works: pd.DataFrame, primary_col: str | None = None) -> pd.DataFrame:
+    """Registered population (prereg v0.5 §2) from data/work/works_v2.parquet:
+    author_key <- author_group (PG-agent clusters, house names merged), split <- split_v2, and keep
+    only primary-set works (primary_v2_capv2 if present, else primary_v2: date resolved in window,
+    not historical_setting, author cap). date_verified is applied upstream when it is filled."""
+    pcol = primary_col or next((c for c in ("primary_v2_capv2", "primary_v2") if c in works), None)
+    cols = ["work_id", "author_group", "split_v2"] + ([pcol] if pcol else [])
+    w = works[cols]
+    out = labels.merge(w, on="work_id", how="inner")
+    if pcol:
+        out = out[out[pcol].fillna(False).astype(bool)].drop(columns=[pcol])
+    return out.assign(author_key=out.author_group, split=out.split_v2).drop(columns=["author_group", "split_v2"])
+
+
 def attach_canon(labels: pd.DataFrame, canon: pd.DataFrame) -> pd.DataFrame:
     """Attach the registered metadata-only canonicity flag (data/work/canon.parquet: work_id,
     canonical [bool], optional canon_score; docs/canon_measure.md)."""
     out = labels.drop(columns=["canonical"], errors="ignore").merge(canon[["work_id", "canonical"]], on="work_id", how="left")
     if out.canonical.isna().mean() > 0.01:
         raise ValueError("canonical flag missing for > 1% of passages")
-    out["canonical"] = out.canonical.fillna(False).astype(bool)
+    out["canonical"] = out.canonical.astype("boolean").fillna(False).astype(bool)
     return out
 
 
