@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { AppEnv, requireAdmin } from "./auth";
-import { GATE_SETS, certFor, validateReference } from "./annotate_routes";
+import { REF_SETS, certFor, validateReference } from "./annotate_routes";
 import { CFG, getConfig, sealState, setConfigStmt } from "./db";
 import { REGISTRY_KEY } from "./registry";
 import {
@@ -450,16 +450,16 @@ adminRoutes.post("/v1/admin/ann_items", async (c) => {
     if (it.item_id.includes(it.passage_id)) return err("item_id must be opaque (must not contain passage_id)");
     if (typeof it.text !== "string" || !it.text.trim()) return err("text required");
     for (const k of ["ctx_before", "ctx_after"]) if (it[k] !== undefined && typeof it[k] !== "string") return err(`${k} must be a string`);
-    if (!["practice", "cert", "retake", "teaching", "audit"].includes(it.set as string))
-      return err("set must be practice|cert|retake|teaching|audit");
+    if (!["review", "practice", "cert", "retake", "teaching", "audit"].includes(it.set as string))
+      return err("set must be review|practice|cert|retake|teaching|audit");
     // A reference answer exists only for practice and check items (never sent before the annotator answers).
-    if ((GATE_SETS as readonly unknown[]).includes(it.set)) {
+    if ((REF_SETS as readonly unknown[]).includes(it.set)) {
       try {
         it.reference = validateReference(it.reference);
       } catch (e) {
         return err(`practice reference: ${e instanceof HttpError ? e.message : String(e)}`);
       }
-    } else if (it.reference !== undefined) return err("reference is only allowed on practice/cert/retake items");
+    } else if (it.reference !== undefined) return err("reference is only allowed on review/practice/cert/retake items");
     if (!isStringArray(it.assign)) return err("assign must be an array of annotator names");
     const unknown = it.assign.filter((n) => !byName.has(n));
     if (unknown.length) return err(`unknown annotator(s): ${unknown.join(",")}`);
@@ -514,7 +514,7 @@ adminRoutes.get("/v1/admin/ann_labels", async (c) => {
       ...r,
       label: parseJsonField(String(label_json)),
       undone: undone === 1,
-      practice: (GATE_SETS as readonly unknown[]).includes(r.set), // training/certification only, never analysed as data
+      practice: (REF_SETS as readonly unknown[]).includes(r.set), // key review / training / certification: never analysed as data
     })),
   });
 });

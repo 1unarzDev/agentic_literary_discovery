@@ -465,3 +465,64 @@ describe("certification", () => {
     expect(st.body.queues.find((q: any) => q.queue === "audit").locked).toBe(true);
   });
 });
+
+describe("answer-key review (expert reader)", () => {
+  it("shows the reference only in the review queue, stores agree/correct as labels, never gates", async () => {
+    const { names, tokens } = await mkAnnotators(2); // [0] expert reader, [1] peer
+    const [expert, peer] = names;
+    const [te, tp] = tokens;
+    const review = mkItems(3, "review", [expert], () => ({ reference: ref() }));
+    const practice = mkItems(2, "practice", [peer], () => ({ reference: ref() }));
+    const audit = mkItems(3, "audit", [expert, peer]);
+    await post([...review, ...practice, ...audit]);
+
+    // expert: review first (default), audit open (no gate); reference + rationale visible up front
+    const st = await callJson("GET", `/annotate/${te}/state`);
+    expect(st.body.queues.map((q: any) => [q.queue, q.locked])).toEqual([["review", false], ["audit", false]]);
+    expect(st.body.cert.status).toBe("none");
+    const n = await next(te);
+    expect(n.body.queue).toBe("review");
+    expect(n.body.reference.rationale).toContain("REF_RATIONALE_SECRET");
+    expect(Object.keys(n.body.reference).sort()).toEqual(["domain", "failure_cause", "has_obstacle", "locus", "rationale"]);
+    // agree = submit the reference label
+    const { rationale: _r, ...core } = ref();
+    expect((await submit(te, n.body.item_id, { ...core, note: "" })).status).toBe(200);
+    // correct = a different label with a note
+    const n2 = await next(te, "review");
+    const corr = { ...NO, note: "no goal is blocked" };
+    const r2 = await submit(te, n2.body.item_id, corr);
+    expect(r2.status).toBe(200);
+    expect(r2.body.feedback).toBeUndefined();
+    // review answers can be undone and corrected
+    const u = await callJson("POST", `/annotate/${te}/undo`, { json: { queue: "review" } });
+    expect(u.body.undone).toBe(n2.body.item_id);
+    expect(u.body.previous_label).toEqual(corr);
+    expect((await submit(te, n2.body.item_id, corr)).status).toBe(200);
+
+    // audit items never carry the reference, even for the expert
+    const a = await next(te, "audit");
+    expect(a.body.queue).toBe("audit");
+    expectBlind(JSON.stringify(a.body));
+
+    // peers never see review items or references before answering
+    const p = await next(tp);
+    expect(p.body.queue).toBe("practice");
+    expectBlind(JSON.stringify(p.body));
+    expect((await next(tp, "review")).status).toBe(404);
+    expect((await submit(tp, review[2].item_id, NO)).status).toBe(404);
+
+    // admin export: review labels flagged (never analysed) and identifiable by set
+    const all = await admin("GET", "/v1/admin/ann_labels");
+    const mine = all.body.labels.filter((l: any) => l.annotator === expert && l.set === "review" && !l.undone);
+    expect(mine.length).toBe(2);
+    expect(mine.every((l: any) => l.practice)).toBe(true);
+    expect(mine.map((l: any) => l.label.note)).toContain("no goal is blocked");
+  });
+
+  it("requires a reference on review items", async () => {
+    const name = uid("ann");
+    await admin("POST", "/v1/admin/annotators", { name });
+    const r = await admin("POST", "/v1/admin/ann_items", { items: [{ item_id: uid("it"), passage_id: "pgR_p1", text: "t", set: "review", assign: [name] }] });
+    expect(r.status).toBe(400);
+  });
+});

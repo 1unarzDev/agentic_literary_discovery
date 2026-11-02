@@ -95,7 +95,7 @@ npm run dev                                       # http://localhost:8787
 
 ## Human annotation (blind UI at `/annotate/<token>`, guide at `/annotate/guide`)
 
-- Sets: `practice` (20 items, the reference + rationale are shown after each answer), `cert` (20, no feedback), `retake` (20, offered once if cert fails), `audit` (main set) and `teaching` (student only).
+- Sets: `review` (expert reader adjudicates the practice/cert/retake key: the reference + rationale are shown before answering; never gates), `practice` (20 items, the reference + rationale are shown after each answer), `cert` (20, no feedback), `retake` (20, offered once if cert fails), `audit` (main set) and `teaching` (student only).
 - Gate: an annotator with practice/cert items must finish practice, then pass cert (locus kappa >= 0.60 on none/material/social/internal, and obstacle yes vs not-yes agreement >= 0.75), before `audit`/`teaching` unlock. Annotators without gate items (the expert) are never gated. Override with `POST /v1/admin/ann_cert {name, decision: pass|revoke|clear}`.
 - Admin: `POST /v1/admin/annotators`, `POST /v1/admin/ann_items` (<= 250 per call; `reference` is required on practice/cert/retake and refused elsewhere), `GET /v1/admin/ann_labels` (`practice: true` marks gate-set labels), `GET /v1/admin/ann_status` (per-queue progress + cert status and scores).
 - The guide page is rendered from `docs/annotator_guide.md` by `scripts/build-html.mjs` (run by test/dev/deploy).

@@ -197,6 +197,11 @@ details[open] summary { margin-bottom: 6px; }
   </section>
 
   <aside id="side">
+    <div id="refPanel" class="hidden">
+      <div class="rationale"><b>Draft answer key</b><div id="refLabel" style="font-family:var(--sans);font-size:14px;margin-bottom:6px"></div><span id="refWhy"></span></div>
+      <p style="font-size:13px;color:var(--ink-2);margin:8px 0 0">The answers below start as the draft. If you agree, press <b>Agree</b> (<kbd>a</kbd>). Otherwise change them and add a short note saying why (<kbd>t</kbd>), then Submit.</p>
+      <div class="actions" style="margin-top:8px"><button class="primary" id="agreeBtn">Agree <kbd>a</kbd></button></div>
+    </div>
     <div id="form">
       <fieldset>
         <legend><span>1. Is there a plot obstacle?<span class="q">A character wants something, something is in the way, and it matters for what happens next.</span></span><span class="hint">y / n / c</span></legend>
@@ -259,6 +264,7 @@ details[open] summary { margin-bottom: 6px; }
       <dt>1&ndash;9, o</dt><dd>The kind of obstacle (choosing one also sets &ldquo;yes&rdquo;).</dd>
       <dt>Shift+1&ndash;6</dt><dd>Why communication fails (only for Communication).</dd>
       <dt>m / s / i</dt><dd>Where it comes from: material, social, inner.</dd>
+      <dt>a</dt><dd>Key review only: agree with the draft answer and submit.</dd>
       <dt>e</dt><dd>Add the selected words as evidence (optional).</dd>
       <dt>t</dt><dd>Write a note (Esc to leave the note field).</dd>
       <dt>Enter</dt><dd>Submit, or go on after practice feedback. Ctrl+Enter inside the note.</dd>
@@ -563,7 +569,8 @@ details[open] summary { margin-bottom: 6px; }
     $("panel").classList.add("hidden"); $("article").classList.remove("hidden"); $("side").classList.remove("hidden");
     item = { item_id: j.item_id, text: j.text || "", ctx_before: j.ctx_before || "", ctx_after: j.ctx_after || "" };
     $("plabel").textContent = queue === "practice" ? "Practice \u00b7 judge this passage (you'll see the reference after)" :
-      (queue === "cert" || queue === "retake") ? "Check \u00b7 judge this passage (no feedback in this round)" : "Judge this passage";
+      (queue === "cert" || queue === "retake") ? "Check \u00b7 judge this passage (no feedback in this round)" :
+      queue === "review" ? "Key review \u00b7 is the draft answer right?" : "Judge this passage";
     paras($("ctxBefore"), item.ctx_before);
     paras($("ctxAfter"), item.ctx_after);
     ["ctxBeforeWrap", "ctxAfterWrap"].forEach(function (id) { $(id).classList.remove("open"); $(id).querySelector(".ctx-toggle").textContent = "show all"; });
@@ -585,7 +592,17 @@ details[open] summary { margin-bottom: 6px; }
       state = draft.state; state.evidence = state.evidence || [];
       $("note").value = draft.note || ""; ms = draft.ms || 0;
     }
-    $("extras").open = !!(state.evidence.length || $("note").value);
+    item.reference = (queue === "review" && j.reference) ? j.reference : null;
+    $("refPanel").classList.toggle("hidden", !item.reference);
+    if (item.reference && !prefill && !(draft && draft.item_id === item.item_id)) {
+      var R = item.reference;
+      state.has_obstacle = R.has_obstacle; state.domain = R.domain; state.locus = R.locus; state.failure_cause = R.failure_cause;
+    }
+    if (item.reference) {
+      $("refLabel").textContent = labelText(item.reference);
+      $("refWhy").textContent = item.reference.rationale || "";
+    }
+    $("extras").open = !!(state.evidence.length || $("note").value || item.reference);
     render();
     window.scrollTo(0, 0);
     timerStart(ms);
@@ -679,12 +696,30 @@ details[open] summary { margin-bottom: 6px; }
     switchQueue(open[(i + 1) % open.length].queue);
   }
 
+  function labelText(l) {
+    if (l.has_obstacle !== "yes") return nameOf(HAS, l.has_obstacle);
+    return "Yes \u00b7 " + nameOf(DOMAINS, l.domain) + (l.domain === "COMMUNICATION_INFORMATION" ? " (" + nameOf(FCS, l.failure_cause) + ")" : "") + " \u00b7 " + nameOf(LOCI, l.locus);
+  }
+  function differsFromRef() {
+    var R = item && item.reference;
+    if (!R) return false;
+    var yes = state.has_obstacle === "yes";
+    return state.has_obstacle !== R.has_obstacle || (yes && (state.domain !== R.domain || state.locus !== R.locus ||
+      (state.domain === "COMMUNICATION_INFORMATION" && state.failure_cause !== R.failure_cause)));
+  }
+  function agree() {
+    if (!item || !item.reference || busy) return;
+    var R = item.reference;
+    state.has_obstacle = R.has_obstacle; state.domain = R.domain; state.locus = R.locus; state.failure_cause = R.failure_cause;
+    render(); submit();
+  }
   function submit() {
     if (busy || !state || !item || feedbackOn) return;
     if (!state.has_obstacle) { say("Answer question 1 first: yes (y), no (n) or can’t tell (c)."); return; }
     if (state.has_obstacle === "yes" && !state.domain) { say("Pick what kind of thing is in the way (1–9, o)."); return; }
     if (state.domain === "COMMUNICATION_INFORMATION" && !state.failure_cause) { say("Pick why the communication fails (Shift+1–6)."); return; }
     if (state.has_obstacle === "yes" && !state.locus) { say("Pick where the resistance comes from (m, s, i)."); return; }
+    if (differsFromRef() && !$("note").value.trim()) { $("extras").open = true; say("You changed the draft answer: please add a short note saying why (t)."); return; }
     var yes = state.has_obstacle === "yes";
     var label = {
       has_obstacle: state.has_obstacle,
@@ -775,7 +810,8 @@ details[open] summary { margin-bottom: 6px; }
     if (any || lsGet(LS + "welcomed")) return false;
     var pr = qState("practice"), main = qState("audit"), te = qState("teaching");
     var html = "<p>You will read short passages (about 350 words) from novels and stories published 1800–1929 and answer three quick questions about each. Most take <b>25–35 seconds</b>.</p>";
-    var ce = qState("cert");
+    var ce = qState("cert"), rv = qState("review");
+    if (rv) html += "<p><b>First: review the answer key</b> (" + rv.total + " passages). For each one you see our draft answer and the reason. If you agree, press <b>Agree</b>; if not, change the answers and add a short note. Your answers become the key that other annotators are trained and checked against.</p>";
     if (pr) html += "<p><b>Start with the guide</b> (about 10 minutes). Then do <b>" + pr.total + " practice passages</b>: after each one you will see a reference answer and a short explanation.</p>";
     if (ce) html += "<p>Next comes a <b>check</b> of " + ce.total + " passages without feedback (about " + fmtMin(ce.total) + "). It unlocks the main set when your answers mostly agree with the reference. If not, you get to review your misses and take one second check.</p>";
     if (main) html += "<p>The main set has <b>" + main.total + "</b> passages, about " + fmtMin(main.total) + " in total. Work in sessions of 20–30 minutes; use <b>Break</b> at the top (key <kbd>b</kbd>) to pause. Everything you submit is saved at once, and your personal link brings you back to where you stopped.</p>";
@@ -795,6 +831,7 @@ details[open] summary { margin-bottom: 6px; }
   $("submitBtn").addEventListener("click", submit);
   $("undoBtn").addEventListener("click", undo);
   $("nextBtn").addEventListener("click", afterFeedback);
+  $("agreeBtn").addEventListener("click", agree);
   Array.prototype.forEach.call(document.querySelectorAll(".ctx-toggle"), function (b) {
     b.addEventListener("click", function () {
       var w = $(b.dataset.for), open = !w.classList.contains("open");
@@ -828,6 +865,7 @@ details[open] summary { margin-bottom: 6px; }
     if (e.shiftKey) return;
     if (/^[1-9]$/.test(e.key)) { setDomain(DOMAINS[+e.key - 1].v); e.preventDefault(); return; }
     switch (e.key) {
+      case "a": if (item && item.reference) agree(); else return; break;
       case "y": setHas("yes"); break;
       case "n": setHas("no"); break;
       case "c": setHas("insufficient_context"); break;

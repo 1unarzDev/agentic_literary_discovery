@@ -33,11 +33,15 @@ export const FAILURE_CAUSES = [
 export const COMM = "COMMUNICATION_INFORMATION";
 
 /** Queues (= item sets) an annotator can have, in the order the UI offers them. */
-export const QUEUES = ["practice", "cert", "retake", "audit", "teaching"] as const;
+export const QUEUES = ["review", "practice", "cert", "retake", "audit", "teaching"] as const;
 export type Queue = (typeof QUEUES)[number];
 /** Sets that carry a reference answer; their labels are training/certification, never data. */
 export const GATE_SETS: readonly Queue[] = ["practice", "cert", "retake"];
+/** Sets whose items carry a reference answer. In "review" the expert reader sees it up front
+ *  and agrees or corrects it (their answers become the practice/cert key). */
+export const REF_SETS: readonly Queue[] = ["review", ...GATE_SETS];
 const QUEUE_TITLE: Record<Queue, string> = {
+  review: "Key review",
   practice: "Practice",
   cert: "Check",
   retake: "Second check",
@@ -347,7 +351,7 @@ annotateRoutes.get("/annotate/:token/next", async (c) => {
   const cert = publicCert(gate);
   if (!s) return json({ ...empty, queue: null, progress: { done: 0, total: 0 }, queues: states, cert });
   const item = await c.env.DB.prepare(
-    `SELECT i.item_id, i.text, i.ctx_before, i.ctx_after
+    `SELECT i.item_id, i.text, i.ctx_before, i.ctx_after, i.ref_json
        FROM ann_assignments s JOIN ann_items i ON i.item_id = s.item_id
       WHERE s.annotator_id = ?1 AND i.set_name = ?2
         AND NOT EXISTS (SELECT 1 FROM ann_labels l WHERE l.annotator_id = ?1 AND l.item_id = s.item_id AND l.undone = 0)
@@ -357,10 +361,13 @@ annotateRoutes.get("/annotate/:token/next", async (c) => {
       LIMIT 1`,
   )
     .bind(a.id, s.queue)
-    .first<{ item_id: string; text: string; ctx_before: string; ctx_after: string }>();
+    .first<{ item_id: string; text: string; ctx_before: string; ctx_after: string; ref_json: string | null }>();
   const base = { queue: s.queue, progress: progressOf(s), queues: states, cert };
   if (!item) return json({ ...empty, ...base });
-  return json({ item_id: item.item_id, text: item.text, ctx_before: item.ctx_before, ctx_after: item.ctx_after, ...base });
+  const out: Record<string, unknown> = { item_id: item.item_id, text: item.text, ctx_before: item.ctx_before, ctx_after: item.ctx_after, ...base };
+  // Only the answer-key review shows the reference before answering (that is its purpose).
+  if (s.queue === "review" && item.ref_json) out.reference = JSON.parse(item.ref_json) as Reference;
+  return json(out);
 });
 
 annotateRoutes.post("/annotate/:token/label", async (c) => {

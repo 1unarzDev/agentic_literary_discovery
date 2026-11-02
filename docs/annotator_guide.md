@@ -188,6 +188,8 @@ Rob learns by coded telegram that his father, far away in China, is dangerously 
 3. **Check: 20 passages**, without feedback. If your answers mostly agree with the reference, the main set unlocks. If not, you see the passages where you differed, with the reasons, and you can take one **second check** with 20 new passages.
 4. **Main set: about 500 passages**, in random order. A few of them are also labelled by another person, so we can measure agreement. That is normal, and it is not a test of you.
 
+**If you are the expert reader**, your link starts with a **key review** of 60 passages instead of practice and the check. For each passage you see our draft answer and the reason for it. Press **Agree** (<kbd>a</kbd>) if it is right. If it isn't, change the answers and add a short note (<kbd>t</kbd>) saying why. Your answers become the key the other annotators are trained and checked against, so take your time here. After that comes your main set (about 450 passages); there is no check for you.
+
 **Time.** Plan on about 30 seconds per passage: 10 to 15 minutes each for practice and the check, and about 4 hours for the main set. Spread that over several days, in sittings of 20 to 30 minutes. The header shows how much time is left.
 
 **Breaks.** Every answer is saved as soon as you press Enter. Press <kbd>b</kbd> (or **Break**) to pause the timer. You can close the tab at any time and come back later with **your personal link**, on any device. Bookmark it, and don't share it: it is your identity in the study.
