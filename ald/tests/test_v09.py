@@ -242,3 +242,58 @@ def test_update_applied_while_low_on_ram(env):
     w = env.make_worker(auto_update=True)
     w.run()
     assert env.reexec_calls
+
+
+# --- RAM thrash (COLLIN 22:12: load took ~6.5 GB, guard interrupted after 40/400) --------------------------
+def test_no_lease_when_model_load_would_breach_reserve(env):
+    from ald.scheduler import GB
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 2))
+    (env.root).mkdir(parents=True, exist_ok=True)
+    model = env.registry.stages["label"].model_ref
+    import json as _j
+    (env.root / "ram_footprint.json").write_text(_j.dumps({model: 6.5}))
+    env.ram_avail = 8 * GB  # above the 2.5 GB reserve, but 8 - 6.5 < 2.5
+    w = env.make_worker()
+    w.cfg.min_free_ram_gb = 2.5
+    w.run()
+    assert env.coord.state == {"job-1": "queued"}
+    assert any("loading the model would leave 1.5 GB" in m for m in env.logs)
+
+
+def test_footprint_learned_from_first_load(env):
+    from ald.scheduler import GB
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 3))
+    env.ram_avail = 20 * GB
+
+    def on_chat(body, n):
+        if n == 1:
+            env.ram_avail = 14 * GB  # the model load took 6 GB of system RAM
+
+    env.ollama.on_chat = on_chat
+    w = env.make_worker()
+    w.cfg.min_free_ram_gb = 2.5
+    w.run()
+    assert env.coord.state == {"job-1": "done"}
+    model = env.registry.stages["label"].model_ref
+    assert w.model_ram_gb(env.registry.stages["label"]) == 6.0
+    import json as _j
+    assert _j.loads((env.root / "ram_footprint.json").read_text())[model] == 6.0
+
+
+def test_hysteresis_after_low_memory_interrupt(env):
+    from ald.scheduler import GB
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 6))
+    w = env.make_worker()
+    w.cfg.min_free_ram_gb = 2.5
+    w.startup()
+    st = env.registry.stages["label"]
+    w._ram_backoff_until = env.clock.monotonic() + 600  # as set by a low-memory interrupt
+    env.ram_avail = 12 * GB
+    assert "backing off" in w.ram_blocked()
+    env.clock.advance(601)
+    env.ollama.loaded.clear()
+    need = w.model_ram_gb(st)
+    env.ram_avail = (2.5 + need - 0.3) * GB  # enough for the reserve, not reserve + model
+    assert "waiting for" in w.ram_blocked()
+    env.ram_avail = (2.5 + need + 0.5) * GB
+    assert w.ram_blocked() is None and w._ram_backoff_until is None

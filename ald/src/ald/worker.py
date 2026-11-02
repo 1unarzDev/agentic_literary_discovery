@@ -59,6 +59,7 @@ GPU_YIELD_CONTENDED_S = 30.0   # ... when the lock was contended in the last GPU
 GPU_YIELD_UNKNOWN_S = 20.0     # ... where waiters cannot be detected (macOS)
 GPU_CONTENDED_WINDOW_S = 900.0
 DESKTOP_VRAM_BASELINE_GB = 1.5  # VRAM other programs may hold without lowering ald's plan
+RAM_BACKOFF_S = 600.0  # after a low-memory interrupt: no new lease for 10 min (then reserve + model needed)
 IDLE_HEARTBEAT_S = 300.0  # self-report while holding nothing (fleet view); cheap on D1 writes
 STATE_SAVE_S = 15.0
 MAX_PASSAGE_ERRORS = 2
@@ -740,6 +741,72 @@ class Worker:
             return False
         return self._ram_avail_gb < limit
 
+    # -- host RAM prediction ------------------------------------------------------------------------
+    def _footprints(self) -> dict[str, float]:
+        if not hasattr(self, "_footprint_cache"):
+            self._footprint_cache = read_json(self.root / "ram_footprint.json", {}) or {}
+        return self._footprint_cache
+
+    def model_ram_gb(self, st: Stage) -> float:
+        """System RAM the model takes when Ollama loads it: learned on this machine from the last load,
+        else ~0.8 x model size (mapped weights touched while uploading to the GPU, buffers)."""
+        v = self._footprints().get(st.model_ref)
+        return float(v) if v is not None else round(0.8 * st.model_size_gb, 2)
+
+    def _learn_footprint(self, st: Stage, before_gb: float) -> None:
+        try:
+            after = self.ram_available_fn() / GB
+        except Exception:  # noqa: BLE001
+            return
+        used = round(max(0.0, before_gb - after), 2)
+        fp = self._footprints()
+        old = fp.get(st.model_ref)
+        # A smaller reading can be noise (other programs freed memory meanwhile): keep the max of recent loads.
+        fp[st.model_ref] = round(max(used, 0.75 * old) if old else used, 2) if used > 0.2 else (old or used)
+        try:
+            atomic_write_json(self.root / "ram_footprint.json", fp)
+        except OSError:
+            pass
+        self.log(f"[ram] loading {st.model_ref} took {used:.1f} GB of system RAM (planning with {fp[st.model_ref]:.1f} GB)")
+
+    def _loaded_models(self) -> set[str]:
+        try:
+            return {m.get("name") or m.get("model") for m in self.backend.ps()}
+        except BackendError:
+            return set()
+
+    def ram_blocked(self) -> str | None:
+        """Why not to lease right now (None = go): below the reserve; a model load would push available
+        RAM below the reserve; or still backing off after a low-memory interrupt."""
+        reserve = float(self.cfg.min_free_ram_gb or 0)
+        if reserve <= 0:
+            return None
+        try:
+            avail = self.ram_available_fn() / GB
+        except Exception:  # noqa: BLE001
+            return None
+        self._ram_avail_gb = avail
+        if avail < reserve:
+            return f"only {avail:.1f} GB of system RAM available (< {reserve:g} GB reserve)"
+        loaded = self._loaded_models()
+        need = 0.0
+        for name in self.stages:
+            st = self.registry.stages.get(name) if self._registry else None
+            if st is not None and not any(self.backend.same_model(m, st.model_ref) for m in loaded):
+                need = max(need, self.model_ram_gb(st))
+        now = self.clock.monotonic()
+        if now < getattr(self, "_ram_backoff_until", -1e18):
+            return f"backing off after a low-memory interrupt ({(self._ram_backoff_until - now) / 60:.0f} min left)"
+        if getattr(self, "_ram_backoff_until", None) is not None and avail < reserve + max(need, 0.5):
+            return (f"{avail:.1f} GB available; after a low-memory interrupt waiting for "
+                    f"{reserve + max(need, 0.5):.1f} GB (reserve + model)")
+        if avail - need < reserve:
+            return (f"loading the model would leave {avail - need:.1f} GB of system RAM "
+                    f"(< {reserve:g} GB reserve; model needs ~{need:.1f} GB)")
+        if getattr(self, "_ram_backoff_until", None) is not None:
+            self._ram_backoff_until = None  # recovered
+        return None
+
     def paused(self) -> bool:
         return (self.root / "paused").exists()  # = config.pause_marker() for the real data dir
 
@@ -753,7 +820,9 @@ class Worker:
                 return "paused"
             # Hand the job back well before the host runs out of memory (other programs may be growing).
             if self.ram_low(factor=0.75):
-                self.log(f"[ram] {self._ram_avail_gb:.1f} GB available: interrupting {hj.job_id}")
+                self.log(f"[ram] {self._ram_avail_gb:.1f} GB available: interrupting {hj.job_id}; "
+                         f"backing off {RAM_BACKOFF_S / 60:.0f} min")
+                self._ram_backoff_until = self.clock.monotonic() + RAM_BACKOFF_S
                 return "low_memory"
         if hj.revoked.is_set():
             return "revoked"
@@ -914,6 +983,12 @@ class Worker:
         if st.unload_others(self.registry.unload_others):
             self.unload_non_pinned(keep={st.model_ref})
         self.ensure_model_context(st)
+        ram_before: float | None = None
+        if not any(self.backend.same_model(m, st.model_ref) for m in self._loaded_models()):
+            try:
+                ram_before = self.ram_available_fn() / GB
+            except Exception:  # noqa: BLE001
+                ram_before = None
         residency_checked = False
         residency_tries = 0
 
@@ -959,6 +1034,9 @@ class Worker:
                             continue
                         line = self._error_line(st, p, hj.pin_hash, digest, str(e))
                     backend_backoff.reset()
+                    if ram_before is not None:
+                        self._learn_footprint(st, ram_before)
+                        ram_before = None
                     if not residency_checked and residency_tries < 20:
                         residency_tries += 1
                         residency_checked = self.check_residency(hj.stage) == "ok"
@@ -1353,10 +1431,10 @@ class Worker:
                     if self.exit_when_idle or self.clock.sleep(10.0, self.stop):
                         break
                     continue
-                if self.ram_low():
+                why_ram = self.ram_blocked()
+                if why_ram:
                     if self.activity != "low_memory":
-                        self.log(f"[ram] only {self._ram_avail_gb:.1f} GB of system RAM available "
-                                 f"(< {self.cfg.min_free_ram_gb:g} GB): not leasing; freeing ours")
+                        self.log(f"[ram] {why_ram}: not leasing; freeing ours")
                     self.activity = "low_memory"
                     self.check_for_update()  # idle: updating is fine (never while paused)
                     self.maybe_apply_update()
