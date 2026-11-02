@@ -67,3 +67,38 @@ def test_domain_strata_draw_interface(corpus):
     sel2 = lab.assign(era=dsl._era(lab.decade.values), group=lab.apply(sa.group, axis=1))
     aud2, fr2 = sa.draw_audit(sel2, set(), np.random.default_rng(0), n_target=120)
     assert fr2.audit_cell.str.split("|").str[1].isin({"material", "social", "internal", "no_obstacle", "other"}).all()
+
+
+def test_metadata_draw_is_seal_safe():
+    from analysis.stats.simulate import SimConfig, simulate
+    c = simulate(SimConfig.v05(n_works=4000, seed=1), audit=False)
+    lab = c.labels[c.labels.split == "confirmation"]
+    meta = lab[["passage_id", "work_id", "author_key", "year", "split", "stratum", "genre", "canonical"]]
+    aud, fr = sa.draw_audit_metadata(meta, np.random.default_rng(0), n_target=600)
+    assert {"canon", "noncanon"} <= set(fr.audit_cell.str.split("|").str[2])
+    assert abs(len(aud) - 600) < 60 and np.allclose(aud.weight, aud.cell_N / aud.cell_n)
+    # budget balanced over era x canonical
+    per = aud.groupby(aud.audit_cell.str.split("|").str[:3:2].str.join("|")).size()
+    assert per.max() <= 2 * per.min() + 20 or (per < 100).any()      # small canon cells may cap
+    import pytest
+    with pytest.raises(ValueError):
+        sa.draw_audit(lab.assign(era=sa.era_by_year(lab.year), group="x"), set(), np.random.default_rng(0), 100,
+                      group_col="group", metadata_only=True)
+    assert len(sa.cell_table_hash(fr)) == 64
+
+
+def test_anchored_dsl_unbiased_for_expert():
+    rng = np.random.default_rng(0)
+    n, K = 20000, 4
+    y = rng.choice(4, n, p=[0.3, 0.15, 0.45, 0.1])
+    yhat = np.where(rng.random(n) < 0.7, y, rng.integers(0, 4, n))
+    peer = np.where(rng.random(n) < 0.65, y, rng.integers(0, 4, n))
+    folds = rng.integers(0, 5, n)
+    est = []
+    for _ in range(60):
+        R3 = rng.random(n) < 0.1
+        Rh = R3 & (rng.random(n) < 0.25)
+        Y = dsl.pseudo_outcomes_anchored(yhat, dsl.onehot(peer, K), R3, np.full(n, 0.1), y, Rh, np.full(n, 0.25),
+                                         K, folds)
+        est.append(Y.mean(0))
+    assert np.allclose(np.mean(est, 0), dsl.onehot(y, K).mean(0), atol=0.012)

@@ -162,7 +162,13 @@ def standardized_share(tf: TargetFit, ref_cov: pd.DataFrame, years: np.ndarray, 
     A = np.zeros(Km1 + 1)
     dA = np.zeros((Km1 + 1, Km1 * p))
     M = 0
-    yrs, cnt = np.unique(np.atleast_1d(years), return_counts=True)
+    if years is None:                          # each reference work at its own year
+        X = tf.Xk(ref_cov)
+        a, da = tf.fit.mean_and_grad(X)
+        A, dA, M = A + a, dA + da, len(X)
+        yrs, cnt = [], []
+    else:
+        yrs, cnt = np.unique(np.atleast_1d(years), return_counts=True)
     for y, k in zip(yrs, cnt):                 # repeated years weight by their counts
         X = tf.Xk(ref_cov, y)
         a, da = tf.fit.mean_and_grad(X)
@@ -275,20 +281,34 @@ def _ref(wd: WorkData, ref_cov: pd.DataFrame | None, max_ref: int = 3000) -> pd.
     return c.sample(n=max_ref, random_state=0) if len(c) > max_ref else c
 
 
+def _direction(c: Component, level: float) -> int:
+    lo, hi = c.ci(level)
+    return 1 if lo > 0 else (-1 if hi < 0 else 0)
+
+
 def classify_h1(d_mat: Component, d_int: Component, p_wald: float, alpha: float = 0.05) -> str:
-    """Pre-registered sign rules (prereg v0.4 §1), applied only when the joint test rejects:
-    inward  = material falls AND internal rises, both 95% CIs excluding 0 (the Kahler pattern);
-    outward = material rises with its 95% CI excluding 0 AND internal does not rise (estimate <= 0);
-    mixed   = any other significant pattern;  none = joint test not significant."""
+    """Symmetric pre-registered classification (prereg v0.5 §1, fixing review P10), applied only when
+    the joint Wald test rejects at alpha. Each component is 'up', 'down' or 'flat' by its
+    Bonferroni-adjusted CI at level 1 - alpha/2 (directional error control over the 2 components):
+      inward        : material down & internal not down, or internal up & material not up
+      outward       : material up & internal not up, or internal down & material not down
+      socialisation : material down & internal down   (the social share rises)
+      de-socialisation: material up & internal up     (the social share falls)
+      indeterminate : joint test rejects but neither component CI excludes 0
+      none          : joint test not significant."""
     if not p_wald < alpha:
         return "none"
-    mlo, mhi = d_mat.ci()
-    ilo, ihi = d_int.ci()
-    if mhi < 0 and ilo > 0:
+    lev = 1 - alpha / 2
+    m, i = _direction(d_mat, lev), _direction(d_int, lev)
+    if m == -1 and i == -1:
+        return "socialisation"
+    if m == 1 and i == 1:
+        return "de-socialisation"
+    if (m == -1 and i >= 0) or (i == 1 and m <= 0):
         return "inward"
-    if mlo > 0 and d_int.estimate <= 0:
+    if (m == 1 and i <= 0) or (i == -1 and m >= 0):
         return "outward"
-    return "mixed"
+    return "indeterminate"
 
 
 def wald(est: np.ndarray, cov: np.ndarray) -> tuple[float, float]:
@@ -298,8 +318,11 @@ def wald(est: np.ndarray, cov: np.ndarray) -> tuple[float, float]:
     return W, float(stats.chi2.sf(W, len(est)))
 
 
+ALPHA_PRIMARY = 0.025         # prereg v0.5: two co-primary tests (TF, H1) at 0.025 each
+
+
 def h1(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, late=LATE,
-       two_sided: bool = True, name: str = "H1 locus shift") -> Effect:
+       two_sided: bool = True, name: str = "H1 locus shift", alpha: float = ALPHA_PRIMARY) -> Effect:
     """Registered H1 (prereg v0.4): two-sided 2-df Wald test of (d_material, d_internal) = 0, L - E,
     genre-standardised; result classified inward / outward / mixed (classify_h1).
     two_sided=False reproduces the v0.3 directional intersection-union test (material down AND
@@ -315,13 +338,14 @@ def h1(wd: WorkData, design: Design | None = None, ref_cov=None, early=EARLY, la
     if two_sided:
         comps[0].in_test = comps[1].in_test = True
         W, p = wald([comps[0].estimate, comps[1].estimate], shares["_cov"][:2, :2])
-        extra.update({"two_sided": True, "wald": W, "p_test": p, "classification": classify_h1(comps[0], comps[1], p)})
+        extra.update({"two_sided": True, "wald": W, "p_test": p, "alpha": alpha,
+                      "classification": classify_h1(comps[0], comps[1], p, alpha)})
     return Effect(name, comps, infl, extra)
 
 
 def h1_contrast(wd: WorkData, design: Design | None = None, ref_cov=None, time: str = "spline",
                 window: tuple | None = None, years_a=None, years_b=None, cut: int = 1880,
-                name: str = "H1 contrast", fit_cache: dict | None = None) -> Effect:
+                name: str = "H1 contrast", fit_cache: dict | None = None, alpha: float = ALPHA_PRIMARY) -> Effect:
     """General two-sided locus contrast (same Wald test + classification as h1) for alternative H1
     statistics (levers.py, prereg v0.5 §7.6):
       time="spline", years = empirical era years  -> E vs L / M vs L (h1, h1_mid_late)
@@ -351,7 +375,49 @@ def h1_contrast(wd: WorkData, design: Design | None = None, ref_cov=None, time: 
     W, p = wald([c.estimate for c in comps], V)
     infl = tf.fit.cluster_influence() @ G
     return Effect(name, comps, infl, {"two_sided": True, "wald": W, "p_test": p,
-                                      "classification": classify_h1(comps[0], comps[1], p), "link": tf.fit.link})
+                                      "classification": classify_h1(comps[0], comps[1], p, alpha), "link": tf.fit.link,
+                                      "alpha": alpha})
+
+
+def two_fictions(wd: WorkData, design: Design | None = None, ref_cov=None, adjust_genre: bool = False,
+                 alpha: float = ALPHA_PRIMARY, name: str = "TF two fictions") -> Effect:
+    """Co-primary (prereg v0.5) TWO FICTIONS: canonical vs non-canonical works differ in locus mix.
+    Multinomial logit of DSL soft outcomes ~ canonical + ns(year, df=4) + origin + log length
+    (genre NOT adjusted in the primary: genre composition is part of what separates the two fields;
+    adjust_genre=True is the registered secondary). Estimand: g-computation over the standard
+    population at each work's own year, canonical set to 1 vs 0; (d_material, d_internal) =
+    canonical - non-canonical; two-sided 2-df Wald; symmetric classification ('inward' = canon more
+    inward). Needs cov.canonical (bool / 0-1)."""
+    base = design or Design.from_data(wd)
+    cov = wd.cov.assign(canon_num=wd.cov.canonical.astype(float).values)
+    wd2 = WorkData(cov, wd.Y, wd.method, wd.info)
+    d = Design(base.knots, base.genres if adjust_genre else base.genres[:1], base.origins, base.loglen_mean,
+               "spline", base.cut, tuple(base.extra) + ("canon_num",))
+    tf = fit_target(wd2, "locus", d)
+    ref = _ref(wd2, ref_cov)
+    if "canon_num" not in ref:
+        ref = ref.assign(canon_num=0.0)
+    comps, grads = [], []
+    r1, r0 = ref.assign(canon_num=1.0), ref.assign(canon_num=0.0)
+    shares = {}
+    for label, num in (("material share", [1]), ("internal share", [3]), ("social share", [2])):
+        s1, g1 = standardized_share(tf, r1, None, num, [1, 2, 3])
+        s0, g0 = standardized_share(tf, r0, None, num, [1, 2, 3])
+        g = g1 - g0
+        comps.append(Component(label, s1 - s0, float(np.sqrt(max(g @ tf.fit.cov @ g, 0))), 0, label != "social share"))
+        grads.append(g)
+        shares[label] = (s0, s1)
+    G = np.column_stack(grads[:2])
+    W, p = wald([comps[0].estimate, comps[1].estimate], G.T @ tf.fit.cov @ G)
+    infl = tf.fit.cluster_influence() @ np.column_stack(grads)
+    return Effect(name, comps, infl, {"two_sided": True, "wald": W, "p_test": p, "alpha": alpha,
+                                      "classification": classify_h1(comps[0], comps[1], p, alpha),
+                                      "shares_noncanon_canon": shares, "link": tf.fit.link, "converged": tf.fit.converged})
+
+
+def within_strata(fn, wd: WorkData, col: str = "canonical", **kw) -> dict:
+    """Secondary (v0.5): run an era contrast (e.g. h1) separately within each level of `col`."""
+    return {lev: fn(wd.subset(wd.cov[col].values == lev), **kw) for lev in pd.unique(wd.cov[col])}
 
 
 def h1_mid_late(wd: WorkData, design: Design | None = None, ref_cov=None) -> Effect:

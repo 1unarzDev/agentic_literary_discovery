@@ -109,6 +109,11 @@ class SimConfig:
     dom_slope: dict = field(default_factory=lambda: {
         "DISTANCE_TRAVEL": -0.5, "DARKNESS_VISIBILITY": -0.4, "ILLNESS_BODY_DEATH": -0.2,
         "SOCIAL_RANK_CONVENTION": 0.1, "INNER_STATE": 0.6, "NATURE_WEATHER": -0.3})
+    # canonical authors (prereg v0.5 "two fictions"): share of authors canonical by career era E/M/L,
+    # and a domain-logit shift applied to canonical works
+    canon: bool = False
+    canon_shares: tuple = (0.31, 0.22, 0.04)
+    canon_shift: dict = field(default_factory=dict)
     # optional step change in the domain logits at step_year (pilot-like "1880s step" scenario)
     dom_step: dict = field(default_factory=dict)
     step_year: int = 1883
@@ -125,6 +130,28 @@ class SimConfig:
         tests/test_simulate.py::test_pilot_step_calibration."""
         return SimConfig(effect=0.0, dom_step={"NATURE_WEATHER": step, "DISTANCE_TRAVEL": step,
                                                "DARKNESS_VISIBILITY": step}, **kw)
+
+    @staticmethod
+    def v05(gap: float = -3.0, trend: float = 0.0, **kw) -> "SimConfig":
+        """Calibrated to the v0.9 Discovery labels and the v0.5 primary set (docs/review/methods_review.md
+        appendix; literary_review.md P1): prevalence 0.70; locus among obstacles ~0.21 / 0.69 / 0.10 for
+        non-canonical works; Confirmation primary set ~4,000 works (E ~85 after excluding historical
+        novels, M ~530, L ~3,400), ~2.5 works per author; observed author ICC ~0.10 for the material
+        indicator (tests/test_simulate.py::test_v05_calibration). Canonical authors 31% / 22% / 4% by
+        era. `gap` = logit shift of the four material domains for canonical works (-3.0 gives material
+        ~0.10 vs 0.21, near the literary review's two-fictions pattern; 0 = no gap). `trend` scales a smooth
+        within-stratum material decline/rise (0 = none: the aggregate trend is pure composition)."""
+        mat = ("DISTANCE_TRAVEL", "DARKNESS_VISIBILITY", "NATURE_WEATHER", "ILLNESS_BODY_DEATH")
+        base = {"DISTANCE_TRAVEL": -1.55, "COMMUNICATION_INFORMATION": 0.3, "DARKNESS_VISIBILITY": -2.35,
+                "ILLNESS_BODY_DEATH": -1.15, "MONEY_PROPERTY_LAW": 0.2, "SOCIAL_RANK_CONVENTION": 0.6,
+                "INTERPERSONAL_CONFLICT": 0.8, "INNER_STATE": -0.2, "NATURE_WEATHER": -2.05, "OTHER": -1.5}
+        cfg = dict(n_works=8000, works_per_author=2.5, wpa_size=0.5, wpa_max=15, prevalence=0.70,
+                   icc_author=0.20, icc_work=0.15, passages_per_work=12, effect=trend,
+                   dom_slope={d: 0.6 for d in mat}, dom_base=base,
+                   decade_profile=(2, 4, 10, 21, 48, 110, 140, 175, 330, 700, 900, 1000, 600),
+                   canon=True, canon_shift={d: gap for d in mat})
+        cfg.update(kw)
+        return SimConfig(**cfg)
 
     def with_(self, **kw) -> "SimConfig":
         return replace(self, **kw)
@@ -197,6 +224,11 @@ def make_works(cfg: SimConfig, rng: np.random.Generator) -> pd.DataFrame:
     p_us = np.clip(0.18 + 0.15 * tc, 0.05, 0.6)
     ao = _draw(rng, np.c_[0.9 - p_us, p_us, np.full(n_auth, 0.1)])
     split = np.where(rng.random(n_auth) < 0.5, "discovery", "confirmation")
+    if cfg.canon:
+        ce = np.searchsorted([1850, 1885], centre, side="right")
+        canon_a = rng.random(n_auth) < np.asarray(cfg.canon_shares)[ce]
+    else:
+        canon_a = np.zeros(n_auth, bool)
     n_words = np.exp(rng.normal(np.log(95_000), 0.5, n)).clip(15_000, 600_000).astype(int)
     dc = _draw(rng, np.tile([0.47, 0.27, 0.26], (n, 1)))     # G0 shares high/medium/low
     canon = rng.random(n_auth) < 0.1
@@ -213,6 +245,7 @@ def make_works(cfg: SimConfig, rng: np.random.Generator) -> pd.DataFrame:
         "date_confidence": np.array(["high", "medium", "low"])[dc],
         "memorization": memo,
         "setting_period": "contemporary",
+        "canonical": canon_a[a_idx],
     })
 
 
@@ -238,6 +271,8 @@ def _truth(cfg: SimConfig, rng: np.random.Generator, wk: pd.DataFrame, w_of_p: n
     has = np.where(u < p_obs, 1, np.where(u < p_obs + 0.03 * (1 - p_obs), 2, 0))  # 1 yes, 0 no, 2 insufficient
     gdom = np.array([_vec(GENRE_DOM[g], DOMAINS) for g in GENRES])[gi] * ge
     eta = _vec(cfg.dom_base, DOMAINS) + cfg.effect * np.outer(t, _vec(cfg.dom_slope, DOMAINS)) + gdom + re[:, 1:11]
+    if cfg.canon and cfg.canon_shift:
+        eta = eta + np.outer(wk.canonical.values[w_of_p], _vec(cfg.canon_shift, DOMAINS))
     if cfg.dom_step:
         yr = 1860 + 60 * t
         eta = eta + np.outer(yr >= cfg.step_year, _vec(cfg.dom_step, DOMAINS))
@@ -382,7 +417,7 @@ def simulate(cfg: SimConfig | None = None, audit: bool = True) -> Corpus:
     hu = _human(cfg, rng, tr)
 
     pid = np.char.add(np.char.add(wk.work_id.values[w_of_p].astype(str), "_p"), j.astype(str))
-    base = wk.iloc[w_of_p][["work_id", "author_key", "decade", "year", "genre", "origin", "split",
+    base = wk.iloc[w_of_p][["work_id", "author_key", "decade", "year", "genre", "origin", "split", "canonical",
                             "n_words", "date_confidence", "memorization", "setting_period"]].reset_index(drop=True)
     base.insert(0, "passage_id", pid)
     base["stratum"] = stratum

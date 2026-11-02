@@ -202,8 +202,8 @@ def date_permutation(fn: HypFn, wd: WorkData, primary: Effect, n_perm: int = 200
 
 def replication(fn: HypFn, primary: Effect, rep: WorkData | None, rep_fn: HypFn | None = None) -> Check:
     """rep_fn lets the replication use another era window (e.g. ELTeC starts 1841)."""
-    if rep is None:
-        return Check("replication", False, {"note": "not run: no replication sample"})
+    if rep is None:          # prereg v0.5 (review P9.5): replication is reported when available, never a gate
+        return Check("replication", None, {"note": "not run: no replication sample (optional)"})
     e = _safe(rep_fn or fn, rep)
     idx, s = _ref(primary)
     ok = e is not None and bool(np.all(np.sign(_ests(e, idx)) == s))
@@ -218,7 +218,7 @@ def verdict(holm_reject: bool, checks: list[Check]) -> tuple[str, int, int, int]
     n_pass = sum(bool(c.passed) for c in app)
     need = math.ceil(7 / 9 * len(app))
     rep = next((c for c in checks if c.name == "replication"), None)
-    rep_ok = bool(rep and rep.passed)
+    rep_ok = rep is None or rep.passed is None or bool(rep.passed)   # optional since v0.5
     if not holm_reject:
         return "null", n_pass, len(app), need
     if n_pass >= need and rep_ok:

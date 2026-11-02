@@ -62,11 +62,12 @@ def test_h1_oracle_recovers_truth_direction(oracle_wd):
 
 def test_classify_and_wald():
     C = models.Component
-    assert models.classify_h1(C("m", -0.1, 0.02, 0), C("i", 0.08, 0.02, 0), 0.001) == "inward"
-    assert models.classify_h1(C("m", 0.08, 0.02, 0), C("i", -0.01, 0.02, 0), 0.001) == "outward"
-    assert models.classify_h1(C("m", 0.08, 0.02, 0), C("i", 0.05, 0.02, 0), 0.001) == "mixed"
-    assert models.classify_h1(C("m", -0.1, 0.02, 0), C("i", 0.01, 0.02, 0), 0.001) == "mixed"
-    assert models.classify_h1(C("m", 0.08, 0.02, 0), C("i", -0.01, 0.02, 0), 0.2) == "none"
+    k = lambda m, i, p=0.001: models.classify_h1(C("m", m, 0.02, 0), C("i", i, 0.02, 0), p, 0.025)
+    assert k(-0.1, 0.08) == "inward" and k(0.08, -0.08) == "outward"          # symmetric strong forms
+    assert k(-0.1, 0.01) == "inward" and k(0.1, -0.01) == "outward"           # symmetric one-component forms
+    assert k(0.01, 0.08) == "inward" and k(-0.01, -0.08) == "outward"
+    assert k(-0.1, -0.08) == "socialisation" and k(0.1, 0.08) == "de-socialisation"
+    assert k(0.03, 0.03) == "indeterminate" and k(0.1, -0.01, p=0.2) == "none"
     W, p = models.wald(np.array([0.0196 * 2, 0.0]), np.diag([0.0196 ** 2, 1.0]))
     assert abs(W - 4) < 1e-9 and abs(p - np.exp(-2)) < 1e-9          # chi2_2 sf(4) = e^-2
 
@@ -128,3 +129,13 @@ def test_shift_share_exact_on_simulation():
     assert np.allclose(s.total, s.within_genre + s.composition)
     f = models.fixed_composition_trend(wd, "darkness", [1], None, B=10)
     assert {"n_works", "n_authors", "ref_coverage"} <= set(f.columns)
+
+
+def test_two_fictions_recovers_gap():
+    from analysis.stats.simulate import LLMNoise, SimConfig, simulate
+    c = simulate(SimConfig.v05(n_works=6000, noise=LLMNoise.perfect(), seed=2), audit=False)
+    wd = dsl.prepare(c.labels, method="oracle", truth=c.truth, targets=("locus",))
+    e = models.two_fictions(wd)
+    assert e.components[0].estimate < -0.05 and e.p < 0.025 and e.extra["classification"] == "inward"
+    ws = models.within_strata(models.h1, wd)
+    assert set(ws) == {True, False}

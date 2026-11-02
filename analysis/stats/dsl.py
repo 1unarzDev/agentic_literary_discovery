@@ -248,7 +248,7 @@ def pseudo_outcomes(Yhat_code: np.ndarray, Y_code: np.ndarray, labelled: np.ndar
 # ------------------------------------------------------------------ work-level data
 
 WORK_COLS = ["work_id", "author_key", "year", "decade", "genre", "origin", "split"]
-OPT_WORK_COLS = ["n_words", "date_confidence", "memorization", "setting_period", "work_weight"]
+OPT_WORK_COLS = ["n_words", "date_confidence", "memorization", "setting_period", "work_weight", "canonical"]
 # work_weight: 1 / P(work labelled) under adaptive stopping (cell = decade x stratum closes early,
 # whole works in seeded order), so closed decades are not under-weighted. Default 1.
 
@@ -607,6 +607,54 @@ def fit_linear(X: np.ndarray, Y: np.ndarray, weights: np.ndarray | None = None,
     Hinv = np.kron(np.eye(K - 1), Ainv)
     cov = Hinv @ cluster_cov(scores, cl) @ Hinv
     return MNLFit(beta, cov, Hinv, scores, cl, True, 1, columns or [f"x{i}" for i in range(p)], "identity")
+
+
+def pseudo_outcomes_anchored(yhat: np.ndarray, peer_soft: np.ndarray, R3: np.ndarray, pi3: np.ndarray,
+                             expert: np.ndarray, Rh: np.ndarray, pih: np.ndarray, K: int,
+                             folds: np.ndarray, strata: np.ndarray | None = None) -> np.ndarray:
+    """Expert-anchored three-level DSL (registered v0.5). Estimand = the EXPERT construct.
+
+    level 1: model labels on every passage (yhat codes);
+    level 2: peer annotator-mean soft labels on the audit (R3, pi3 = audit probability);
+    level 3: expert labels on a probability subsample of the audit (Rh, pih = P(expert | audit)).
+
+      Ytilde = g1(yhat) + R3/pi3 (g2 - g1) + R3 Rh/(pi3 pih) (onehot(expert) - g2)
+
+    g2 = cross-fitted multinomial logit of the expert label on (peer soft label, model label), fitted
+    on expert items in the other folds: it uses the peers' information optimally, so the expert term
+    has the smallest residual. g1 = cross-fitted calibration of g2 on the model label (by stratum).
+    E[Ytilde] = expert label for ANY g1, g2 (cross-fitted), so peer noise, peer bias and annotator
+    exclusions cannot bias the estimate; they only change its variance."""
+    n = len(yhat)
+    Yh1 = onehot(yhat, K)
+    X = np.c_[np.ones(n), peer_soft[:, 1:], Yh1[:, 1:]]
+    g2 = np.zeros((n, K))
+    g1 = np.zeros((n, K))
+    E = np.zeros((n, K))
+    E[Rh] = onehot(expert[Rh], K)
+    for f in np.unique(folds):
+        tr_e = Rh & R3 & (folds != f)
+        te = folds == f
+        # g2: logit with a light ridge (few hundred training items)
+        fit = fit_mnlogit(X[tr_e], E[tr_e], ridge=1e-3) if tr_e.sum() > 20 else None
+        if fit is None or not fit.converged:
+            # fall back: smoothed table P(expert | argmax peer)
+            pk = np.argmax(peer_soft, 1)
+            t = np.eye(K) + 0.0
+            np.add.at(t, pk[tr_e], E[tr_e])
+            g2[te] = (t / t.sum(1, keepdims=True))[pk[te]]
+        else:
+            g2[te] = mnl_probs(X[te], fit.beta)
+    for f in np.unique(folds):
+        tr = R3 & (folds != f)
+        te = folds == f
+        g = calibration_g(yhat[tr], g2[tr], 1 / pi3[tr], None if strata is None else strata[tr], K)
+        g1[te] = g(yhat[te], None if strata is None else strata[te])
+    out = g1.copy()
+    out[R3] += (g2[R3] - g1[R3]) / pi3[R3, None]
+    m = R3 & Rh
+    out[m] += (E[m] - g2[m]) / (pi3[m] * pih[m])[:, None]
+    return out
 
 
 # ------------------------------------------------------------------ PPI (cross-check for means)

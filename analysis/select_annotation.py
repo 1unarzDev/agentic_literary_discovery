@@ -62,33 +62,89 @@ def item_id(pid: str) -> str:
     return "it_" + hashlib.sha256(f"{SEED}:{pid}".encode()).hexdigest()[:12]
 
 
-def draw_audit(lab: pd.DataFrame, teaching_authors: set, rng: np.random.Generator,
-               n_target: int = 200, group_col: str = "group") -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Probability sample for DSL/PPI. `lab` needs era, <group_col>, split, stratum, author_key, passage_id.
+LABEL_DERIVED = {"group", "dgroup", "has_obstacle", "locus", "domains"}   # never strata under the seal (prereg v0.5)
 
-    group_col: "group" (locus groups, the original design) or e.g. "dgroup" = domain_group() strata
-    (the registered final design: Confirmation only, era x predicted-domain group, n_target ~1800).
-    Restrict `lab` to the Confirmation split before calling to draw a Confirmation-only audit.
+
+def era_by_year(year) -> np.ndarray:
+    """Estimand eras on YEAR cuts (prereg v0.5): E 1800-1849, M 1850-1884, L 1885-1929."""
+    y = np.asarray(year)
+    return np.where(y < 1850, "E_1800_1849", np.where(y < 1885, "M_1850_1884", "L_1885_1929"))
+
+
+def draw_audit(lab: pd.DataFrame, teaching_authors: set, rng: np.random.Generator,
+               n_target: int = 200, group_col: str | list = "group", balance_on: list | None = None,
+               metadata_only: bool = False, n_min: int = 2) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Probability sample for DSL/PPI. `lab` needs era, <group_col(s)>, split, stratum, author_key, passage_id.
+
+    Strata = era x group_col(s) x split. Allocation:
+      balance_on=None  : equal n per stratum (legacy designs, n_cell = min(per, N_cell));
+      balance_on=[...] : n_target split equally over the cells of `balance_on` (x split), then within
+                         each such cell proportional to N_cell (at least n_min, at most N_cell).
+    metadata_only=True refuses label-derived strata (LABEL_DERIVED): the registered v0.5 seal fix,
+    because N_cell of predicted-label strata reveals the naive Confirmation answer.
+
+    Registered v0.5 call (Confirmation, before registration):
+      draw_audit_metadata(meta_conf, rng, n_target) == draw_audit(meta_conf, set(), rng, n_target,
+          group_col=["genre", "canonical"], balance_on=["era", "canonical"], metadata_only=True)
+    with meta_conf.era = era_by_year(year). If `canonical` is not yet available, use
+    group_col=["genre"], balance_on=["era"].
 
     Returns (audit, frame). `frame` lists EVERY pool passage with its audit cell and first-order
-    inclusion probability pi_audit = n_cell / N_cell (0 for passages outside the pool); DSL needs
-    pi for unaudited passages too, so the frame must be persisted (analysis/stats/README.md).
+    inclusion probability pi_audit = n_cell / N_cell; DSL needs pi for unaudited passages too, so the
+    frame must be persisted. Do not print or publish N_cell before registration; deposit
+    cell_table_hash(frame) instead.
     """
+    gcols = [group_col] if isinstance(group_col, str) else list(group_col)
+    if metadata_only and (set(gcols) | set(balance_on or [])) & LABEL_DERIVED:
+        raise ValueError(f"label-derived strata {set(gcols) & LABEL_DERIVED} break the Confirmation seal")
     pool = lab[~lab.author_key.isin(teaching_authors) & (lab.stratum == "random")]
-    cells = pool.groupby(["era", group_col, "split"])
-    n_cells = cells.ngroups
-    per = max(2, int(np.ceil(n_target / n_cells)))
+    keys = ["era"] + [c for c in gcols if c != "era"] + ["split"]
+    cells = pool.groupby(keys)
+    if balance_on is None:
+        per = max(n_min, int(np.ceil(n_target / cells.ngroups)))
+        alloc = {k: min(per, len(g)) for k, g in cells}
+    else:
+        bkeys = list(dict.fromkeys(list(balance_on) + ["split"]))
+        Ncell = cells.size()
+        bal = Ncell.groupby(level=[keys.index(b) for b in bkeys])
+        budget = n_target / bal.ngroups
+        alloc = {}
+        for _, sub in bal:
+            share = budget * sub / sub.sum()
+            for k, N in sub.items():
+                alloc[k] = int(min(N, max(n_min, round(share[k]))))
     rows, frame = [], []
     for key, g in cells:
-        k = min(per, len(g))
+        key = key if isinstance(key, tuple) else (key,)
+        k = alloc[key]
+        cell = "|".join(map(str, key))
         s = g.sample(n=k, random_state=int(rng.integers(1e9)))
-        s = s.assign(audit_cell="|".join(key), cell_N=len(g), cell_n=k, weight=len(g) / k)
+        s = s.assign(audit_cell=cell, cell_N=len(g), cell_n=k, weight=len(g) / k)
         rows.append(s)
-        frame.append(pd.DataFrame({"passage_id": g.passage_id.values, "audit_cell": "|".join(key),
-                                   "pi_audit": k / len(g)}))
+        frame.append(pd.DataFrame({"passage_id": g.passage_id.values, "audit_cell": cell, "pi_audit": k / len(g)}))
     audit = pd.concat(rows)
     audit = audit.sample(frac=1, random_state=SEED)
     return audit, pd.concat(frame, ignore_index=True)
+
+
+def draw_audit_metadata(meta: pd.DataFrame, rng: np.random.Generator, n_target: int = 1800,
+                        use_canon: bool = True) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Registered v0.5 audit draw (seal-safe): strata era(year) x genre x canonical, budget balanced
+    over era x canonical, proportional to N within. `meta` = Confirmation passages with passage_id,
+    work_id, author_key, year, split, stratum, genre (+ canonical). No label columns are read."""
+    m = meta.assign(era=era_by_year(meta.year.values))
+    if use_canon and "canonical" in m:
+        m = m.assign(canonical=m.canonical.astype(bool).map({True: "canon", False: "noncanon"}))
+        return draw_audit(m, set(), rng, n_target, group_col=["genre", "canonical"],
+                          balance_on=["era", "canonical"], metadata_only=True)
+    return draw_audit(m, set(), rng, n_target, group_col=["genre"], balance_on=["era"], metadata_only=True)
+
+
+def cell_table_hash(frame: pd.DataFrame) -> str:
+    """SHA-256 of the (cell, N_cell, pi) table: deposit this, not the counts, before registration."""
+    t = frame.groupby("audit_cell").agg(N=("passage_id", "size"), pi=("pi_audit", "first")).reset_index()
+    txt = t.sort_values("audit_cell").to_csv(index=False)
+    return hashlib.sha256(txt.encode()).hexdigest()
 
 
 def main(lab_path: str, alt_path: str | None = None) -> None:
