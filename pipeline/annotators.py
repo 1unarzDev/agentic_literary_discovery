@@ -498,6 +498,91 @@ def adjudicate(ref: dict, labels: pd.DataFrame | None = None, expert_reader: str
     return out, pd.DataFrame(rows, columns=["set", "verdict"])
 
 
+# ---------------------------------------------------------------------------- offline returns (packets)
+OFFLINE_RETURNS = ANN / "offline/returned_*.parquet"
+OFFLINE_SET = {"B1_practice": "practice", "B2_check": "cert", "B3_second_check": "retake"}
+
+
+def _glob_paths(spec: str | Path) -> list[Path]:
+    import glob as _glob
+    spec = str(spec)
+    paths = _glob.glob(spec) if any(ch in spec for ch in "*?[") else ([spec] if Path(spec).exists() else [])
+    return sorted(map(Path, paths), key=lambda p: (p.stat().st_mtime, p.name))
+
+
+def load_offline_labels(spec: str | Path = OFFLINE_RETURNS, rename: dict | None = None) -> pd.DataFrame:
+    """Imported LABEL returns (pipeline/offline_annotation.py import -> returned_expert_*.parquet: item_id,
+    annotator, has_obstacle, domain, locus, failure_cause, evidence, note, seconds, passage_id, set) ->
+    the flattened label schema (LABEL_COLS + locus4/obstacle/domains). Answer-key returns (a `decision`
+    column) are skipped. cant_tell -> insufficient_context; packet sets B1/B2/B3 -> practice/cert/retake;
+    item_id is the queue id (select_annotation.item_id(passage_id)) so roles join from queues.parquet;
+    `created` orders returns (file mtime, then row), so the latest return per annotator x passage wins."""
+    from analysis.select_annotation import item_id
+    rows = []
+    for k, p in enumerate(_glob_paths(spec)):
+        df = pd.read_parquet(p)
+        if "decision" in df.columns:
+            continue
+        for j, r in enumerate(df.to_dict("records")):
+            h = _norm(str(r.get("has_obstacle", "")).strip())
+            st = str(r.get("set", "audit"))
+            rows.append({"label_id": f"{p.stem}:{j}", "item_id": item_id(r["passage_id"]), "passage_id": r["passage_id"],
+                         "set": OFFLINE_SET.get(st, st), "annotator": str(r.get("annotator", "")).strip(),
+                         "has_obstacle": OFFLINE_HAS.get(h, h),
+                         "domain": _norm(str(r.get("domain", "")).strip()), "locus": _norm(str(r.get("locus", "")).strip()),
+                         "failure_cause": _norm(str(r.get("failure_cause", "")).strip()),
+                         "note": _norm(str(r.get("note", "")).strip()), "evidence_text": _norm(str(r.get("evidence", "")).strip()),
+                         "seconds_spent": r.get("seconds"), "created": k * 1_000_000 + j, "undone": False,
+                         "practice": OFFLINE_SET.get(st) == "practice", "offline_item_id": r.get("item_id"),
+                         "source_file": p.name})
+    df = pd.DataFrame(rows, columns=[*LABEL_COLS, "offline_item_id", "source_file"])
+    df["seconds_spent"] = pd.to_numeric(df.seconds_spent.replace("", None), errors="coerce")
+    df["created"] = df.created.astype("int64")
+    return apply_rename(add_constructs(df), rename or {})
+
+
+def offline_human_labels(labels: pd.DataFrame, queues: pd.DataFrame | None, audit: pd.DataFrame | None,
+                         frame: pd.DataFrame, all_sets: bool = False) -> tuple[pd.DataFrame, dict]:
+    """Analysis file (one row per annotator x passage, latest return wins) in the human_labels schema:
+    + role, partner, era (queues.parquet), audit_cell, pi_audit (audit_frame.parquet), weight,
+    pi_expert_given_audit, is_expert (audit.parquet). Non-audit sets are dropped unless all_sets.
+    Audit rows whose passage is not in the audit frame are dropped with a count."""
+    rep = {"n_rows_in": int(len(labels))}
+    act = active(labels)
+    rep["n_duplicates_replaced"] = int(len(labels) - len(act))
+    rep["by_set"] = act.set.value_counts().to_dict()
+    df = act if all_sets else act[act.set == "audit"]
+    df = attach_roles(df, queues)
+    fr = frame[["passage_id", "audit_cell", "pi_audit"]].drop_duplicates("passage_id")
+    in_frame = df.passage_id.isin(fr.passage_id)
+    bad = (df.set == "audit") & ~in_frame
+    rep["n_dropped_not_in_frame"] = int(bad.sum())
+    df = df[~bad].merge(fr, on="passage_id", how="left")
+    if audit is not None:
+        cols = [c for c in ("weight", "pi_expert_given_audit", "is_expert", "era") if c in audit]
+        a = audit[["passage_id", *cols]].drop_duplicates("passage_id").rename(columns={"era": "audit_era"})
+        df = df.merge(a, on="passage_id", how="left")
+        if "audit_era" in df:
+            df["era"] = df.era.where(df.era.notna(), df.audit_era) if "era" in df else df.audit_era
+            df = df.drop(columns="audit_era")
+    rep["n_unassigned"] = int(((df.set == "audit") & df.role.isna()).sum()) if "role" in df else 0
+    rep["n_rows_out"] = int(len(df))
+    rep["by_annotator"] = df.annotator.value_counts().to_dict()
+    return df.reset_index(drop=True), rep
+
+
+def _load_parquet(p: str | Path | None) -> pd.DataFrame | None:
+    return pd.read_parquet(p) if p and Path(p).exists() else None
+
+
+def _practice_ref_for_progress(a: argparse.Namespace) -> dict | None:
+    """Adjudicated key (what the offline checks are scored against) if present, else practice_ref.json."""
+    for p in (getattr(a, "key", None), a.practice_ref):
+        if p and Path(p).exists():
+            return json.loads(Path(p).read_text(encoding="utf-8"))
+    return None
+
+
 # ---------------------------------------------------------------------------- commands
 def cmd_create(a: argparse.Namespace) -> None:
     url, _ = admin_cfg()
@@ -543,11 +628,31 @@ def load_queues(p: Path) -> pd.DataFrame | None:
 
 
 def cmd_export(a: argparse.Namespace) -> None:
+    mp = parse_rename(a.rename)
+    out = Path(a.out)
+    if a.from_offline:
+        frame = _load_parquet(a.frame)
+        if frame is None:
+            raise SystemExit(f"{a.frame} missing: the audit frame is needed to validate and weight the labels")
+        labels = load_offline_labels(a.from_offline, mp)
+        if not len(labels):
+            raise SystemExit(f"no imported label returns match {a.from_offline}")
+        df, r = offline_human_labels(labels, apply_rename(load_queues(Path(a.queues)), mp), _load_parquet(a.audit),
+                                     frame, a.all_sets)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(out, index=False)
+        print(f"offline returns: {r['n_rows_in']} rows, {r['n_duplicates_replaced']} superseded by a later return; "
+              f"by set {r['by_set']}")
+        if r["n_dropped_not_in_frame"]:
+            print(f"WARNING: dropped {r['n_dropped_not_in_frame']} audit rows whose passage is not in the audit frame")
+        if r["n_unassigned"]:
+            print(f"WARNING: {r['n_unassigned']} audit rows were not assigned to that annotator in queues.parquet")
+        print(f"wrote {r['n_rows_out']} rows ({'all sets' if a.all_sets else 'audit only'}) by annotator "
+              f"{r['by_annotator']} -> {out}")
+        return
     with client() as c:
         rows = request(c, "GET", "/v1/admin/ann_labels").json()["labels"]
-    mp = parse_rename(a.rename)
     df = attach_roles(apply_rename(flatten_labels(rows), mp), apply_rename(load_queues(Path(a.queues)), mp))
-    out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, index=False)
     print(f"exported {len(df)} labels ({int((~df.undone).sum())} active) -> {out}")
@@ -556,6 +661,8 @@ def cmd_export(a: argparse.Namespace) -> None:
 def fetch_labels(a: argparse.Namespace) -> tuple[pd.DataFrame, dict | None]:
     """Labels (+ ann_status for progress), with the --rename mapping (default expert1=grad) applied."""
     mp = parse_rename(getattr(a, "rename", None))
+    if getattr(a, "from_offline", None) and a.cmd == "progress":
+        return load_offline_labels(a.from_offline, mp), None
     if getattr(a, "from_parquet", None):
         return apply_rename(pd.read_parquet(a.from_parquet), mp), None
     with client() as c:
@@ -571,7 +678,7 @@ def _expert_name(a: argparse.Namespace) -> str:
 def cmd_progress(a: argparse.Namespace) -> None:
     queues = apply_rename(load_queues(Path(a.queues)), parse_rename(a.rename))
     labels, status = fetch_labels(a)
-    ref = json.loads(Path(a.practice_ref).read_text(encoding="utf-8")) if Path(a.practice_ref).exists() else None
+    ref = _practice_ref_for_progress(a)
     ex = _expert_name(a)
     rows = progress_table(labels, queues, status, ref, ex, a.teacher)
     ov = overlap_report(active(labels), queues, ex) if queues is not None else None
@@ -615,10 +722,20 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("export")
     p.add_argument("--out", default=str(ANN / "human_labels.parquet"))
     p.add_argument("--queues", default=str(ANN / "queues.parquet"))
+    p.add_argument("--from-offline", nargs="?", const=str(OFFLINE_RETURNS),
+                   help="build from imported offline label returns (path or glob, default %(const)s) instead of the Worker")
+    p.add_argument("--audit", default=str(ANN / "audit.parquet"))
+    p.add_argument("--frame", default=str(ANN / "audit_frame.parquet"))
+    p.add_argument("--all-sets", action="store_true", help="keep practice/cert/retake/teaching rows (flagged by `set`)")
     p.add_argument("--rename", default="expert1=grad", help="annotator renames for the analysis, a=b[,c=d]")
     p.set_defaults(fn=cmd_export)
     p = sub.add_parser("progress")
-    p.add_argument("--from-parquet")
+    src = p.add_mutually_exclusive_group()
+    src.add_argument("--from-parquet")
+    src.add_argument("--from-offline", nargs="?", const=str(OFFLINE_RETURNS),
+                     help="imported offline label returns (path or glob, default %(const)s)")
+    p.add_argument("--key", default=str(ANN / "practice_ref_adjudicated.json"),
+                   help="key the checks are scored against (falls back to --practice-ref)")
     p.add_argument("--queues", default=str(ANN / "queues.parquet"))
     p.add_argument("--practice-ref", default=str(ANN / "practice_ref.json"))
     p.add_argument("--expert-reader", default="expert1", help="Worker name of the expert (before --rename)")

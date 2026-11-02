@@ -283,3 +283,136 @@ def test_adjudicate_offline_raw_csv(tmp_path, monkeypatch):
                                       "kr_zz,expert1,maybe,,,,,,,\n")
     with pytest.raises(SystemExit):
         an.load_offline_returns(str(tmp_path / "bad.csv"))
+
+
+# ------------------------------------------------------------------ offline label returns
+def _ret(annotator, items, set_="audit", **over):
+    """Imported offline label return (offline_annotation.import_file output schema)."""
+    from pipeline.offline_annotation import EXP_COLS
+    rows = []
+    for k, (pid, ho, dom, loc) in enumerate(items):
+        r = {"item_id": f"c_{annotator}{k}", "annotator": annotator, "has_obstacle": ho, "domain": dom, "locus": loc,
+             "failure_cause": "", "evidence": "", "note": "", "seconds": "30", "passage_id": pid, "set": set_}
+        r.update(over)
+        rows.append(r)
+    df = pd.DataFrame(rows)
+    assert set(EXP_COLS) <= set(df.columns)
+    return df
+
+
+def _offline_world():
+    from analysis.select_annotation import item_id
+    eras = ["E_1800_1849", "L_1885_1929"]
+    pids = [f"pg9_p{i}" for i in range(12)]
+    frame = pd.DataFrame({"passage_id": pids + ["pg9_p99"], "audit_cell": ["c1"] * 6 + ["c2"] * 7,
+                          "pi_audit": [0.5] * 6 + [0.25] * 7})
+    audit = pd.DataFrame({"passage_id": pids, "era": [eras[i % 2] for i in range(12)], "weight": [2.0] * 6 + [4.0] * 6,
+                          "is_expert": [i < 6 for i in range(12)], "pi_expert_given_audit": [0.5] * 12})
+    rows = []
+    for i, p in enumerate(pids):  # p0..p5 -> alice, p6..p11 -> bob; p0, p6 second-coded; p0..p5 expert
+        a, b = ("alice", "bob") if i < 6 else ("bob", "alice")
+        e = eras[i % 2]
+        if i in (0, 6):
+            rows += [(a, p, "audit", "overlap", b, e), (b, p, "audit", "overlap", a, e)]
+        else:
+            rows.append((a, p, "audit", "single", None, e))
+        if i < 6:
+            rows.append(("expert1", p, "audit", "expert", a, e))
+        if i == 1:
+            rows.append(("teacher", p, "audit", "teacher", None, e))
+    q = pd.DataFrame(rows, columns=["annotator", "passage_id", "set", "role", "partner", "era"])
+    q.insert(1, "item_id", q.passage_id.map(item_id))
+    return pids, frame, audit, q
+
+
+def test_offline_export(tmp_path):
+    pids, frame, audit, q = _offline_world()
+    off = tmp_path / "offline"
+    off.mkdir()
+    Y = ("yes", "INNER_STATE", "internal_psychological")
+    N = ("no", "", "")
+    _ret("alice", [(p, *Y) for p in pids[:6]] + [(pids[6], *Y)]).to_parquet(off / "returned_expert_C_main_alice.parquet")
+    _ret("bob", [(p, *N) for p in pids[6:]] + [(pids[0], "cant_tell", "", "")]).to_parquet(off / "returned_expert_C_main_bob.parquet")
+    _ret("expert1", [(p, *Y) for p in pids[:6]]).to_parquet(off / "returned_expert_C_main_grad.parquet")
+    _ret("teacher", [(pids[1], *N)]).to_parquet(off / "returned_expert_T_main.parquet")
+    _ret("alice", [("pg1_p1", *N)], set_="B2_check").to_parquet(off / "returned_expert_B2_check.parquet")
+    _ret("bob", [("pg7_p7", *Y)]).to_parquet(off / "returned_expert_C_main_bob_stray.parquet")  # not in frame
+    pd.DataFrame([{"item_id": "kr_x", "annotator": "expert1", "decision": "agree", "passage_id": "pg1_p1",
+                   "set": "key_practice"}]).to_parquet(off / "returned_key_A.parquet")
+    import os, time
+    # a LATER alice return corrects pids[2] -> no
+    later = off / "returned_expert_C_main_alice_v2.parquet"
+    _ret("alice", [(pids[2], *N)]).to_parquet(later)
+    t = time.time() + 10
+    os.utime(later, (t, t))
+    labs = an.load_offline_labels(str(off / "returned_*.parquet"), {"expert1": "grad"})
+    assert set(labs.annotator) == {"alice", "bob", "grad", "teacher"}
+    assert set(labs.set) == {"audit", "cert"}
+    df, rep = an.offline_human_labels(labs, an.apply_rename(q, {"expert1": "grad"}), audit, frame)
+    assert rep["n_dropped_not_in_frame"] == 1 and rep["n_duplicates_replaced"] == 1
+    assert set(df.set) == {"audit"} and not df.duplicated(["annotator", "passage_id"]).any()
+    r = df.set_index(["annotator", "passage_id"])
+    assert r.loc[("alice", pids[2]), "has_obstacle"] == "no"  # latest return wins
+    assert r.loc[("bob", pids[0]), "has_obstacle"] == "insufficient_context"
+    assert r.loc[("bob", pids[0]), "locus4"] == "none"
+    assert r.loc[("grad", pids[3]), "role"] == "expert" and r.loc[("grad", pids[3]), "partner"] == "alice"
+    assert r.loc[("alice", pids[0]), "role"] == "overlap" and r.loc[("alice", pids[0]), "partner"] == "bob"
+    assert r.loc[("teacher", pids[1]), "role"] == "teacher"
+    assert r.loc[("alice", pids[0]), "audit_cell"] == "c1" and r.loc[("bob", pids[7]), "pi_audit"] == 0.25
+    assert r.loc[("bob", pids[7]), "weight"] == 4.0 and bool(r.loc[("grad", pids[3]), "is_expert"])
+    assert r.loc[("bob", pids[7]), "era"] == "L_1885_1929"
+    assert r.loc[("grad", pids[3]), "domains"] == ["INNER_STATE"]
+    # the stats code accepts it
+    from analysis.stats import annotators as A
+    from analysis.stats.dsl import TARGETS
+    assert all(c in df.columns for c in TARGETS["locus"].human_fields)
+    rk = A.expert_agreement(df[df.annotator != "teacher"], expert="grad").set_index("annotator")
+    assert rk.loc["alice", "n_expert_items"] == 6
+    # CLI writes human_labels.parquet (frame / audit / queues from disk)
+    frame.to_parquet(tmp_path / "frame.parquet")
+    audit.to_parquet(tmp_path / "audit.parquet")
+    q.to_parquet(tmp_path / "queues.parquet")
+    an.main(["export", "--from-offline", str(off / "returned_*.parquet"), "--out", str(tmp_path / "hl.parquet"),
+             "--frame", str(tmp_path / "frame.parquet"), "--audit", str(tmp_path / "audit.parquet"),
+             "--queues", str(tmp_path / "queues.parquet")])
+    hl = pd.read_parquet(tmp_path / "hl.parquet")
+    assert len(hl) == len(df) and "grad" in set(hl.annotator) and "expert1" not in set(hl.annotator)
+    an.main(["export", "--from-offline", str(off / "returned_*.parquet"), "--out", str(tmp_path / "hl_all.parquet"),
+             "--frame", str(tmp_path / "frame.parquet"), "--audit", str(tmp_path / "audit.parquet"),
+             "--queues", str(tmp_path / "queues.parquet"), "--all-sets"])
+    assert "cert" in set(pd.read_parquet(tmp_path / "hl_all.parquet").set)
+
+
+def test_offline_progress(tmp_path, capsys):
+    pids, frame, audit, q = _offline_world()
+    off = tmp_path / "offline"
+    off.mkdir()
+    Y = ("yes", "INNER_STATE", "internal_psychological")
+    N = ("no", "", "")
+    _ret("alice", [(p, *Y) for p in pids[:6]] + [(pids[6], *Y)]).to_parquet(off / "returned_expert_C_alice.parquet")
+    _ret("bob", [(p, *N) for p in pids[6:]] + [(pids[0], *N)], seconds="20").to_parquet(off / "returned_expert_C_bob.parquet")
+    _ret("expert1", [(p, *(Y if i % 2 else N)) for i, p in enumerate(pids[:6])]).to_parquet(off / "returned_expert_C_grad.parquet")
+    _ret("teacher", [(pids[1], *Y)]).to_parquet(off / "returned_expert_T.parquet")
+    _ret("alice", [("pg1_p1", *N), ("pg1_p2", *Y)], set_="B2_check").to_parquet(off / "returned_expert_B2.parquet")
+    ent = lambda p, ho: {"passage_id": p, "reference": {"has_obstacle": ho, "domain": None, "locus": None,
+                                                        "failure_cause": None}, "rationale": ""}
+    key = {"version": "k+adjudicated", "practice": [], "cert": [ent("pg1_p1", "no"), ent("pg1_p2", "no")], "retake": []}
+    (tmp_path / "key.json").write_text(json.dumps(key))
+    labs = an.load_offline_labels(str(off / "returned_*.parquet"), {"expert1": "grad"})
+    qq = an.apply_rename(q, {"expert1": "grad"})
+    out = {r["annotator"]: r for r in an.progress_table(labs, qq, None, key, "grad")}
+    al, bo = out["alice"], out["bob"]
+    assert al["queues"]["audit"] == (7, 7) and bo["queues"]["audit"] == (7, 7)
+    assert al["median_s"] == 30.0 and bo["median_s"] == 20.0
+    assert al["vs_expert"]["all"]["n"] == 6 and math.isclose(al["vs_expert"]["all"]["has_obstacle"]["pct"], 0.5)
+    assert bo["vs_expert"]["all"]["n"] == 1  # bob's second coding of an expert item
+    assert al["vs_partners"]["all"]["n"] == 2 and al["vs_partners"]["all"]["has_obstacle"]["pct"] == 0.0
+    assert al["vs_teacher"]["n"] == 1 and out["grad"]["vs_teacher"]["n"] == 1
+    c = al["cert_local"]["cert"]
+    assert c["done"] == 2 and c["obs_agree"] == 0.5 and c["passed"] is False
+    # CLI, offline
+    q.to_parquet(tmp_path / "queues.parquet")
+    an.main(["progress", "--from-offline", str(off / "returned_*.parquet"), "--queues", str(tmp_path / "queues.parquet"),
+             "--key", str(tmp_path / "key.json"), "--practice-ref", str(tmp_path / "none.json")])
+    txt = capsys.readouterr().out
+    assert "grad" in txt and "vs expert" in txt and "cert" in txt and "peer overlap kappa" in txt
