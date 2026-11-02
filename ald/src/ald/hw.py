@@ -202,3 +202,24 @@ def gpu_memory_used_gb(run: Callable[[list[str]], str | None] = _run) -> float |
         if best is None or total > best[0]:
             best = (total, used)
     return round(best[1] / 1024, 2) if best else None
+
+
+def gpu_process_memory_gb(run: Callable[[list[str]], str | None] = _run) -> dict[int, float] | None:
+    """{pid: GB} of GPU memory per compute process (nvidia-smi), or None where the driver does not report it
+    (Windows/WDDM shows "[N/A]")."""
+    smi = nvidia_smi_path()
+    if not smi:
+        return None
+    out = run([smi, "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"])
+    if out is None:
+        return None
+    res: dict[int, float] = {}
+    for line in out.strip().splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) < 2:
+            continue
+        try:
+            res[int(parts[0])] = float(parts[1]) / 1024
+        except ValueError:
+            return None  # N/A
+    return res

@@ -178,11 +178,21 @@ def test_foreign_vram_lowers_capacity_and_num_parallel(env):
     assert st.vram_gb_required + (np_eff - 1) * st.kv_gb_per_slot + w.fit.headroom_gb <= w.fit.capacity_gb or np_eff == 1
 
 
-def test_our_own_resident_model_is_not_foreign(env):
+def test_our_own_resident_model_is_not_foreign(env, monkeypatch):
+    """COLLIN 22:44: /api/ps under-reports a loaded model (2.2 GB vs ~10 GB real); without per-process data
+    the worker must not count its own model as foreign (it dropped label after every job)."""
     w = env.make_worker()
-    env.ollama.loaded["m"] = int(6.0 * 1024 ** 3)
-    env.gpu_used = 8.3  # 6.0 GB our model + its CUDA context + desktop
-    assert w.measure_foreign_vram() < 0.5
+    env.gpu_used = 0.9
+    env.ollama.loaded.clear()
+    assert w.measure_foreign_vram() == 0.0       # clean measurement while nothing of ours is loaded
+    env.ollama.loaded["m"] = int(2.2 * 1024 ** 3)  # Ollama reports 2.2 GB ...
+    env.gpu_used = 10.9                            # ... nvidia-smi shows the real ~10 GB
+    assert w.measure_foreign_vram() == 0.0       # kept the last clean value
+    # Linux: per-process numbers available -> exact, even with our model loaded
+    monkeypatch.setattr(type(w), "_is_ollama_pid", staticmethod(lambda pid: pid == 111))
+    env.gpu_procs = {111: 9.8, 222: 4.7}         # our llama-server + another study's llama-server
+    env.gpu_used = 9.8 + 4.7 + 0.4
+    assert w.measure_foreign_vram() == pytest.approx(max(0.0, 4.7 + 0.4 - 1.5))
 
 
 # --- host RAM guard -------------------------------------------------------------------------------------

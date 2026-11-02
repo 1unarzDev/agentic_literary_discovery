@@ -139,6 +139,7 @@ class Worker:
         schedule: str | None = None,
         gpu_used_fn: Callable[[], float | None] | None = None,
         ram_available_fn: Callable[[], float] | None = None,
+        gpu_procs_fn: Callable[[], dict[int, float] | None] | None = None,
     ):
         self.cfg = cfg
         self.client = client
@@ -206,6 +207,10 @@ class Worker:
             from .hw import gpu_memory_used_gb
             gpu_used_fn = gpu_memory_used_gb
         self.gpu_used_fn = gpu_used_fn
+        if gpu_procs_fn is None:
+            from .hw import gpu_process_memory_gb
+            gpu_procs_fn = gpu_process_memory_gb
+        self.gpu_procs_fn = gpu_procs_fn
         if ram_available_fn is None:
             import psutil
             ram_available_fn = lambda: float(psutil.virtual_memory().available)  # noqa: E731
@@ -1252,28 +1257,52 @@ class Worker:
             self.log(f"[service] could not refresh the service definition: {e}")
 
     def measure_foreign_vram(self) -> float:
-        """VRAM held by programs other than our Ollama = GPU memory in use - what Ollama has resident.
-        (Per-process figures are often N/A on Windows/WDDM, so this works from totals.)"""
+        """VRAM held by programs other than our Ollama.
+
+        Ollama 0.40's /api/ps size_vram covers only part of a loaded model (1.5-2.9 GB reported for gemma4
+        12B while nvidia-smi shows ~10 GB), so "GPU used - size_vram" counted our own weights as foreign
+        (0.1.10-0.1.17: a 3060 dropped label after every job). Instead:
+        1. per-process GPU memory (nvidia-smi compute apps; Linux): foreign = used - Ollama's processes;
+        2. else, only while our Ollama has NO model loaded: foreign = used; otherwise keep the last value."""
         if self.hw.accel != "cuda":
             return self.fit.foreign_gb
         used = self.gpu_used_fn()
         if used is None:
             return self.fit.foreign_gb
-        try:
-            ours = sum(float(m.get("size_vram") or 0) for m in self.backend.ps()) / GB
-        except BackendError:
-            ours = 0.0
-        # The CUDA context / compute buffers of a loaded model are not in size_vram: allow ~0.6 GB of them.
-        slack = 0.6 if ours > 0 else 0.0
-        # Up to ~1.5 GB is the normal desktop / display baseline. The registry's VRAM figures and tier
-        # thresholds were calibrated on cards that carry it (COLLIN: 0.9 GB), so only memory beyond it
-        # counts. Counting all of it cut NUM_PARALLEL to 1 on a 3060 (-30%).
-        foreign = max(0.0, round(used - ours - slack - DESKTOP_VRAM_BASELINE_GB, 2))
+        foreign: float | None = None
+        per_proc = self.gpu_procs_fn() if self.gpu_procs_fn else None
+        if per_proc:
+            ours = sum(gb for pid, gb in per_proc.items() if self._is_ollama_pid(pid))
+            foreign = used - ours
+        else:
+            try:
+                loaded = self.backend.ps()
+            except BackendError:
+                loaded = []
+            if not loaded:
+                foreign = used
+        if foreign is None:
+            return self.fit.foreign_gb  # a model of ours is resident: keep the last clean measurement
+        # Up to ~1.5 GB is the normal desktop / display baseline (the registry figures assume it).
+        foreign = max(0.0, round(foreign - DESKTOP_VRAM_BASELINE_GB, 2))
         if abs(foreign - self.fit.foreign_gb) >= 0.5:
             self.log(f"[gpu] {foreign:.1f} GB of VRAM held by other programs; planning with "
                      f"{max(0.0, self.hw.usable_vram_gb - foreign):.1f} GB")
         self.fit.foreign_gb = foreign
         return foreign
+
+    @staticmethod
+    def _is_ollama_pid(pid: int) -> bool:
+        """Our Ollama server or its runner (…/lib/ollama/llama-server). Another program's llama-server
+        (e.g. /app/llama-server in a container, or one we may not inspect) is foreign."""
+        try:
+            import psutil
+            p = psutil.Process(pid)
+            name = p.name().lower()
+            exe = (p.exe() or "").lower().replace("\\", "/")
+        except Exception:  # noqa: BLE001
+            return False
+        return name.startswith("ollama") or "/ollama/" in exe or "/programs/ollama/" in exe
 
     def _recheck_vram(self, every_s: float = 600.0) -> None:
         """Between jobs: other programs may have taken or freed VRAM; re-plan NUM_PARALLEL if it changed."""
