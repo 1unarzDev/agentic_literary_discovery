@@ -57,21 +57,26 @@ def test_constructs():
 
 
 def _queues():
+    """Nested design: every audit item dealt to one peer; expert rows (partner = dealt peer) on a subsample;
+    teacher rows on 8 expert items. Worker names (expert1); renamed to grad in the tests."""
     rows = []
-    for i in range(8):  # teacher items: everyone
-        e = ("E_1800_1849", "M_1850_1884", "L_1885_1929")[i % 3]
-        rows += [(a, f"t{i}", f"p_t{i}", "audit", "teacher", None, e) for a in ("student", "peer1", "expert1", "teacher")]
-    for i in range(20):  # expert_overlap: student/peer1 with expert1
+    era = lambda i: ("E_1800_1849", "M_1850_1884", "L_1885_1929")[i % 3]
+    for i in range(8):  # teacher items (also expert items)
+        a = "student" if i < 4 else "peer1"
+        rows += [(a, f"t{i}", f"p_t{i}", "audit", "single", None, era(i)),
+                 ("expert1", f"t{i}", f"p_t{i}", "audit", "expert", a, era(i)),
+                 ("teacher", f"t{i}", f"p_t{i}", "audit", "teacher", None, era(i))]
+    for i in range(20):  # expert items dealt to student / peer1
         e = "E_1800_1849" if i % 2 else "L_1885_1929"
         a = "student" if i < 10 else "peer1"
-        rows += [(a, f"x{i}", f"p_x{i}", "audit", "expert_overlap", "expert1", e),
-                 ("expert1", f"x{i}", f"p_x{i}", "audit", "expert_overlap", a, e)]
-    for i in range(6):
+        rows += [(a, f"x{i}", f"p_x{i}", "audit", "single", None, e),
+                 ("expert1", f"x{i}", f"p_x{i}", "audit", "expert", a, e)]
+    for i in range(6):  # peer overlap; o0 is also an expert item
         e = "E_1800_1849" if i % 2 else "L_1885_1929"
         rows += [("student", f"o{i}", f"p_o{i}", "audit", "overlap", "peer1", e),
                  ("peer1", f"o{i}", f"p_o{i}", "audit", "overlap", "student", e)]
+    rows.append(("expert1", "o0", "p_o0", "audit", "expert", "student", "L_1885_1929"))
     rows.append(("student", "s1", "p_s1", "audit", "single", None, "L_1885_1929"))
-    rows.append(("expert1", "eo1", "p_eo1", "audit", "expert_only", None, "L_1885_1929"))
     return pd.DataFrame(rows, columns=["annotator", "item_id", "passage_id", "set", "role", "partner", "era"])
 
 
@@ -82,7 +87,9 @@ def lab(i, item, ann, **kw):
 
 
 def test_progress_offline():
-    q = _queues()
+    mp = an.parse_rename("expert1=grad")
+    q = an.apply_rename(_queues(), mp)
+    assert "grad" in set(q.annotator) and "grad" not in set(q.partner.dropna())
     pids = [f"pg1_p{i}" for i in range(4)]
     ent = lambda p, ho: {"passage_id": p, "reference": {"has_obstacle": ho, "domain": None, "locus": None,
                                                         "failure_cause": None}, "rationale": ""}
@@ -90,44 +97,56 @@ def test_progress_offline():
            "retake": [ent(pids[3], "no")]}
     rows, i = [], 0
     for k in range(8):
-        for a in ("student", "peer1", "expert1", "teacher"):
+        dealt = "student" if k < 4 else "peer1"
+        for a in (dealt, "expert1", "teacher"):
             i += 1
-            rows.append(lab(i, f"t{k}", a, loc="material_external" if (a == "peer1" and k < 4) else "internal_psychological"))
+            rows.append(lab(i, f"t{k}", a, loc="material_external" if (a == "peer1" and k < 6) else "internal_psychological"))
     for k in range(20):
         a = "student" if k < 10 else "peer1"
         rows.append(lab(100 + k, f"x{k}", a))
-        # expert1 disagrees with peer1 on locus for early items
-        rows.append(lab(200 + k, f"x{k}", "expert1",
+        rows.append(lab(200 + k, f"x{k}", "expert1",  # disagrees with peer1 on early items
                         loc="social_institutional" if (a == "peer1" and k % 2) else "internal_psychological"))
     for k in range(6):
         rows += [lab(300 + k, f"o{k}", "student", s=20), lab(400 + k, f"o{k}", "peer1",
                  ho="yes" if k < 4 else "no", dom=None if k >= 4 else "INNER_STATE")]
+    rows.append(lab(450, "o0", "expert1"))
     rows.append(lab(500, "s1", "student", s=30, undone=True))
     rows += [lab(501, item_id(pids[0]), "student", ho="no", dom=None, loc=None, practice=True, set_="practice", s=999),
              lab(502, item_id(pids[1]), "student", ho="no", dom=None, loc=None, set_="cert"),
              lab(503, item_id(pids[2]), "student", ho="yes", set_="cert")]
-    labs = an.flatten_labels(rows)
-    out = {r["annotator"]: r for r in an.progress_table(labs, q, None, ref)}
+    labs = an.apply_rename(an.flatten_labels(rows), mp)
+    out = {r["annotator"]: r for r in an.progress_table(labs, q, None, ref, "grad")}
+    assert "expert1" not in out and "grad" in out
     st, p1 = out["student"], out["peer1"]
-    assert st["queues"]["audit"] == (24, 25)
+    assert st["queues"]["audit"] == (20, 21)
     assert st["median_s"] == 10.0
-    assert st["vs_expert"]["all"]["n"] == 10 and st["vs_expert"]["all"]["locus4"]["pct"] == 1.0
-    assert p1["vs_expert"]["all"]["n"] == 10 and p1["vs_expert"]["E_1800_1849"]["locus4"]["pct"] == 0.0
-    assert p1["vs_expert"]["L_1885_1929"]["locus4"]["pct"] == 1.0
+    # expert agreement on ALL nested items the peer has: teacher items + expert singles + expert overlap item
+    assert st["vs_expert"]["all"]["n"] == 15 and st["vs_expert"]["all"]["locus4"]["pct"] == 1.0
+    v = p1["vs_expert"]
+    assert v["all"]["n"] == 15 and math.isclose(v["all"]["locus4"]["pct"], 8 / 15)
+    assert math.isclose(v["E_1800_1849"]["locus4"]["pct"], 1 / 6) and math.isclose(v["L_1885_1929"]["locus4"]["pct"], 6 / 7)
     assert st["vs_partners"]["all"]["n"] == 6 and math.isclose(st["vs_partners"]["all"]["has_obstacle"]["pct"], 4 / 6)
-    assert st["vs_teacher"]["n"] == 8 and p1["vs_teacher"]["locus4"]["pct"] == 0.5
-    assert out["expert1"]["vs_teacher"]["n"] == 8
-    assert "vs_expert" not in out["expert1"] and "cert_local" not in out["expert1"]
+    assert st["vs_teacher"]["n"] == 4 and p1["vs_teacher"]["n"] == 4 and p1["vs_teacher"]["locus4"]["pct"] == 0.5
+    assert out["grad"]["vs_teacher"]["n"] == 8
+    assert "vs_expert" not in out["grad"] and "cert_local" not in out["grad"]
     assert "vs_teacher" not in out["teacher"]
     c = st["cert_local"]
     assert c["practice"]["done"] == 1 and c["practice"]["passed"] is None
     assert c["cert"]["done"] == 2 and c["cert"]["obs_agree"] == 0.5 and c["cert"]["passed"] is False
     assert c["retake"]["done"] == 0
-    ov = an.overlap_report(an.active(labs), q)
+    ov = an.overlap_report(an.active(labs), q, "grad")
     assert ov.set_index("subset").n_pairs.to_dict() == {"all": 6, "E_1800_1849": 3, "L_1885_1929": 3}
     txt = an.format_progress(list(out.values()), ov)
-    assert "vs expert1" in txt and "vs teacher (descriptive)" in txt and "L_1885_1929" in txt
-    assert "FLAG" not in txt
+    assert "vs expert" in txt and "vs teacher (descriptive)" in txt and "L_1885_1929" in txt and "grad" in txt
+    assert "expert1" not in txt
+
+
+def test_rename_helpers():
+    assert an.parse_rename("expert1=grad, a=b") == {"expert1": "grad", "a": "b"}
+    assert an.parse_rename("") == {}
+    st = an.rename_status({"annotators": [{"name": "expert1", "queues": []}, {"name": "peer1", "queues": []}]},
+                          {"expert1": "grad"})
+    assert [a["name"] for a in st["annotators"]] == ["grad", "peer1"]
 
 
 def test_adjudicate():
@@ -142,7 +161,7 @@ def test_adjudicate():
             lab(4, item_id("pd"), "student", ho="yes", set_="retake")]  # not a review label
     rows[1]["label"]["note"] = "it is a social constraint"
     rows[1]["label"]["domain"] = "SOCIAL_RANK_CONVENTION"
-    out, summ = an.adjudicate(ref, an.flatten_labels(rows))
+    out, summ = an.adjudicate(ref, an.apply_rename(an.flatten_labels(rows), {"expert1": "grad"}), "grad")
     assert out["version"] == "v1+adjudicated"
     pa, pb = out["practice"]
     assert pa["review"]["verdict"] == "agree" and pa["rationale"] == "orig"
@@ -241,6 +260,9 @@ def test_adjudicate_offline_parquet(tmp_path):
              "--practice-ref", str(tmp_path / "ref.json"), "--out", str(tmp_path / "adj.json")])
     adj = json.loads((tmp_path / "adj.json").read_text())
     assert adj["version"] == "v1+adjudicated" and adj["practice"][1]["review"]["verdict"] == "corrected"
+    assert adj["practice"][1]["review"]["reviewer"] == "grad"  # default --rename expert1=grad
+    df2 = an.load_offline_returns(str(tmp_path / "offline" / "returned_key_*.parquet"), "grad", {"expert1": "grad"})
+    assert set(df2.annotator) == {"grad"}
 
 
 def test_adjudicate_offline_raw_csv(tmp_path, monkeypatch):

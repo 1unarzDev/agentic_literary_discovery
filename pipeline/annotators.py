@@ -15,7 +15,7 @@ printed, and only on explicit request (`links`, or `create --print-links`).
                                                       # -> practice_ref_adjudicated.json
 
 progress: queue done/total, cert rounds (Worker status + local recompute vs practice_ref.json), median s/item,
-agreement with expert1 on expert_overlap items (overall + by era), with peer partners (+ pooled overlap kappa
+agreement with the expert (grad; --rename expert1=grad) on all nested expert items (overall + by era), with peer partners (+ pooled overlap kappa
 by era via analysis.stats.annotators), and vs the teacher on the teacher items (descriptive only).
 """
 from __future__ import annotations
@@ -224,6 +224,42 @@ def _pairs(act: pd.DataFrame, queues: pd.DataFrame, name: str, role: str) -> pd.
     return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=cols)
 
 
+def _expert_pairs(act: pd.DataFrame, queues: pd.DataFrame, name: str, expert: str) -> pd.DataFrame:
+    """Peer `name` vs the expert on every nested expert item the peer was assigned (dealt or second coding)."""
+    exp_items = set(queues[(queues.annotator == expert) & (queues.role == "expert")].item_id)
+    q = queues[(queues.annotator == name) & (queues.set == "audit") & queues.item_id.isin(exp_items)]
+    mine = act[(act.annotator == name) & act.item_id.isin(q.item_id)]
+    ex = act[(act.annotator == expert) & act.item_id.isin(q.item_id)]
+    m = mine.merge(ex, on="item_id", suffixes=("_a", "_b"))
+    return m.merge(q[["item_id", "era"]].rename(columns={"era": "q_era"}), on="item_id", how="left")
+
+
+def parse_rename(spec: str | None) -> dict:
+    """'expert1=grad,a=b' -> {'expert1': 'grad', 'a': 'b'}."""
+    out = {}
+    for part in (spec or "").split(","):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def apply_rename(df: pd.DataFrame | None, mapping: dict, cols=("annotator", "partner")) -> pd.DataFrame | None:
+    if df is None or not mapping:
+        return df
+    df = df.copy()
+    for c in cols:
+        if c in df:
+            df[c] = df[c].map(lambda x: mapping.get(x, x) if isinstance(x, str) else x)
+    return df
+
+
+def rename_status(status: dict | None, mapping: dict) -> dict | None:
+    if not status or not mapping:
+        return status
+    return {**status, "annotators": [{**a, "name": mapping.get(a["name"], a["name"])} for a in status.get("annotators", [])]}
+
+
 def stats_by_era(m: pd.DataFrame) -> dict:
     """{'all': {...}, era: {...}} of agreement on FIELDS for a merged pair table."""
     out = {"all": {f: agreement(m[f"{f}_a"], m[f"{f}_b"]) for f in FIELDS} | {"n": len(m)}}
@@ -233,19 +269,19 @@ def stats_by_era(m: pd.DataFrame) -> dict:
 
 
 def teacher_comparison(act: pd.DataFrame, queues: pd.DataFrame, teacher: str = "teacher") -> dict:
-    """Descriptive only: each other labeller vs the teacher on the teacher items."""
-    t_items = queues[queues.role == "teacher"]
-    t = act[(act.annotator == teacher) & act.item_id.isin(t_items.item_id)]
+    """Descriptive only: every other labeller assigned a teacher item vs the teacher on those items."""
+    t_ids = set(queues[(queues.annotator == teacher) & (queues.role == "teacher")].item_id)
+    t = act[(act.annotator == teacher) & act.item_id.isin(t_ids)]
     out = {}
-    for name in dict.fromkeys(t_items.annotator):
+    for name in dict.fromkeys(queues[queues.item_id.isin(t_ids)].annotator):
         if name == teacher:
             continue
-        mine = act[(act.annotator == name) & act.item_id.isin(t_items.item_id)]
+        mine = act[(act.annotator == name) & act.item_id.isin(t_ids)]
         out[name] = pair_stats(mine, t)
     return out
 
 
-def overlap_report(act: pd.DataFrame, queues: pd.DataFrame, expert_reader: str = "expert1") -> pd.DataFrame:
+def overlap_report(act: pd.DataFrame, queues: pd.DataFrame, expert_reader: str = "grad") -> pd.DataFrame:
     """Pooled pairwise peer-overlap kappa (locus 4-cat and obstacle), overall and by era, via
     analysis.stats.annotators.overlap_agreement (era from queues.parquet)."""
     from analysis.stats import annotators as A
@@ -266,10 +302,10 @@ def overlap_report(act: pd.DataFrame, queues: pd.DataFrame, expert_reader: str =
 
 
 def progress_table(labels: pd.DataFrame, queues: pd.DataFrame | None = None, status: dict | None = None,
-                   practice_ref: dict | None = None, expert_reader: str = "expert1",
+                   practice_ref: dict | None = None, expert_reader: str = "grad",
                    teacher: str = "teacher") -> list[dict]:
     """One dict per labeller: queue done/total, median seconds, cert rounds (peers), agreement with
-    expert1 on expert_overlap items (overall + by era), with peer partners, and vs the teacher."""
+    the expert on all nested expert items (overall + by era), with peer partners, and vs the teacher."""
     act = active(labels)
     names = []
     if status:
@@ -297,7 +333,7 @@ def progress_table(labels: pd.DataFrame, queues: pd.DataFrame | None = None, sta
         if ref is not None and peer:
             row["cert_local"] = cert_scores(mine, ref)
         if queues is not None and peer:
-            row["vs_expert"] = stats_by_era(_pairs(act, queues, name, "expert_overlap"))
+            row["vs_expert"] = stats_by_era(_expert_pairs(act, queues, name, expert_reader))
             row["vs_partners"] = stats_by_era(_pairs(act, queues, name, "overlap"))
         if name in tcmp:
             row["vs_teacher"] = tcmp[name]
@@ -341,7 +377,7 @@ def format_progress(rows: list[dict], ov: pd.DataFrame | None = None) -> str:
         lines.append(f"{r['annotator']:<10} {q or '(no queues)'}  median/item {med}")
         for ln in _fmt_cert(r):
             lines.append(f"{'':<10}   {ln}")
-        for key, lab in (("vs_expert", "vs expert1  "), ("vs_partners", "vs partners ")):
+        for key, lab in (("vs_expert", "vs expert   "), ("vs_partners", "vs partners ")):
             if key in r:
                 lines.append(f"{'':<10}   {lab} {_fmt_agr(r[key]['all'])}")
                 for e, s in r[key].items():
@@ -363,7 +399,7 @@ def _norm(v):
     return None if isinstance(v, str) and v in ("", "nan", "None") else v
 
 
-def review_decisions_online(labels: pd.DataFrame, ref: dict, expert_reader: str = "expert1") -> dict:
+def review_decisions_online(labels: pd.DataFrame, ref: dict, expert_reader: str = "grad") -> dict:
     """passage_id -> {"label": {...}, "note", "decision": None} from expert1's active set=="review" Worker labels."""
     from analysis.build_annotation_queues import parse_practice_ref, review_item_id
     act = active(labels)
@@ -380,7 +416,7 @@ def review_decisions_online(labels: pd.DataFrame, ref: dict, expert_reader: str 
 OFFLINE_HAS = {"cant_tell": "insufficient_context"}
 
 
-def load_offline_returns(spec: str, expert_reader: str | None = None) -> pd.DataFrame:
+def load_offline_returns(spec: str, expert_reader: str | None = None, rename: dict | None = None) -> pd.DataFrame:
     """Returned answer-key file(s) from pipeline/offline_annotation.py: imported parquet
     (returned_key_*.parquet: KEY_COLS + passage_id + set) by path or glob; a raw CSV/JSONL return is
     validated with offline_annotation.validate and mapped back with its private item map. Later files win."""
@@ -404,6 +440,7 @@ def load_offline_returns(spec: str, expert_reader: str | None = None) -> pd.Data
             raise SystemExit(f"{p} is not an answer-key return (no decision column)")
         frames.append(df.assign(_src=str(p)))
     df = pd.concat(frames, ignore_index=True)
+    df = apply_rename(df, rename or {}, ("annotator",))
     if expert_reader and "annotator" in df and (df.annotator == expert_reader).any():
         df = df[df.annotator == expert_reader]
     return df.drop_duplicates("passage_id", keep="last")
@@ -424,7 +461,7 @@ def review_decisions_offline(df: pd.DataFrame) -> dict:
     return out
 
 
-def adjudicate(ref: dict, labels: pd.DataFrame | None = None, expert_reader: str = "expert1",
+def adjudicate(ref: dict, labels: pd.DataFrame | None = None, expert_reader: str = "grad",
                decisions: dict | None = None) -> tuple[dict, pd.DataFrame]:
     """practice_ref.json + expert1's review (Worker labels, or `decisions` from an offline return) ->
     adjudicated practice_ref (same format): reference = expert1's answer; rationale += 'Expert correction:
@@ -454,7 +491,7 @@ def adjudicate(ref: dict, labels: pd.DataFrame | None = None, expert_reader: str
                     note = d.get("note")
                     rat = (rat + " " if rat else "") + (f"Expert correction: {note}" if note else "Expert correction.")
                 e["rationale"] = rat
-                e["review"] = {"verdict": "agree" if same else "corrected", "original": orig}
+                e["review"] = {"verdict": "agree" if same else "corrected", "original": orig, "reviewer": expert_reader}
             new.append(e)
             rows.append({"set": st, "verdict": e["review"]["verdict"]})
         out[st] = new
@@ -508,7 +545,8 @@ def load_queues(p: Path) -> pd.DataFrame | None:
 def cmd_export(a: argparse.Namespace) -> None:
     with client() as c:
         rows = request(c, "GET", "/v1/admin/ann_labels").json()["labels"]
-    df = attach_roles(flatten_labels(rows), load_queues(Path(a.queues)))
+    mp = parse_rename(a.rename)
+    df = attach_roles(apply_rename(flatten_labels(rows), mp), apply_rename(load_queues(Path(a.queues)), mp))
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, index=False)
@@ -516,32 +554,39 @@ def cmd_export(a: argparse.Namespace) -> None:
 
 
 def fetch_labels(a: argparse.Namespace) -> tuple[pd.DataFrame, dict | None]:
+    """Labels (+ ann_status for progress), with the --rename mapping (default expert1=grad) applied."""
+    mp = parse_rename(getattr(a, "rename", None))
     if getattr(a, "from_parquet", None):
-        return pd.read_parquet(a.from_parquet), None
+        return apply_rename(pd.read_parquet(a.from_parquet), mp), None
     with client() as c:
         labels = flatten_labels(request(c, "GET", "/v1/admin/ann_labels").json()["labels"])
         status = request(c, "GET", "/v1/admin/ann_status").json() if a.cmd == "progress" else None
-    return labels, status
+    return apply_rename(labels, mp), rename_status(status, mp)
+
+
+def _expert_name(a: argparse.Namespace) -> str:
+    return parse_rename(a.rename).get(a.expert_reader, a.expert_reader)
 
 
 def cmd_progress(a: argparse.Namespace) -> None:
-    queues = load_queues(Path(a.queues))
+    queues = apply_rename(load_queues(Path(a.queues)), parse_rename(a.rename))
     labels, status = fetch_labels(a)
     ref = json.loads(Path(a.practice_ref).read_text(encoding="utf-8")) if Path(a.practice_ref).exists() else None
-    rows = progress_table(labels, queues, status, ref, a.expert_reader, a.teacher)
-    ov = overlap_report(active(labels), queues, a.expert_reader) if queues is not None else None
+    ex = _expert_name(a)
+    rows = progress_table(labels, queues, status, ref, ex, a.teacher)
+    ov = overlap_report(active(labels), queues, ex) if queues is not None else None
     print(format_progress(rows, ov))
 
 
 def cmd_adjudicate(a: argparse.Namespace) -> None:
     ref = json.loads(Path(a.practice_ref).read_text(encoding="utf-8"))
     if a.from_offline:
-        dec = review_decisions_offline(load_offline_returns(a.from_offline, a.expert_reader))
-        out, summ = adjudicate(ref, None, a.expert_reader, decisions=dec)
+        dec = review_decisions_offline(load_offline_returns(a.from_offline, _expert_name(a), parse_rename(a.rename)))
+        out, summ = adjudicate(ref, None, _expert_name(a), decisions=dec)
         print(f"source: offline return {a.from_offline} ({len(dec)} reviewed passages)")
     else:
         labels, _ = fetch_labels(a)
-        out, summ = adjudicate(ref, labels, a.expert_reader)
+        out, summ = adjudicate(ref, labels, _expert_name(a))
     p = Path(a.out)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -570,13 +615,15 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("export")
     p.add_argument("--out", default=str(ANN / "human_labels.parquet"))
     p.add_argument("--queues", default=str(ANN / "queues.parquet"))
+    p.add_argument("--rename", default="expert1=grad", help="annotator renames for the analysis, a=b[,c=d]")
     p.set_defaults(fn=cmd_export)
     p = sub.add_parser("progress")
     p.add_argument("--from-parquet")
     p.add_argument("--queues", default=str(ANN / "queues.parquet"))
     p.add_argument("--practice-ref", default=str(ANN / "practice_ref.json"))
-    p.add_argument("--expert-reader", default="expert1")
+    p.add_argument("--expert-reader", default="expert1", help="Worker name of the expert (before --rename)")
     p.add_argument("--teacher", default="teacher")
+    p.add_argument("--rename", default="expert1=grad", help="annotator renames for the analysis, a=b[,c=d]")
     p.set_defaults(fn=cmd_progress)
     p = sub.add_parser("adjudicate", help="expert1's review labels -> practice_ref_adjudicated.json")
     src = p.add_mutually_exclusive_group()
@@ -586,7 +633,8 @@ def main(argv: list[str] | None = None) -> None:
                           "a raw CSV/JSONL is validated with pipeline/offline_annotation.py")
     p.add_argument("--practice-ref", default=str(ANN / "practice_ref.json"))
     p.add_argument("--out", default=str(ANN / "practice_ref_adjudicated.json"))
-    p.add_argument("--expert-reader", default="expert1")
+    p.add_argument("--expert-reader", default="expert1", help="Worker name of the expert (before --rename)")
+    p.add_argument("--rename", default="expert1=grad", help="annotator renames for the analysis, a=b[,c=d]")
     p.set_defaults(fn=cmd_adjudicate)
     a = ap.parse_args(argv)
     a.fn(a)

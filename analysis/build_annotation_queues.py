@@ -22,25 +22,27 @@ Roles / queues (parameters recorded in design_summary.json; final numbers fixed 
   TEACHING  ~60 Discovery items (model-label prototypes + boundary cases) for the teaching annotator.
   AUDIT     draw_audit_metadata(pool_conf minus teaching authors, rng, n_target) (legacy fallback:
             draw_audit(..., group_col=--group-col)),
-            audit.parquet + audit_frame.parquet persisted exactly as returned. Every audit item gets
-            >= 1 label, so no role below changes pi.
-              teacher         n_teacher items, random within era (3/3/2), labelled by the teacher,
-                              expert1 and every peer (descriptive comparison only)
-              expert_only     n_expert_extra items reserved (era-balanced, random) for expert1 only
-              deal            the rest: within each era shuffled and dealt round-robin to the peers,
-                              offset carried across eras (totals differ by <= 1)
-              overlap         ~overlap_frac of the dealt items per era get a second, randomly chosen
-                              peer (least-loaded first); partner = the other peer
-              expert_overlap  n_expert_overlap dealt single items (era-balanced, spread over peers)
-                              also labelled by expert1; partner = the peer / expert1
+            audit.parquet + audit_frame.parquet persisted exactly as returned (+ expert columns below).
+            Every audit item is dealt to exactly one peer, so no role below changes pi.
+              deal      within each era shuffled and dealt round-robin to the peers, offset carried
+                        across eras (totals differ by <= 1)
+              overlap   ~overlap_frac of the audit per era gets a second, randomly chosen peer
+                        (least-loaded first); partner = the other peer
+              expert    NESTED stratified subsample: within each audit cell a seeded SRS of
+                        n_e = floor(expert_frac * n_cell + 0.5) items (>= 1 when n_cell >= 2), labelled by
+                        expert1 in addition to their peer; audit.parquet / queues.parquet carry
+                        pi_expert_given_audit = n_e / n_cell (data/ only; per-cell numbers never printed).
+                        Expert rows: role "expert", partner = the dealt peer.
+              teacher   n_teacher items from the expert subsample, random within era (3/3/2), also
+                        labelled by the teacher (descriptive only; role "teacher" on the teacher's rows)
             No adjudication of audit labels.
 
 usage:
   uv run python -I analysis/build_annotation_queues.py practice      # practice/cert/retake + review items
   uv run python -I analysis/build_annotation_queues.py build DISCOVERY_LABELS.parquet [--alt ALT.parquet]
         [--annotators student,peer1,peer2,peer3] [--expert-reader expert1] [--teacher teacher]
-        [--n-target 1800] [--group-col COL (legacy)] [--overlap-frac 0.10] [--expert-overlap 100]
-        [--expert-extra 350] [--n-teacher 8] [--n-teaching 60] [--teaching-annotator student]
+        [--n-target 1800] [--group-col COL (legacy)] [--overlap-frac 0.10] [--expert-frac 0.5]
+        [--n-teacher 8] [--n-teaching 60] [--teaching-annotator student]
         [--works ...] [--works-v2 ...] [--genre ...] [--canon ...] [--no-canonical] [--passages ...] [--out DIR]
 
 Uploaded items carry ONLY item_id, passage_id, text, ctx_before, ctx_after, set, assign (+ reference
@@ -98,7 +100,7 @@ ITEM_KEYS = ("item_id", "passage_id", "text", "ctx_before", "ctx_after", "set", 
 REF_KEYS = ("has_obstacle", "domain", "locus", "failure_cause")
 TEXT_COLS = ["text", "ctx_before", "ctx_after"]
 QUEUE_COLS = ["annotator", "item_id", "passage_id", "set", "role", "partner", "era"]
-ROLES = ["review", *CERT_SETS, "teaching", "teacher", "expert_only", "expert_overlap", "overlap", "single"]
+ROLES = ["review", *CERT_SETS, "teaching", "teacher", "expert", "overlap", "single"]
 
 
 # ------------------------------------------------------------------ helpers
@@ -382,25 +384,6 @@ def select_overlap(items: pd.DataFrame, owner: dict, frac: float, annotators: li
     return second
 
 
-def select_expert_overlap(items: pd.DataFrame, owner: dict, n: int, annotators: list[str],
-                          rng: np.random.Generator, eras: list[str]) -> list[str]:
-    """n single-coded dealt items, era-balanced, spread evenly over the peers within each era."""
-    q = era_quota(n, items.era.value_counts().to_dict(), eras)
-    out = []
-    for e in eras:
-        by_peer = {a: list(rng.permutation(np.sort(items.loc[(items.era == e) &
-                   (items.passage_id.map(owner) == a), "passage_id"].values))) for a in annotators}
-        start = int(rng.integers(len(annotators)))
-        i = 0
-        while q[e] > 0 and any(by_peer.values()):
-            a = annotators[(start + i) % len(annotators)]
-            i += 1
-            if by_peer[a]:
-                out.append(str(by_peer[a].pop()))
-                q[e] -= 1
-    return out
-
-
 # ------------------------------------------------------------------ design
 @dataclass
 class Design:
@@ -435,10 +418,31 @@ def call_draw_audit(pool: pd.DataFrame, teaching_authors: set, rng: np.random.Ge
     return a, f, f"draw_audit: era x {gc} (metadata)"
 
 
+def select_expert_nested(audit: pd.DataFrame, frac: float, rng: np.random.Generator) -> pd.DataFrame:
+    """Nested stratified expert subsample: within each audit cell, a simple random subsample of
+    n_e = floor(frac * n_cell + 0.5) items, at least 1 when n_cell >= 2 (capped at n_cell).
+    Returns audit + is_expert, expert_cell_n (n_e), pi_expert_given_audit (= n_e / n_cell)."""
+    sel, ne = set(), {}
+    for cell in sorted(audit.audit_cell.unique()):
+        ids = np.sort(audit.loc[audit.audit_cell == cell, "passage_id"].values)
+        n = len(ids)
+        k = int(np.floor(frac * n + 0.5))
+        if n >= 2:
+            k = max(k, 1)
+        k = min(k, n)
+        ne[cell] = k
+        if k:
+            sel |= {str(x) for x in rng.choice(ids, size=k, replace=False)}
+    n_cell = audit.groupby("audit_cell").passage_id.transform("size")
+    e_n = audit.audit_cell.map(ne)
+    return audit.assign(is_expert=audit.passage_id.isin(sel), expert_cell_n=e_n.astype(int),
+                        pi_expert_given_audit=(e_n / n_cell).astype(float))
+
+
 def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] = DEFAULT_ANNOTATORS,
                  expert_reader: str = "expert1", teacher: str = "teacher", n_target: int = 1800,
-                 group_col: str | None = None, overlap_frac: float = 0.10, n_expert_overlap: int = 100,
-                 n_expert_extra: int = 350, n_teacher: int = 8, n_teaching: int = 60,
+                 group_col: str | None = None, overlap_frac: float = 0.10, expert_frac: float = 0.5,
+                 n_teacher: int = 8, n_teaching: int = 60,
                  teaching_annotator: str = "student", practice: pd.DataFrame | None = None,
                  get_text: Callable[[list[str]], pd.DataFrame] | None = None, split_warning: str | None = None,
                  use_canon: bool = True, split_source: str = "works.split (OLD)",
@@ -471,33 +475,25 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
         audit = audit.merge(get_text(audit.passage_id.tolist()), on="passage_id", how="left")
 
     arng = np.random.default_rng([seed, 1])
-    teacher_ids = sample_by_era(audit, n_teacher, arng, ERAS)
-    rest = audit[~audit.passage_id.isin(teacher_ids)]
-    exonly_ids = sample_by_era(rest, n_expert_extra, arng, ERAS)
-    dealt = rest[~rest.passage_id.isin(exonly_ids)]
-    owner = deal(dealt, annotators, arng, ERAS)
-    second = select_overlap(dealt, owner, overlap_frac, annotators, arng, ERAS)
-    singles = dealt[~dealt.passage_id.isin(second)]
-    exov_ids = set(select_expert_overlap(singles, owner, n_expert_overlap, annotators, arng, ERAS))
+    audit = select_expert_nested(audit, expert_frac, arng)       # P(expert | audit) per cell, nested
+    exp_ids = set(audit.passage_id[audit.is_expert])
+    teacher_ids = set(sample_by_era(audit[audit.is_expert], n_teacher, arng, ERAS))
+    owner = deal(audit, annotators, arng, ERAS)                  # every audit item -> exactly one peer
+    second = select_overlap(audit, owner, overlap_frac, annotators, arng, ERAS)
 
     era_of = dict(zip(audit.passage_id, audit.era))
-    t_set, x_set = set(teacher_ids), set(exonly_ids)
     rows = []
     for pid in audit.passage_id:  # draw_audit's shuffled order
-        e = era_of[pid]
-        if pid in t_set:
-            rows += [(a, pid, "audit", "teacher", None, e) for a in [*annotators, expert_reader, teacher]]
-        elif pid in x_set:
-            rows.append((expert_reader, pid, "audit", "expert_only", None, e))
-        elif pid in second:
-            a, b = owner[pid], second[pid]
+        e, a = era_of[pid], owner[pid]
+        if pid in second:
+            b = second[pid]
             rows += [(a, pid, "audit", "overlap", b, e), (b, pid, "audit", "overlap", a, e)]
-        elif pid in exov_ids:
-            a = owner[pid]
-            rows += [(a, pid, "audit", "expert_overlap", expert_reader, e),
-                     (expert_reader, pid, "audit", "expert_overlap", a, e)]
         else:
-            rows.append((owner[pid], pid, "audit", "single", None, e))
+            rows.append((a, pid, "audit", "single", None, e))
+        if pid in exp_ids:
+            rows.append((expert_reader, pid, "audit", "expert", a, e))   # partner = the dealt peer
+        if pid in teacher_ids:
+            rows.append((teacher, pid, "audit", "teacher", None, e))
     for r in teaching.itertuples():
         rows.append((teaching_annotator, r.passage_id, "teaching", "teaching", None, r.q_era))
     if practice is not None:
@@ -508,6 +504,8 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
     queues = pd.DataFrame(rows, columns=[c for c in QUEUE_COLS if c != "item_id"])
     queues.insert(1, "item_id", [review_item_id(p) if s == "review" else item_id(p)
                                  for p, s in zip(queues.passage_id, queues.set)])
+    pe = dict(zip(audit.passage_id, audit.pi_expert_given_audit))
+    queues["pi_expert_given_audit"] = [pe.get(p) if s == "audit" else None for p, s in zip(queues.passage_id, queues.set)]
     if queues.duplicated(["annotator", "item_id"]).any() or queues.drop_duplicates(["item_id", "set"]).item_id.duplicated().any():
         raise AssertionError("duplicate assignment or item id reused across sets")
 
@@ -530,7 +528,7 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
     per["audit_total"] = aq.groupby("annotator").size().reindex(people, fill_value=0)
     per_era = aq.groupby(["annotator", "era"]).size().unstack(fill_value=0).reindex(index=people, columns=ERAS, fill_value=0)
     by_era = lambda ids: pd.Series([era_of[p] for p in ids], dtype=object).value_counts().reindex(ERAS, fill_value=0).astype(int).to_dict()
-    # N_cell is never printed or written (prereg v0.5): only the number of cells and the table hash
+    # N_cell / n_cell / n_e per cell are never printed or written to the summary (prereg v0.5)
     summary = {
         "seed": seed, "strata": strata, "group_col": group_col, "eras": ERAS,
         "n_cells": int(frame.audit_cell.nunique()), "cell_table_hash": cell_table_hash(frame),
@@ -538,16 +536,17 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
         "canonical_used": strata.endswith("x canonical"),
         "annotators": annotators, "expert_reader": expert_reader, "teacher": teacher,
         "teaching_annotator": teaching_annotator,
-        "params": {"n_target": n_target, "overlap_frac": overlap_frac, "n_expert_overlap": n_expert_overlap,
-                   "n_expert_extra": n_expert_extra, "n_teacher": n_teacher, "n_teaching": n_teaching},
-        "pi_note": "expert_only / overlap / teacher roles do not change pi: every audit item gets >= 1 label",
+        "params": {"n_target": n_target, "overlap_frac": overlap_frac, "expert_frac": expert_frac,
+                   "expert_rule": "n_e = floor(frac * n_cell + 0.5), >= 1 when n_cell >= 2",
+                   "n_teacher": n_teacher, "n_teaching": n_teaching},
+        "pi_note": ("roles do not change pi: every audit item is dealt to exactly one peer; the expert subsample "
+                    "is nested within audit cells with P(expert | audit) = pi_expert_given_audit (audit.parquet)"),
         "n_target": n_target, "audit_drawn": int(len(audit)), "audit_pool": int(len(frame)),
         "n_teaching_authors": len(teaching_authors), "audit_by_era": by_era(audit.passage_id),
-        "n_teacher_items": len(teacher_ids), "teacher_by_era": by_era(teacher_ids),
-        "n_expert_only": len(exonly_ids), "expert_only_by_era": by_era(exonly_ids),
-        "n_expert_overlap": len(exov_ids), "expert_overlap_by_era": by_era(exov_ids),
-        "expert_overlap_per_peer": pd.Series([owner[p] for p in exov_ids], dtype=object).value_counts()
+        "n_expert": len(exp_ids), "expert_by_era": by_era(exp_ids),
+        "expert_per_peer": pd.Series([owner[p] for p in exp_ids], dtype=object).value_counts()
         .reindex(annotators, fill_value=0).astype(int).to_dict(),
+        "n_teacher_items": len(teacher_ids), "teacher_by_era": by_era(teacher_ids),
         "n_overlap": len(second), "overlap_by_era": by_era(second),
         "second_codings_per_annotator": pd.Series(list(second.values()), dtype=object).value_counts()
         .reindex(annotators, fill_value=0).astype(int).to_dict(),
@@ -579,13 +578,12 @@ def print_summary(s: dict) -> None:
     print(f"seed={s['seed']} strata={s['strata']} n_target={s['n_target']} "
           f"drawn={s['audit_drawn']} {s['audit_by_era']} pool={s['audit_pool']} cells={s['n_cells']} "
           f"teaching_authors={s['n_teaching_authors']}")
-    print(f"teacher={s['n_teacher_items']} {s['teacher_by_era']}  expert_only={s['n_expert_only']} "
-          f"{s['expert_only_by_era']}  expert_overlap={s['n_expert_overlap']} {s['expert_overlap_by_era']} "
-          f"per peer {s['expert_overlap_per_peer']}")
+    print(f"expert (nested, frac {s['params']['expert_frac']})={s['n_expert']} {s['expert_by_era']} "
+          f"per dealt peer {s['expert_per_peer']}  teacher={s['n_teacher_items']} {s['teacher_by_era']}")
     print(f"peer overlap={s['n_overlap']} {s['overlap_by_era']} second-codings={s['second_codings_per_annotator']} "
           f"peer audit labels={s['n_peer_labels_audit']} teaching={s['n_teaching']} cert sets={s['n_cert_sets']}")
     cols = [*ROLES, "audit_total"]
-    short = {"expert_overlap": "x_overlap", "expert_only": "x_only", "audit_total": "audit"}
+    short = {"audit_total": "audit"}
     print(f"{'':<9}" + "".join(f"{short.get(c, c):>10}" for c in cols) + "".join(f"{e[:5]:>7}" for e in s["eras"]))
     for a, r in s["per_annotator"].items():
         pe = s["per_annotator_era"].get(a, {})
@@ -653,7 +651,7 @@ def cmd_build(a: argparse.Namespace) -> None:
     elif not a.no_practice:
         print(f"note: {a.practice_ref} not found, building without practice/cert/retake/review items", file=sys.stderr)
     d = build_design(pool, disc, a.annotators.split(","), a.expert_reader, a.teacher, a.n_target, a.group_col,
-                     a.overlap_frac, a.expert_overlap, a.expert_extra, a.n_teacher, a.n_teaching,
+                     a.overlap_frac, a.expert_frac, a.n_teacher, a.n_teaching,
                      a.teaching_annotator, practice, lambda ids: read_text(Path(a.passages), ids), split.warning,
                      not a.no_canonical, split.source, split.author_source,
                      practice_split_warnings(practice, split, pd.read_parquet(a.passages, columns=["passage_id", "work_id"])
@@ -685,8 +683,8 @@ def main(argv: list[str] | None = None) -> None:
                            help="legacy draw_audit with this METADATA column (default: the registered "
                                 "draw_audit_metadata, era(year) x genre [x canonical])")
             p.add_argument("--overlap-frac", type=float, default=0.10)
-            p.add_argument("--expert-overlap", type=int, default=100)
-            p.add_argument("--expert-extra", type=int, default=350)
+            p.add_argument("--expert-frac", type=float, default=0.5,
+                           help="nested expert subsample: fraction of each audit cell (seeded)")
             p.add_argument("--n-teacher", type=int, default=8)
             p.add_argument("--n-teaching", type=int, default=60)
             p.add_argument("--teaching-annotator", default="student")

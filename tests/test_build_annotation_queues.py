@@ -104,17 +104,18 @@ def test_draw_passthrough(inputs, design):
     from analysis.select_annotation import draw_audit_metadata
     a, f = draw_audit_metadata(pool[~pool.author_key.isin(design.teaching.author_key)],
                                np.random.default_rng(baq.SEED), 1800)
-    pd.testing.assert_frame_equal(a.reset_index(drop=True), design.audit)
+    extra = ["is_expert", "expert_cell_n", "pi_expert_given_audit"]
+    pd.testing.assert_frame_equal(a.reset_index(drop=True), design.audit.drop(columns=extra))
     pd.testing.assert_frame_equal(f, design.frame)
-    assert design.summary["params"] == {"n_target": 1800, "overlap_frac": 0.10, "n_expert_overlap": 100,
-                                        "n_expert_extra": 350, "n_teacher": 8, "n_teaching": 60}
+    p = design.summary["params"]
+    assert (p["n_target"], p["overlap_frac"], p["expert_frac"], p["n_teacher"], p["n_teaching"]) == (1800, 0.10, 0.5, 8, 60)
     assert not set(design.audit.author_key) & set(design.teaching.author_key)
     assert not set(pool[pool.author_key.isin(design.teaching.author_key)].passage_id) & set(f.passage_id)
 
 
 def test_legacy_group_col(inputs):
     pool, disc, warn = inputs
-    d = baq.build_design(pool, disc, ANN, group_col="genre", n_target=600, n_expert_extra=60, n_expert_overlap=30)
+    d = baq.build_design(pool, disc, ANN, group_col="genre", n_target=600)
     assert d.summary["strata"] == "draw_audit: era x genre (metadata)"
     with pytest.raises(ValueError):  # label-derived strata are refused by draw_audit(metadata_only=True)
         baq.call_draw_audit(pool.assign(dgroup="x"), set(), np.random.default_rng(0), 100, "dgroup")
@@ -126,37 +127,53 @@ def test_every_audit_item_labelled(design):
     assert q.era.notna().all()
 
 
+def test_expert_nested(design):
+    q, a = design.queues, design.audit
+    ex = q[q.role == "expert"]
+    assert set(ex.annotator) == {"expert1"} and ex.passage_id.is_unique
+    assert set(ex.passage_id) == set(a.passage_id[a.is_expert])
+    # within-cell SRS with n_e = floor(.5 * n_cell + .5), >= 1 when n_cell >= 2
+    for cell, g in a.groupby("audit_cell"):
+        n = len(g)
+        ne = max(int(np.floor(0.5 * n + 0.5)), 1 if n >= 2 else 0)
+        assert g.is_expert.sum() == ne == g.expert_cell_n.iloc[0]
+        np.testing.assert_allclose(g.pi_expert_given_audit, ne / n)
+    assert abs(a.is_expert.mean() - 0.5) < 0.02
+    # nested: every expert item is also peer-labelled; partner = the dealt peer
+    peer = q[(q.set == "audit") & q.annotator.isin(ANN)]
+    assert set(ex.passage_id) <= set(peer.passage_id)
+    dealt = peer[(peer.role == "single") | ((peer.role == "overlap"))]
+    for r in ex.itertuples():
+        assert r.partner in set(dealt[dealt.passage_id == r.passage_id].annotator)
+    # expert1: only expert audit items + review; never practice/cert/retake
+    assert set(q[q.annotator == "expert1"].set) <= {"audit", "review"}
+    assert set(q[(q.annotator == "expert1") & (q.set == "audit")].role) == {"expert"}
+    qa = q[q.set == "audit"]
+    m = qa.merge(a[["passage_id", "pi_expert_given_audit"]], on="passage_id", suffixes=("", "_a"))
+    np.testing.assert_allclose(m.pi_expert_given_audit, m.pi_expert_given_audit_a)
+    assert "cells" not in design.summary and design.summary["n_expert"] == a.is_expert.sum()
+
+
+def test_expert_nested_small_cells():
+    a = pd.DataFrame({"passage_id": [f"p{i}" for i in range(6)], "audit_cell": ["c1", "c2", "c2", "c3", "c3", "c3"]})
+    out = baq.select_expert_nested(a, 0.5, np.random.default_rng(0)).groupby("audit_cell").is_expert.sum()
+    assert out.to_dict() == {"c1": 1, "c2": 1, "c3": 2}  # half-up rounding: 0.5 -> 1
+    out = baq.select_expert_nested(a, 0.1, np.random.default_rng(0)).groupby("audit_cell").is_expert.sum()
+    assert out.to_dict() == {"c1": 0, "c2": 1, "c3": 1}
+
+
 def test_teacher_items(design):
     q = design.queues
     t = q[q.role == "teacher"]
-    assert t.passage_id.nunique() == 8
-    for _, g in t.groupby("passage_id"):
-        assert set(g.annotator) == set(PEOPLE)
+    assert set(t.annotator) == {"teacher"} and len(t) == 8
     assert set(q[q.annotator == "teacher"].role) == {"teacher"}
-    assert sorted(t.drop_duplicates("passage_id").era.value_counts().tolist()) == [2, 3, 3]
-
-
-def test_expert_only_and_overlap(design):
-    q = design.queues
-    x = q[q.role == "expert_only"]
-    assert len(x) == x.passage_id.nunique() == 350 and set(x.annotator) == {"expert1"}
-    assert set(q[q.passage_id.isin(x.passage_id)].annotator) == {"expert1"}
-    cnt = x.era.value_counts()
-    assert cnt.max() - cnt.min() <= 1
-    xo = q[q.role == "expert_overlap"]
-    assert xo.passage_id.nunique() == 100 and all(len(g) == 2 for _, g in xo.groupby("passage_id"))
-    ex = xo[xo.annotator == "expert1"]
-    assert set(ex.partner) <= set(ANN) and len(ex) == 100
-    pe = xo[xo.annotator != "expert1"]
-    assert (pe.partner == "expert1").all()
-    m = ex.merge(pe, on="passage_id")
-    assert (m.partner_x == m.annotator_y).all()
-    per_peer = pe.annotator.value_counts()
-    assert per_peer.max() - per_peer.min() <= 3
-    e = xo.drop_duplicates("passage_id").era.value_counts()
-    assert e.max() - e.min() <= 1
-    # expert1 never does practice/cert/retake
-    assert not set(q[q.annotator == "expert1"].set) & set(baq.CERT_SETS)
+    assert set(t.passage_id) <= set(q[q.role == "expert"].passage_id)
+    assert sorted(t.era.value_counts().tolist()) == [2, 3, 3]
+    # teacher items keep exactly their expert + peer assignments, nothing added for other peers
+    for pid in t.passage_id:
+        g = q[(q.passage_id == pid) & (q.set == "audit")]
+        assert set(g.role) <= {"teacher", "expert", "single", "overlap"}
+        assert (g.annotator.isin(ANN)).sum() in (1, 2)
 
 
 def test_peer_overlap(design):
@@ -164,12 +181,14 @@ def test_peer_overlap(design):
     ov = q[q.role == "overlap"]
     assert set(ov.annotator) <= set(ANN) and set(ov.partner) <= set(ANN)
     assert all(len(g) == 2 for _, g in ov.groupby("passage_id"))
-    dealt = q[q.role.isin(["single", "overlap", "expert_overlap"]) & q.annotator.isin(ANN)].passage_id.nunique()
-    assert abs(ov.passage_id.nunique() / dealt - 0.10) < 0.01
+    assert abs(ov.passage_id.nunique() / len(design.audit) - 0.10) < 0.01
     pairs = {frozenset(g.annotator) for _, g in ov.groupby("passage_id")}
     assert len(pairs) == 6
     sec = pd.Series(design.summary["second_codings_per_annotator"])
     assert sec.max() - sec.min() <= 2
+    # every audit item dealt to exactly one peer (+ at most one second peer)
+    peers = q[(q.set == "audit") & q.annotator.isin(ANN)].groupby("passage_id").size()
+    assert set(peers.index) == set(design.audit.passage_id) and peers.isin([1, 2]).all()
 
 
 def test_balanced_peers(design):
@@ -296,7 +315,7 @@ def _cli(tmp_path, out, extra=()):
               "--genre", str(tmp_path / "genre.parquet"), "--passages", str(tmp_path / "passages.parquet"),
               "--canon", str(tmp_path / "canon.parquet"),
               "--practice-ref", str(tmp_path / "ref.json"), "--n-target", "600", "--n-teaching", "20",
-              "--expert-extra", "60", "--expert-overlap", "30", *extra])
+              "--expert-frac", "0.5", *extra])
 
 
 def _ref(passages, works):
@@ -417,7 +436,7 @@ def test_ann_items_offline_expert_export(design, tmp_path, monkeypatch):
     rows = [json.loads(l) for l in (tmp_path / "offline/expert_items.jsonl").read_text().splitlines()]
     q = design.queues
     exp = q[q.annotator == "expert1"]
-    assert set(exp[exp.set == "audit"].role) == {"teacher", "expert_only", "expert_overlap"}
+    assert set(exp[exp.set == "audit"].role) == {"expert"}
     assert len(rows) == (exp.set == "audit").sum()  # exactly the audit items (no review items)
     m = json.loads((tmp_path / "offline/_map.json").read_text())
     assert {v["passage_id"] for v in m.values()} == set(exp[exp.set == "audit"].passage_id)
