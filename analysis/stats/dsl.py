@@ -657,6 +657,62 @@ def pseudo_outcomes_anchored(yhat: np.ndarray, peer_soft: np.ndarray, R3: np.nda
     return out
 
 
+def prepare_anchored(labels: pd.DataFrame, human: pd.DataFrame, frame: pd.DataFrame,
+                     targets: Iterable[str] = ("locus", "comm_cause", "distance", "darkness", "comm_infra"),
+                     expert: str = "grad", exclude_annotators: Iterable[str] = ("teacher",),
+                     split: str | None = "confirmation", n_folds: int = 5, seed: int = 0) -> WorkData:
+    """Registered v0.5 estimator on real data: expert-anchored 3-level DSL (pseudo_outcomes_anchored).
+
+    labels: model labels (v0.9); human: rows per (passage, annotator); `expert` rows are the anchor;
+    `exclude_annotators` (the teacher's descriptive items, kappa-excluded peers) never enter.
+    frame: audit_frame.parquet (pi_audit, audit_cell for every pool passage).
+    pi3 is recomputed per audit cell from passages with >= 1 retained peer label; P(expert | audit) is
+    the per-cell share of peer-labelled audit items that the expert labelled (the expert subsample is
+    drawn as a stratified random subsample within audit cells, prereg §3.4)."""
+    lab = labels
+    if split is not None:
+        lab = lab[lab.split == split]
+    lab = lab[lab.stratum == "random"].reset_index(drop=True)
+    fr = frame.set_index("passage_id")
+    lab = lab[lab.passage_id.isin(fr.index)].reset_index(drop=True)
+    cell = fr.audit_cell.loc[lab.passage_id].values
+    excl = set(exclude_annotators) | {expert}
+    peers = human[~human.annotator.isin(excl)]
+    exp = human[human.annotator == expert].drop_duplicates("passage_id")
+    pos = pd.Series(np.arange(len(lab)), index=lab.passage_id)
+    peers = peers[peers.passage_id.isin(pos.index)]
+    exp = exp[exp.passage_id.isin(set(peers.passage_id))]
+    R3 = np.zeros(len(lab), bool)
+    R3[pos.loc[peers.passage_id.unique()].values] = True
+    Rh = np.zeros(len(lab), bool)
+    Rh[pos.loc[exp.passage_id].values] = True
+    Nc = pd.Series(cell).value_counts()
+    n3 = pd.Series(cell[R3]).value_counts().reindex(Nc.index, fill_value=0)
+    nh = pd.Series(cell[Rh]).value_counts().reindex(Nc.index, fill_value=0)
+    pi3 = pd.Series(cell).map(n3 / Nc).values
+    pih = pd.Series(cell).map((nh / n3.replace(0, np.nan)).fillna(1.0)).values
+    keep = pi3 > 0
+    folds = _fold_ids(lab.author_key, n_folds, seed)
+    era_s = _era(lab.decade.values)
+    Ys = {}
+    info = {"n_audit": int(R3.sum()), "n_expert": int(Rh.sum()), "n_dropped_pi0": int((~keep).sum())}
+    for tname in targets:
+        T = TARGETS[tname]
+        if not all(c in exp.columns for c in T.human_fields):
+            info[f"{tname}_uncorrected"] = True
+            Ys[tname] = onehot(T.fn(lab), T.K)
+            continue
+        sid, S = human_soft(peers, T)
+        peer_soft = np.zeros((len(lab), T.K))
+        peer_soft[pos.loc[sid].values] = S
+        ex_code = np.zeros(len(lab), int)
+        ex_code[pos.loc[exp.passage_id].values] = T.fn(exp)
+        Ys[tname] = pseudo_outcomes_anchored(T.fn(lab), peer_soft, R3, np.where(keep, pi3, 1), ex_code, Rh,
+                                             pih, T.K, folds, era_s)
+    sub = lab[keep].reset_index(drop=True)
+    return aggregate_to_works(sub, {k: v[keep] for k, v in Ys.items()}, "dsl_anchored", info)
+
+
 # ------------------------------------------------------------------ PPI (cross-check for means)
 
 @dataclass

@@ -87,8 +87,9 @@ def test_h2_and_h3_run(dsl_wd, corpus):
     tab, effs = models.confirmatory(dsl_wd, keyword_series(corpus), n_boot=200)
     assert set(tab.test) == {"H1", "H2a", "H2b", "H2c", "H3", "H1-ML"}
     assert (tab[tab.test == "H1-ML"].role == "descriptive").all()
-    t2 = tab[tab.role != "descriptive"]
+    t2 = tab[tab.role.isin(["co-primary", "secondary"])]
     assert (t2.p_adj >= t2.p_test - 1e-12).all()
+    assert (tab[tab.role == "estimation"].p_test.isna()).all()          # v0.5: H2/H3 are estimation only
 
 
 def test_h3_tracking_vs_divergent(oracle_wd, corpus):

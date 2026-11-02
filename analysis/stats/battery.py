@@ -200,6 +200,32 @@ def date_permutation(fn: HypFn, wd: WorkData, primary: Effect, n_perm: int = 200
                   "null_mean": float(np.nanmean(null[:, 0])), "null_sd": float(np.nanstd(null[:, 0]))})
 
 
+def permute_canon(cov: pd.DataFrame, rng: np.random.Generator) -> np.ndarray:
+    """TF null (prereg v0.5): permute AUTHOR-level canonical flags among authors within era blocks
+    (era of the author's mean year), keeping the canonical share per era and authors intact."""
+    a = cov.groupby("author_key").agg(year=("year", "mean"), canonical=("canonical", "first"))
+    a["era"] = np.where(a.year < 1850, "E", np.where(a.year < 1885, "M", "L"))
+    newc = a.canonical.copy()
+    for _, idx in a.groupby("era").groups.items():
+        newc.loc[idx] = rng.permutation(a.canonical.loc[idx].values)
+    return newc.loc[cov.author_key].values
+
+
+def canon_permutation(fn: HypFn, wd: WorkData, primary: Effect, n_perm: int = 200, seed: int = 0) -> Check:
+    rng = np.random.default_rng(seed)
+    idx, s = _ref(primary)
+    est = _ests(primary, idx)
+    null = []
+    for _ in range(n_perm):
+        cov = wd.cov.assign(canonical=permute_canon(wd.cov, rng))
+        e = _safe(fn, WorkData(cov, wd.Y, wd.method, wd.info))
+        null.append(_ests(e, idx) if e else np.full(len(est), np.nan))
+    null = np.array(null)
+    p = (1 + np.nansum(s * null >= s * est, axis=0)) / (1 + np.isfinite(null).sum(0))
+    return Check("date_permutation", bool(np.all(p < 0.05)),
+                 {"mode": "canon_author_within_era", "n_perm": n_perm, "p_perm": float(p.max())})
+
+
 def replication(fn: HypFn, primary: Effect, rep: WorkData | None, rep_fn: HypFn | None = None) -> Check:
     """rep_fn lets the replication use another era window (e.g. ELTeC starts 1841)."""
     if rep is None:          # prereg v0.5 (review P9.5): replication is reported when available, never a gate
@@ -232,6 +258,7 @@ def run_battery(name: str, fn: HypFn, wd: WorkData, holm_reject: bool, primary: 
                 replication_wd: WorkData | None = None, replication_fn: HypFn | None = None,
                 n_perm: int = 200, seed: int = 0, not_applicable: tuple = (),
                 perm_mode: str = "author_profile") -> BatteryResult:
+    """perm_mode="canon" uses canon_permutation (TF); otherwise date permutation."""
     primary = primary or fn(wd)
     checks = [
         leave_one_author_out(fn, wd, primary, seed=seed),
@@ -241,7 +268,8 @@ def run_battery(name: str, fn: HypFn, wd: WorkData, holm_reject: bool, primary: 
         subset_check("drop_memorized", fn, wd, primary, "memorization", lambda s: (s < s.quantile(0.9)).values),
         label_variant_check("alt_model_labels", fn, primary, alt),
         label_variant_check("segmentation", fn, primary, segmentation),
-        date_permutation(fn, wd, primary, n_perm, seed, perm_mode) if "date_permutation" not in not_applicable
+        (canon_permutation(fn, wd, primary, n_perm, seed) if perm_mode == "canon"
+         else date_permutation(fn, wd, primary, n_perm, seed, perm_mode)) if "date_permutation" not in not_applicable
         else Check("date_permutation", None, {"note": "n/a for this hypothesis"}),
         replication(fn, primary, replication_wd, replication_fn),
     ]
@@ -265,22 +293,26 @@ def _naive_pair(variant_labels: pd.DataFrame, labels: pd.DataFrame, split: str) 
     return v, p
 
 
-def run_all(labels_path: str, human_path: str, frame_path: str | None, keywords_path: str,
+def run_all(labels_path: str, human_path: str, frame_path: str, keywords_path: str | None = None,
             alt_path: str | None = None, seg_paths: tuple = (), rep_labels: str | None = None,
             rep_human: str | None = None, rep_frame: str | None = None, split: str = "confirmation",
             n_perm: int = 200, out_dir: str = "analysis/stats/out/confirmatory",
-            expert: str = "teacher", genre_path: str | None = None, works_path: str | None = None) -> pd.DataFrame:
+            expert: str = "grad", teacher: str = "teacher", genre_path: str | None = None,
+            works_path: str | None = None, canon_path: str | None = None) -> pd.DataFrame:
+    """Registered v0.5 pipeline: attach genre + canon, annotator rules, expert-anchored DSL,
+    confirmatory family (TF + H1 co-primary at 0.025), battery on the co-primaries, verdicts."""
     import functools
     from pathlib import Path
 
+    from analysis.stats import annotators as ann
     from analysis.stats import models
-    from analysis.stats.dsl import prepare
+    from analysis.stats.dsl import prepare_anchored
     labels, human = pd.read_parquet(labels_path), pd.read_parquet(human_path)
-    # registered genre variable (prereg v0.4): pipeline/genre.py -> data/work/genre.parquet
     genre = pd.read_parquet(genre_path) if genre_path else None
     if genre is not None:
         labels = models.attach_genre(labels, genre)
-    # registered standard: pooled covariate mix of the primary set of BOTH halves (metadata only)
+    if canon_path:
+        labels = models.attach_canon(labels, pd.read_parquet(canon_path))
     ref_cov = None
     if works_path:
         w = pd.read_parquet(works_path)
@@ -289,38 +321,35 @@ def run_all(labels_path: str, human_path: str, frame_path: str | None, keywords_
         if "origin" not in w and "origin_locc" in w:
             w = w.assign(origin=w.origin_locc)
         ref_cov = models.reference_covariates(w, genre)
-    frame = pd.read_parquet(frame_path) if frame_path else None
-    kw = pd.read_csv(keywords_path)
-    # registered annotator rules (prereg §5.1): expert rows never enter DSL; kappa exclusion
-    from analysis.stats import annotators as ann
+        if canon_path:
+            ref_cov = ref_cov.merge(pd.read_parquet(canon_path)[["work_id", "canonical"]], on="work_id", how="left")
+            ref_cov["canonical"] = ref_cov.canonical.fillna(False).astype(bool)
+    frame = pd.read_parquet(frame_path)
+    kw = pd.read_csv(keywords_path) if keywords_path else None
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    excl: set = set()
-    if expert in set(human.annotator):
-        rep_k = ann.expert_agreement(human, expert=expert)
-        excl = ann.exclusions(rep_k)
-        rep_k.assign(excluded=rep_k.annotator.isin(excl)).to_csv(out / "annotator_agreement.csv", index=False)
-        ann.overlap_agreement(human, labels, expert=expert).to_csv(out / "overlap_agreement.csv", index=False)
-    wd = prepare(labels, human, frame, split=split, exclude_annotators={expert} | excl)
+    # annotator rules (prereg v0.5 §5.1): peers vs the grad-student anchor; teacher items descriptive
+    rep_k = ann.expert_agreement(human[human.annotator != teacher], expert=expert)
+    excl = ann.exclusions(rep_k)
+    rep_k.assign(excluded=rep_k.annotator.isin(excl)).to_csv(out / "annotator_agreement.csv", index=False)
+    ann.overlap_agreement(human[~human.annotator.isin({expert, teacher})], labels, expert=expert).to_csv(
+        out / "overlap_agreement.csv", index=False)
+    if teacher in set(human.annotator):
+        ann.expert_agreement(human[human.annotator.isin({teacher, expert})], expert=teacher).to_csv(
+            out / "teacher_vs_grad_descriptive.csv", index=False)
+    wd = prepare_anchored(labels, human, frame, expert=expert, exclude_annotators={teacher} | excl, split=split)
     design = models.Design.from_data(wd)
     tab, effs = models.confirmatory(wd, kw, design=design, ref_cov=ref_cov)
-    holm_rej = tab.groupby("test").reject.first().to_dict()
+    rej = tab.groupby("test").reject.first().to_dict()
     alt = [_naive_pair(pd.read_parquet(alt_path), labels, split)] if alt_path else None
     seg = [_naive_pair(pd.read_parquet(p), labels, split) for p in seg_paths] or None
-    rep = None
-    if rep_labels:
-        rl = pd.read_parquet(rep_labels)
-        rep = (prepare(rl, pd.read_parquet(rep_human), pd.read_parquet(rep_frame) if rep_frame else None, split=None)
-               if rep_human else prepare(rl, method="naive", split=None))
-    fns = {"H1": functools.partial(models.h1, design=design, ref_cov=ref_cov),
-           "H2a": functools.partial(models.h2a, design=design, ref_cov=ref_cov),
-           "H2b": functools.partial(models.h2b, design=design, ref_cov=ref_cov),
-           "H2c": functools.partial(models.h2c, design=design, ref_cov=ref_cov),
-           "H3": functools.partial(models.h3, keywords=kw, n_boot=500)}
+    fns = {"H1": functools.partial(models.h1, design=design, ref_cov=ref_cov)}
+    if "TF" in effs:
+        fns["TF"] = functools.partial(models.two_fictions, design=design, ref_cov=ref_cov)
     tabs = []
     for k, fn in fns.items():
-        r = run_battery(k, fn, wd, bool(holm_rej[k]), effs[k], alt=alt, segmentation=seg, replication_wd=rep,
-                        n_perm=n_perm, not_applicable=("date_permutation",) if k == "H3" else ())
+        r = run_battery(k, fn, wd, bool(rej[k]), effs[k], alt=alt, segmentation=seg, replication_wd=None,
+                        n_perm=n_perm, perm_mode="canon" if k == "TF" else "author_profile")
         tabs.append(r.table().assign(verdict=r.verdict, n_pass=r.n_pass, need=r.need))
     bt = pd.concat(tabs)
     tab.to_csv(out / "confirmatory.csv", index=False)
@@ -331,15 +360,18 @@ def run_all(labels_path: str, human_path: str, frame_path: str | None, keywords_
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="confirmatory tests + battery + verdicts on real data")
-    ap.add_argument("labels"); ap.add_argument("human"); ap.add_argument("keywords")
-    ap.add_argument("--frame"); ap.add_argument("--alt"); ap.add_argument("--seg", action="append", default=[])
+    ap.add_argument("labels"); ap.add_argument("human"); ap.add_argument("frame")
+    ap.add_argument("--keywords"); ap.add_argument("--alt"); ap.add_argument("--seg", action="append", default=[])
     ap.add_argument("--rep-labels"); ap.add_argument("--rep-human"); ap.add_argument("--rep-frame")
     ap.add_argument("--split", default="confirmation"); ap.add_argument("--n-perm", type=int, default=200)
     ap.add_argument("--genre", default="data/work/genre.parquet", help="registered genre variable")
-    ap.add_argument("--works", default="data/work/works.parquet", help="metadata for the pooled standard")
+    ap.add_argument("--works", default="data/work/works_v2.parquet", help="metadata for the pooled standard")
+    ap.add_argument("--canon", default="data/work/canon.parquet", help="registered canonicity flag")
+    ap.add_argument("--expert", default="grad"); ap.add_argument("--teacher", default="teacher")
     a = ap.parse_args()
     import os
+    ex = lambda p: p if p and os.path.exists(p) else None
     bt = run_all(a.labels, a.human, a.frame, a.keywords, a.alt, tuple(a.seg), a.rep_labels, a.rep_human,
-                 a.rep_frame, a.split, a.n_perm, genre_path=a.genre if os.path.exists(a.genre) else None,
-                 works_path=a.works if os.path.exists(a.works) else None)
+                 a.rep_frame, a.split, a.n_perm, expert=a.expert, teacher=a.teacher, genre_path=ex(a.genre),
+                 works_path=ex(a.works), canon_path=ex(a.canon))
     print(bt.groupby("hypothesis")[["verdict", "n_pass", "need"]].first())

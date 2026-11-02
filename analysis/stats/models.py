@@ -595,25 +595,67 @@ def holm(p: list[float] | np.ndarray) -> np.ndarray:
     return adj
 
 
-def confirmatory(wd: WorkData, keywords: pd.DataFrame, alpha: float = 0.05, design: Design | None = None,
-                 n_boot: int = 2000, ref_cov: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict[str, Effect]]:
+def confirmatory(wd: WorkData, keywords: pd.DataFrame | None = None, alpha: float = 0.05,
+                 design: Design | None = None, n_boot: int = 2000,
+                 ref_cov: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict[str, Effect]]:
+    """Registered v0.5 family.
+      co-primary (Bonferroni, alpha/2 = 0.025 each): TF (two fictions), H1 (E vs L locus shift)
+      secondary (Holm at alpha over the two): H1 within canonical works, H1 within non-canonical works
+      descriptive (CIs, Wald p, no verdict): TF genre-adjusted, H1-ML, canon composition share
+      estimation only (effect + CI, no test): H2a, H2b, H2c, H3."""
     design = design or Design.from_data(wd)
-    effs = {"H1": h1(wd, design, ref_cov), "H2a": h2a(wd, design, ref_cov), "H2b": h2b(wd, design, ref_cov),
-            "H2c": h2c(wd, design, ref_cov),
-            "H3": h3(wd, keywords, n_boot=n_boot)}
-    # H1 primary at alpha (two-sided Wald); Holm across the four secondary tests; H1-ML descriptive
-    adj = np.r_[effs["H1"].p, holm([effs[k].p for k in ("H2a", "H2b", "H2c", "H3")])]
+    a1 = alpha / 2
+    effs: dict[str, Effect] = {"H1": h1(wd, design, ref_cov, alpha=a1)}
+    role = {"H1": "co-primary"}
+    has_canon = "canonical" in wd.cov and wd.cov.canonical.nunique() == 2
+    if has_canon:
+        effs["TF"] = two_fictions(wd, design, ref_cov, alpha=a1)
+        role["TF"] = "co-primary"
+        for lev, nm in ((True, "H1|canonical"), (False, "H1|non-canonical")):
+            sub = wd.subset(wd.cov.canonical.values.astype(bool) == lev)
+            try:
+                effs[nm] = h1(sub, design, ref_cov, alpha=alpha, name=nm)
+                role[nm] = "secondary"
+            except Exception:
+                pass
+        effs["TF-genre"] = two_fictions(wd, design, ref_cov, adjust_genre=True, alpha=alpha, name="TF genre-adjusted")
+        role["TF-genre"] = "descriptive"
     effs["H1-ML"] = h1_mid_late(wd, design, ref_cov)
-    adj = np.r_[adj, np.nan]
-    role = {"H1": "primary", "H1-ML": "descriptive"}
+    role["H1-ML"] = "descriptive"
+    for k, f in (("H2a", h2a), ("H2b", h2b), ("H2c", h2c)):
+        effs[k] = f(wd, design, ref_cov)
+        role[k] = "estimation"
+    if keywords is not None:
+        effs["H3"] = h3(wd, keywords, n_boot=n_boot)
+        role["H3"] = "estimation"
+    sec = [k for k, r in role.items() if r == "secondary"]
+    sec_adj = dict(zip(sec, holm([effs[k].p for k in sec]))) if sec else {}
     rows = []
-    for (k, e), pa in zip(effs.items(), adj):
+    for k, e in effs.items():
+        r = role[k]
+        if r == "co-primary":
+            p_adj, lev = e.p, a1
+        elif r == "secondary":
+            p_adj, lev = sec_adj[k], alpha
+        else:
+            p_adj, lev = np.nan, np.nan
         for c in e.components:
-            rows.append({"test": k, "role": role.get(k, "secondary"), "component": c.label, "estimate": c.estimate,
-                         "se": c.se, "lo": c.ci()[0], "hi": c.ci()[1], "expected_sign": c.expected_sign,
-                         "p_test": e.p, "p_adj": pa, "reject": bool(pa < alpha) if np.isfinite(pa) else None,
+            rows.append({"test": k, "role": r, "component": c.label, "estimate": c.estimate, "se": c.se,
+                         "lo": c.ci()[0], "hi": c.ci()[1], "expected_sign": c.expected_sign,
+                         "p_test": e.p if r not in ("estimation",) else np.nan, "p_adj": p_adj, "alpha": lev,
+                         "reject": bool(p_adj < lev) if np.isfinite(p_adj) else None,
                          "classification": e.extra.get("classification")})
     return pd.DataFrame(rows), effs
+
+
+def attach_canon(labels: pd.DataFrame, canon: pd.DataFrame) -> pd.DataFrame:
+    """Attach the registered metadata-only canonicity flag (data/work/canon.parquet: work_id,
+    canonical [bool], optional canon_score; docs/canon_measure.md)."""
+    out = labels.drop(columns=["canonical"], errors="ignore").merge(canon[["work_id", "canonical"]], on="work_id", how="left")
+    if out.canonical.isna().mean() > 0.01:
+        raise ValueError("canonical flag missing for > 1% of passages")
+    out["canonical"] = out.canonical.fillna(False).astype(bool)
+    return out
 
 
 # ------------------------------------------------------------------ composition

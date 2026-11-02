@@ -69,16 +69,34 @@ def test_run_battery_end_to_end(corpus, oracle_wd):
 
 
 def test_cli_run_all_on_simulated_files(tmp_path):
-    from analysis.stats.simulate import SimConfig, keyword_series, simulate, write
-    c = simulate(SimConfig(n_works=1600, passages_per_work=8, seed=8, audit_n=800))
-    write(c, tmp_path)
-    keyword_series(c).to_csv(tmp_path / "kw.csv", index=False)
-    alt = c.labels.sample(frac=0.3, random_state=0)
-    alt.to_parquet(tmp_path / "alt.parquet")
+    """v0.5 pipeline end to end: metadata audit draw, 4 peers + grad-student anchor + teacher items,
+    expert-anchored DSL, TF + H1 co-primaries, battery with canon permutation."""
+    from analysis import select_annotation as sa
+    from analysis.stats.power_v05 import peer_labels
+    from analysis.stats.simulate import SimConfig, keyword_series, simulate
+    c = simulate(SimConfig.v05(n_works=3000, seed=8), audit=False)
+    lab = c.labels
+    conf = lab[(lab.split == "confirmation") & (lab.stratum == "random")]
+    rng = np.random.default_rng(0)
+    aud, frame = sa.draw_audit_metadata(conf[["passage_id", "work_id", "author_key", "year", "split", "stratum",
+                                              "genre", "canonical"]], rng, n_target=700)
+    tpos = c.truth.set_index("passage_id")
+    peers = peer_labels(aud.passage_id.values, tpos, (0.2, 0.25, 0.3, 0.3), rng)
+    ex_ids = aud.groupby("audit_cell", group_keys=False).apply(lambda g: g.sample(frac=0.25, random_state=1)).passage_id
+    ex = tpos.loc[ex_ids].reset_index()
+    grad = pd.DataFrame({"passage_id": ex.passage_id, "annotator": "grad", "has_obstacle": ex.has_obstacle,
+                         "domains": ex.domains.map(lambda d: list(d)[:1]), "locus": ex.locus,
+                         "failure_cause": ex.failure_cause})
+    teacher = grad.head(8).assign(annotator="teacher")
+    human = pd.concat([peers, grad, teacher], ignore_index=True)
+    lab.to_parquet(tmp_path / "labels.parquet"); human.to_parquet(tmp_path / "human.parquet")
+    frame.to_parquet(tmp_path / "frame.parquet"); keyword_series(c).to_csv(tmp_path / "kw.csv", index=False)
     bt = battery.run_all(str(tmp_path / "labels.parquet"), str(tmp_path / "human.parquet"),
-                         str(tmp_path / "audit_frame.parquet"), str(tmp_path / "kw.csv"),
-                         alt_path=str(tmp_path / "alt.parquet"), rep_labels=str(tmp_path / "labels.parquet"),
-                         n_perm=5, out_dir=str(tmp_path / "out"))
-    assert set(bt.hypothesis) == {"H1", "H2a", "H2b", "H2c", "H3"}
+                         str(tmp_path / "frame.parquet"), str(tmp_path / "kw.csv"), n_perm=5, out_dir=str(tmp_path / "out"))
+    assert set(bt.hypothesis) == {"H1", "TF"}
     assert all(v.split(":")[0] in {"supported", "unstable", "null"} for v in bt.verdict)
-    assert (tmp_path / "out" / "confirmatory.csv").exists()
+    tab = pd.read_csv(tmp_path / "out" / "confirmatory.csv")
+    assert set(tab[tab.role == "co-primary"].test) == {"H1", "TF"}
+    assert (tab[tab.role == "co-primary"].alpha == 0.025).all()
+    assert set(tab[tab.role == "estimation"].test) >= {"H2a", "H2b", "H2c", "H3"}
+    assert (tmp_path / "out" / "teacher_vs_grad_descriptive.csv").exists()
