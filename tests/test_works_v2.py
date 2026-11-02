@@ -157,6 +157,7 @@ def test_split_v2_map_and_queue_report(tmp_path, monkeypatch):
     df = m.reassign(pd.DataFrame({"passage_id": ["pg461_p1", "pg12_p2", "pg999_p3"]}))
     assert df.moved.tolist() == [True, False, False] and df.split_v2.tolist()[:2] == ["discovery", "confirmation"]
     assert pd.isna(df.split_v2.iloc[2])
+    assert m.split_of("w461_cz0") == "discovery" and not m.moved("w12_cz3")
     # queue report over a synthetic shard
     import pipeline.split_v2_map as S
     monkeypatch.setattr(S, "WORK", tmp_path)
