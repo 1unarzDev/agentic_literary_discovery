@@ -57,14 +57,20 @@ def test_constructs():
 
 def _queues():
     rows = []
-    for i in range(25):  # 25 expert items, early/late
-        e = "early_1800_1849" if i % 2 else "late_1885_1920"
-        rows += [(a, f"e{i}", "p_e%d" % i, "audit", "expert", None, e) for a in ("student", "peer1", "teacher")]
+    for i in range(8):  # teacher items: everyone
+        e = ("E_1800_1849", "M_1850_1884", "L_1885_1929")[i % 3]
+        rows += [(a, f"t{i}", f"p_t{i}", "audit", "teacher", None, e) for a in ("student", "peer1", "expert1", "teacher")]
+    for i in range(20):  # expert_overlap: student/peer1 with expert1
+        e = "E_1800_1849" if i % 2 else "L_1885_1929"
+        a = "student" if i < 10 else "peer1"
+        rows += [(a, f"x{i}", f"p_x{i}", "audit", "expert_overlap", "expert1", e),
+                 ("expert1", f"x{i}", f"p_x{i}", "audit", "expert_overlap", a, e)]
     for i in range(6):
-        e = "early_1800_1849" if i % 2 else "late_1885_1920"
+        e = "E_1800_1849" if i % 2 else "L_1885_1929"
         rows += [("student", f"o{i}", f"p_o{i}", "audit", "overlap", "peer1", e),
                  ("peer1", f"o{i}", f"p_o{i}", "audit", "overlap", "student", e)]
-    rows.append(("student", "s1", "p_s1", "audit", "single", None, "late_1885_1920"))
+    rows.append(("student", "s1", "p_s1", "audit", "single", None, "L_1885_1929"))
+    rows.append(("expert1", "eo1", "p_eo1", "audit", "expert_only", None, "L_1885_1929"))
     return pd.DataFrame(rows, columns=["annotator", "item_id", "passage_id", "set", "role", "partner", "era"])
 
 
@@ -82,40 +88,74 @@ def test_progress_offline():
     ref = {"practice": [ent(pids[0], "no")], "cert": [ent(pids[1], "no"), ent(pids[2], "no")],
            "retake": [ent(pids[3], "no")]}
     rows, i = [], 0
-    for k in range(25):
-        i += 1
-        rows.append(lab(i, f"e{k}", "teacher"))
-        i += 1
-        rows.append(lab(i, f"e{k}", "student"))  # agrees with teacher on all -> kappa 1 (pe=1 -> 1.0)
-        i += 1
-        # peer1 disagrees on locus for most items
-        rows.append(lab(i, f"e{k}", "peer1", loc="material_external" if k % 3 else "internal_psychological"))
+    for k in range(8):
+        for a in ("student", "peer1", "expert1", "teacher"):
+            i += 1
+            rows.append(lab(i, f"t{k}", a, loc="material_external" if (a == "peer1" and k < 4) else "internal_psychological"))
+    for k in range(20):
+        a = "student" if k < 10 else "peer1"
+        rows.append(lab(100 + k, f"x{k}", a))
+        # expert1 disagrees with peer1 on locus for early items
+        rows.append(lab(200 + k, f"x{k}", "expert1",
+                        loc="social_institutional" if (a == "peer1" and k % 2) else "internal_psychological"))
     for k in range(6):
-        rows += [lab(100 + k, f"o{k}", "student", s=20), lab(200 + k, f"o{k}", "peer1",
+        rows += [lab(300 + k, f"o{k}", "student", s=20), lab(400 + k, f"o{k}", "peer1",
                  ho="yes" if k < 4 else "no", dom=None if k >= 4 else "INNER_STATE")]
-    rows.append(lab(300, "s1", "student", s=30, undone=True))
-    rows += [lab(301, item_id(pids[0]), "student", ho="no", dom=None, loc=None, practice=True, set_="practice", s=999),
-             lab(302, item_id(pids[1]), "student", ho="no", dom=None, loc=None, set_="cert"),
-             lab(303, item_id(pids[2]), "student", ho="yes", set_="cert")]
+    rows.append(lab(500, "s1", "student", s=30, undone=True))
+    rows += [lab(501, item_id(pids[0]), "student", ho="no", dom=None, loc=None, practice=True, set_="practice", s=999),
+             lab(502, item_id(pids[1]), "student", ho="no", dom=None, loc=None, set_="cert"),
+             lab(503, item_id(pids[2]), "student", ho="yes", set_="cert")]
     labs = an.flatten_labels(rows)
-    out = {r["annotator"]: r for r in an.progress_table(labs, q, None, ref, "teacher")}
+    out = {r["annotator"]: r for r in an.progress_table(labs, q, None, ref)}
     st, p1 = out["student"], out["peer1"]
-    assert st["queues"]["audit"] == (31, 32)
-    assert st["median_s"] == 10.0  # 25 x 10s expert + 6 x 20s overlap; practice/cert/undone excluded
-    assert st["expert_agr"]["n"] == 25 and st["expert_agr"]["locus4"]["pct"] == 1.0
-    assert st["expert_rule"]["n_expert_items"] == 25 and not st["expert_rule"]["flag_exclude"]
-    assert p1["expert_rule"]["flag_exclude"]  # locus kappa vs expert < 0.40
-    assert st["overlap_agr"]["n"] == 6 and math.isclose(st["overlap_agr"]["has_obstacle"]["pct"], 4 / 6)
+    assert st["queues"]["audit"] == (24, 25)
+    assert st["median_s"] == 10.0
+    assert st["vs_expert"]["all"]["n"] == 10 and st["vs_expert"]["all"]["locus4"]["pct"] == 1.0
+    assert p1["vs_expert"]["all"]["n"] == 10 and p1["vs_expert"]["E_1800_1849"]["locus4"]["pct"] == 0.0
+    assert p1["vs_expert"]["L_1885_1929"]["locus4"]["pct"] == 1.0
+    assert st["vs_partners"]["all"]["n"] == 6 and math.isclose(st["vs_partners"]["all"]["has_obstacle"]["pct"], 4 / 6)
+    assert st["vs_teacher"]["n"] == 8 and p1["vs_teacher"]["locus4"]["pct"] == 0.5
+    assert out["expert1"]["vs_teacher"]["n"] == 8
+    assert "vs_expert" not in out["expert1"] and "cert_local" not in out["expert1"]
+    assert "vs_teacher" not in out["teacher"]
     c = st["cert_local"]
     assert c["practice"]["done"] == 1 and c["practice"]["passed"] is None
     assert c["cert"]["done"] == 2 and c["cert"]["obs_agree"] == 0.5 and c["cert"]["passed"] is False
     assert c["retake"]["done"] == 0
-    assert "expert_agr" not in out["teacher"] and "cert_local" not in out["teacher"]
-    ov = an.overlap_report(an.active(labs), q, "teacher")
-    assert set(ov.subset) == {"all", "early_1800_1849", "late_1885_1920"}
-    assert ov.set_index("subset").n_pairs.to_dict() == {"all": 6, "early_1800_1849": 3, "late_1885_1920": 3}
+    ov = an.overlap_report(an.active(labs), q)
+    assert ov.set_index("subset").n_pairs.to_dict() == {"all": 6, "E_1800_1849": 3, "L_1885_1929": 3}
     txt = an.format_progress(list(out.values()), ov)
-    assert "FLAG" in txt and "late_1885_1920" in txt and "cert" in txt
+    assert "vs expert1" in txt and "vs teacher (descriptive)" in txt and "L_1885_1929" in txt
+    assert "FLAG" not in txt
+
+
+def test_adjudicate():
+    from analysis.build_annotation_queues import review_item_id
+    ent = lambda p, ho, loc=None: {"passage_id": p, "reference": {"has_obstacle": ho, "domain": None if ho != "yes" else "INNER_STATE",
+                                   "locus": loc, "failure_cause": None}, "rationale": "orig"}
+    ref = {"version": "v1", "practice": [ent("pa", "no"), ent("pb", "yes", "internal_psychological")],
+           "cert": [ent("pc", "no")], "retake": [ent("pd", "no")]}
+    rows = [lab(1, review_item_id("pa"), "expert1", ho="no", dom=None, loc=None, set_="review"),
+            dict(lab(2, review_item_id("pb"), "expert1", loc="social_institutional", set_="review")),
+            lab(3, review_item_id("pc"), "expert1", ho="yes", set_="review", undone=True),
+            lab(4, item_id("pd"), "student", ho="yes", set_="retake")]  # not a review label
+    rows[1]["label"]["note"] = "it is a social constraint"
+    rows[1]["label"]["domain"] = "SOCIAL_RANK_CONVENTION"
+    out, summ = an.adjudicate(ref, an.flatten_labels(rows))
+    assert out["version"] == "v1+adjudicated"
+    pa, pb = out["practice"]
+    assert pa["review"]["verdict"] == "agree" and pa["rationale"] == "orig"
+    assert pb["review"]["verdict"] == "corrected"
+    assert pb["reference"] == {"has_obstacle": "yes", "domain": "SOCIAL_RANK_CONVENTION",
+                               "locus": "social_institutional", "failure_cause": None}
+    assert pb["rationale"] == "orig Expert correction: it is a social constraint"
+    assert pb["review"]["original"]["locus"] == "internal_psychological"
+    assert out["cert"][0]["review"]["verdict"] == "pending" and out["cert"][0]["reference"]["has_obstacle"] == "no"
+    assert out["retake"][0]["review"]["verdict"] == "pending"
+    assert summ.verdict.value_counts().to_dict() == {"pending": 2, "agree": 1, "corrected": 1}
+    # output is again a valid practice_ref
+    from analysis.build_annotation_queues import parse_practice_ref
+    assert len(parse_practice_ref(out)) == 4
 
 
 def test_progress_worker_cert_status():
@@ -131,8 +171,8 @@ def test_progress_worker_cert_status():
 def test_attach_roles():
     df = an.flatten_labels([row(1, "o1", "student")])
     q = pd.DataFrame([("student", "o1", "audit", "overlap", "peer1")], columns=["annotator", "item_id", "set", "role", "partner"])
-    out = an.attach_roles(df, q.assign(era="late_1885_1920"))
-    assert out.role.iloc[0] == "overlap" and out.partner.iloc[0] == "peer1" and out.era.iloc[0] == "late_1885_1920"
+    out = an.attach_roles(df, q.assign(era="L_1885_1929"))
+    assert out.role.iloc[0] == "overlap" and out.partner.iloc[0] == "peer1" and out.era.iloc[0] == "L_1885_1929"
     assert an.attach_roles(df, None).role.isna().all()
 
 

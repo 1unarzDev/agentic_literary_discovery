@@ -11,9 +11,11 @@ printed, and only on explicit request (`links`, or `create --print-links`).
   uv run python -I pipeline/annotators.py upload data/work/annotation/ann_items.json
   uv run python -I pipeline/annotators.py export
   uv run python -I pipeline/annotators.py progress [--from-parquet data/work/annotation/human_labels.parquet]
+  uv run python -I pipeline/annotators.py adjudicate [--from-parquet ...]   # -> practice_ref_adjudicated.json
 
 progress: queue done/total, cert rounds (Worker status + local recompute vs practice_ref.json), median s/item,
-expert agreement + the registered exclusion flag (analysis.stats.annotators), overlap kappa overall and by era.
+agreement with expert1 on expert_overlap items (overall + by era), with peer partners (+ pooled overlap kappa
+by era via analysis.stats.annotators), and vs the teacher on the teacher items (descriptive only).
 """
 from __future__ import annotations
 
@@ -33,10 +35,12 @@ ANN = ROOT / "data/work/annotation"
 UA = "ald-annotators/1.0 (+agentic_literary_discovery)"
 CHUNK = 250
 FIELDS = ("has_obstacle", "domain", "locus4")
+REF_KEYS = ("has_obstacle", "domain", "locus", "failure_cause")
 CERT_SETS = ("practice", "cert", "retake")
 CERT_KAPPA, CERT_OBS = 0.60, 0.75  # Worker gate: locus4 kappa >= 0.60 AND obstacle agreement >= 0.75
 LOCUS4 = {"material_external": "material", "social_institutional": "social", "internal_psychological": "internal"}
-ERA_DECADE = {"early_1800_1849": 1820, "mid_1850_1884": 1870, "late_1885_1920": 1900}
+ERA_DECADE = {"early_1800_1849": 1820, "mid_1850_1884": 1870, "late_1885_1920": 1900,
+              "E_1800_1849": 1820, "M_1850_1884": 1870, "L_1885_1929": 1900}  # proxy decades for dsl._era
 LABEL_COLS = ["label_id", "item_id", "passage_id", "set", "annotator", "has_obstacle", "domain", "locus",
               "failure_cause", "note", "evidence_text", "seconds_spent", "created", "undone", "practice"]
 if str(ROOT) not in sys.path:
@@ -206,23 +210,42 @@ def cert_scores(mine: pd.DataFrame, ref: pd.DataFrame) -> dict:
     return out
 
 
-def expert_report(act: pd.DataFrame, queues: pd.DataFrame, expert: str = "teacher") -> pd.DataFrame:
-    """Registered exclusion statistics (analysis.stats.annotators): locus 4-category and obstacle kappa vs
-    the expert on the expert items, n_expert_items, and the flag kappa_locus < 0.40 or n < 20."""
-    from analysis.stats import annotators as A
-    exp_items = set(queues[queues.role == "expert"].item_id)
-    h = act[act.item_id.isin(exp_items) & (act.set == "audit")]
-    names = [a for a in dict.fromkeys(queues.annotator) if a != expert]
-    rep = A.expert_agreement(h, expert) if (h.annotator == expert).any() else pd.DataFrame(
-        columns=["annotator", "n_expert_items", "kappa_locus", "kappa_obstacle"])
-    rep = rep.set_index("annotator").reindex(names)
-    rep["n_expert_items"] = rep.n_expert_items.fillna(0).astype(int)
-    rep["flag_exclude"] = rep.index.isin(A.exclusions(rep.reset_index().fillna({"kappa_locus": -1})))
-    return rep.reset_index().rename(columns={"index": "annotator"})
+def _pairs(act: pd.DataFrame, queues: pd.DataFrame, name: str, role: str) -> pd.DataFrame:
+    """name's active labels merged with the partner's on items where queues has (name, role, partner)."""
+    q = queues[(queues.annotator == name) & (queues.role == role)]
+    mine = act[act.annotator == name]
+    parts = []
+    for partner, g in q.groupby("partner"):
+        p = act[(act.annotator == partner) & act.item_id.isin(g.item_id)]
+        m = mine[mine.item_id.isin(g.item_id)].merge(p, on="item_id", suffixes=("_a", "_b"))
+        parts.append(m.merge(g[["item_id", "era"]].rename(columns={"era": "q_era"}), on="item_id", how="left"))
+    cols = [f"{f}_{s}" for f in FIELDS for s in "ab"] + ["q_era"]
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=cols)
 
 
-def overlap_report(act: pd.DataFrame, queues: pd.DataFrame, expert: str = "teacher") -> pd.DataFrame:
-    """Pooled pairwise overlap kappa (locus 4-cat and obstacle), overall and by era, via
+def stats_by_era(m: pd.DataFrame) -> dict:
+    """{'all': {...}, era: {...}} of agreement on FIELDS for a merged pair table."""
+    out = {"all": {f: agreement(m[f"{f}_a"], m[f"{f}_b"]) for f in FIELDS} | {"n": len(m)}}
+    for e, g in m.groupby("q_era"):
+        out[e] = {f: agreement(g[f"{f}_a"], g[f"{f}_b"]) for f in FIELDS} | {"n": len(g)}
+    return out
+
+
+def teacher_comparison(act: pd.DataFrame, queues: pd.DataFrame, teacher: str = "teacher") -> dict:
+    """Descriptive only: each other labeller vs the teacher on the teacher items."""
+    t_items = queues[queues.role == "teacher"]
+    t = act[(act.annotator == teacher) & act.item_id.isin(t_items.item_id)]
+    out = {}
+    for name in dict.fromkeys(t_items.annotator):
+        if name == teacher:
+            continue
+        mine = act[(act.annotator == name) & act.item_id.isin(t_items.item_id)]
+        out[name] = pair_stats(mine, t)
+    return out
+
+
+def overlap_report(act: pd.DataFrame, queues: pd.DataFrame, expert_reader: str = "expert1") -> pd.DataFrame:
+    """Pooled pairwise peer-overlap kappa (locus 4-cat and obstacle), overall and by era, via
     analysis.stats.annotators.overlap_agreement (era from queues.parquet)."""
     from analysis.stats import annotators as A
     ov = queues[queues.role == "overlap"]
@@ -232,14 +255,20 @@ def overlap_report(act: pd.DataFrame, queues: pd.DataFrame, expert: str = "teach
         return pd.DataFrame(columns=["subset", "n_pairs", "kappa_locus", "kappa_obstacle"])
     eras = ov.drop_duplicates("passage_id")[["passage_id", "era"]]
     lab = eras.assign(decade=eras.era.map(ERA_DECADE).fillna(1900).astype(int))
-    loc = A.overlap_agreement(h, lab, expert, target="locus")
-    obs = A.overlap_agreement(h, lab, expert, target="obstacle")
-    return loc.merge(obs[["subset", "kappa_obstacle"]], on="subset", how="left")
+    loc = A.overlap_agreement(h, lab, expert_reader, target="locus")
+    obs = A.overlap_agreement(h, lab, expert_reader, target="obstacle")
+    out = loc.merge(obs[["subset", "kappa_obstacle"]], on="subset", how="left")
+    # relabel dsl's decade eras back to the queue's era labels
+    from analysis.stats.dsl import _era
+    back = {str(_era(np.array([d]))[0]): e for e, d in ERA_DECADE.items() if e in set(eras.era)}
+    return out.assign(subset=out.subset.map(lambda x: back.get(x, x)))
 
 
 def progress_table(labels: pd.DataFrame, queues: pd.DataFrame | None = None, status: dict | None = None,
-                   practice_ref: dict | None = None, expert: str = "teacher") -> list[dict]:
-    """One dict per annotator: queue done/total, median seconds, cert rounds, expert/overlap agreement."""
+                   practice_ref: dict | None = None, expert_reader: str = "expert1",
+                   teacher: str = "teacher") -> list[dict]:
+    """One dict per labeller: queue done/total, median seconds, cert rounds (peers), agreement with
+    expert1 on expert_overlap items (overall + by era), with peer partners, and vs the teacher."""
     act = active(labels)
     names = []
     if status:
@@ -247,7 +276,7 @@ def progress_table(labels: pd.DataFrame, queues: pd.DataFrame | None = None, sta
     for src in (queues.annotator if queues is not None else [], act.annotator):
         names += [n for n in dict.fromkeys(src) if n not in names]
     ref = ref_frame(practice_ref) if practice_ref else None
-    exp = expert_report(act, queues, expert).set_index("annotator") if queues is not None else None
+    tcmp = teacher_comparison(act, queues, teacher) if queues is not None else {}
     out = []
     for name in names:
         row: dict = {"annotator": name, "queues": {}}
@@ -263,21 +292,14 @@ def progress_table(labels: pd.DataFrame, queues: pd.DataFrame | None = None, sta
                 row["queues"][st] = (int(g.item_id.isin(mine.item_id).sum()), len(g))
         work = mine[~mine.practice.astype(bool) & mine.set.isin(["audit", "teaching"])]
         row["median_s"] = float(work.seconds_spent.median()) if len(work) else float("nan")
-        if ref is not None and name != expert:
+        peer = name not in (expert_reader, teacher)
+        if ref is not None and peer:
             row["cert_local"] = cert_scores(mine, ref)
-        if name != expert and queues is not None:
-            exp_items = set(queues[queues.role == "expert"].item_id)
-            t = act[(act.annotator == expert) & act.item_id.isin(exp_items)]
-            row["expert_agr"] = pair_stats(mine[mine.item_id.isin(exp_items)], t)
-            if exp is not None and name in exp.index:
-                row["expert_rule"] = exp.loc[name].to_dict()
-            ov = queues[(queues.annotator == name) & (queues.role == "overlap")]
-            parts = []
-            for partner, g in ov.groupby("partner"):
-                p = act[(act.annotator == partner) & act.item_id.isin(g.item_id)]
-                parts.append(mine[mine.item_id.isin(g.item_id)].merge(p, on="item_id", suffixes=("_a", "_b")))
-            m = pd.concat(parts) if parts else pd.DataFrame(columns=[f"{f}_{s}" for f in FIELDS for s in "ab"])
-            row["overlap_agr"] = {f: agreement(m[f"{f}_a"], m[f"{f}_b"]) for f in FIELDS} | {"n": len(m)}
+        if queues is not None and peer:
+            row["vs_expert"] = stats_by_era(_pairs(act, queues, name, "expert_overlap"))
+            row["vs_partners"] = stats_by_era(_pairs(act, queues, name, "overlap"))
+        if name in tcmp:
+            row["vs_teacher"] = tcmp[name]
         out.append(row)
     return out
 
@@ -318,18 +340,62 @@ def format_progress(rows: list[dict], ov: pd.DataFrame | None = None) -> str:
         lines.append(f"{r['annotator']:<10} {q or '(no queues)'}  median/item {med}")
         for ln in _fmt_cert(r):
             lines.append(f"{'':<10}   {ln}")
-        if "expert_agr" in r:
-            e = r.get("expert_rule", {})
-            flag = " FLAG: exclusion rule (k_locus<0.40 or n<20; provisional until done)" if e.get("flag_exclude") else ""
-            lines.append(f"{'':<10}   vs expert    {_fmt_agr(r['expert_agr'])}  rule: n={e.get('n_expert_items', 0)} "
-                         f"k_locus {_k(e.get('kappa_locus'))} k_obs {_k(e.get('kappa_obstacle'))}{flag}")
-        if "overlap_agr" in r:
-            lines.append(f"{'':<10}   vs partners  {_fmt_agr(r['overlap_agr'])}")
+        for key, lab in (("vs_expert", "vs expert1  "), ("vs_partners", "vs partners ")):
+            if key in r:
+                lines.append(f"{'':<10}   {lab} {_fmt_agr(r[key]['all'])}")
+                for e, s in r[key].items():
+                    if e != "all":
+                        lines.append(f"{'':<10}     {e:<16} {_fmt_agr(s)}")
+        if "vs_teacher" in r:
+            lines.append(f"{'':<10}   vs teacher (descriptive) {_fmt_agr(r['vs_teacher'])}")
     if ov is not None and len(ov):
-        lines.append("overlap kappa (pooled pairs, expert items excluded):")
+        lines.append("peer overlap kappa (pooled pairs):")
         for o in ov.itertuples():
             lines.append(f"  {o.subset:<16} pairs={o.n_pairs:<4} locus4 k {_k(o.kappa_locus)}  obstacle k {_k(o.kappa_obstacle)}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------- adjudication of references
+def _norm(v):
+    return None if v is None or (isinstance(v, float) and np.isnan(v)) or v == "" else v
+
+
+def adjudicate(ref: dict, labels: pd.DataFrame, expert_reader: str = "expert1") -> tuple[dict, pd.DataFrame]:
+    """practice_ref.json + expert1's active review labels -> adjudicated practice_ref (same format), where
+    reference = expert1's label; rationale += 'Expert correction: <note>' when it differs; per item
+    "review": {"verdict": agree|corrected|pending, "original": {...}}."""
+    from analysis.build_annotation_queues import review_item_id
+    act = active(labels)
+    rev = act[(act.set == "review") & (act.annotator == expert_reader)].set_index("item_id")
+    out = {k: v for k, v in ref.items() if k not in ("items", *CERT_SETS)}
+    out["version"] = f"{ref.get('version', '')}+adjudicated"
+    lists = {s: ref.get(s, []) for s in CERT_SETS}
+    if not any(lists.values()) and "items" in ref:
+        lists["practice"] = ref["items"]
+    rows = []
+    for st, entries in lists.items():
+        new = []
+        for it in entries:
+            orig = {k: _norm(it["reference"].get(k)) for k in REF_KEYS}
+            iid = review_item_id(it["passage_id"])
+            e = dict(it)
+            if iid not in rev.index:
+                e["review"] = {"verdict": "pending", "original": orig}
+            else:
+                r = rev.loc[iid]
+                lab = {k: _norm(r[k]) for k in REF_KEYS}
+                same = lab == orig
+                e["reference"] = lab
+                rat = it.get("rationale", "")
+                if not same:
+                    note = _norm(r.get("note"))
+                    rat = (rat + " " if rat else "") + (f"Expert correction: {note}" if note else "Expert correction.")
+                e["rationale"] = rat
+                e["review"] = {"verdict": "agree" if same else "corrected", "original": orig}
+            new.append(e)
+            rows.append({"set": st, "verdict": e["review"]["verdict"]})
+        out[st] = new
+    return out, pd.DataFrame(rows, columns=["set", "verdict"])
 
 
 # ---------------------------------------------------------------------------- commands
@@ -386,19 +452,37 @@ def cmd_export(a: argparse.Namespace) -> None:
     print(f"exported {len(df)} labels ({int((~df.undone).sum())} active) -> {out}")
 
 
+def fetch_labels(a: argparse.Namespace) -> tuple[pd.DataFrame, dict | None]:
+    if getattr(a, "from_parquet", None):
+        return pd.read_parquet(a.from_parquet), None
+    with client() as c:
+        labels = flatten_labels(request(c, "GET", "/v1/admin/ann_labels").json()["labels"])
+        status = request(c, "GET", "/v1/admin/ann_status").json() if a.cmd == "progress" else None
+    return labels, status
+
+
 def cmd_progress(a: argparse.Namespace) -> None:
     queues = load_queues(Path(a.queues))
-    status = None
-    if a.from_parquet:
-        labels = pd.read_parquet(a.from_parquet)
-    else:
-        with client() as c:
-            labels = flatten_labels(request(c, "GET", "/v1/admin/ann_labels").json()["labels"])
-            status = request(c, "GET", "/v1/admin/ann_status").json()
+    labels, status = fetch_labels(a)
     ref = json.loads(Path(a.practice_ref).read_text(encoding="utf-8")) if Path(a.practice_ref).exists() else None
-    rows = progress_table(labels, queues, status, ref, a.expert)
-    ov = overlap_report(active(labels), queues, a.expert) if queues is not None else None
+    rows = progress_table(labels, queues, status, ref, a.expert_reader, a.teacher)
+    ov = overlap_report(active(labels), queues, a.expert_reader) if queues is not None else None
     print(format_progress(rows, ov))
+
+
+def cmd_adjudicate(a: argparse.Namespace) -> None:
+    ref = json.loads(Path(a.practice_ref).read_text(encoding="utf-8"))
+    labels, _ = fetch_labels(a)
+    out, summ = adjudicate(ref, labels, a.expert_reader)
+    p = Path(a.out)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
+    tab = summ.groupby(["set", "verdict"]).size().unstack(fill_value=0)
+    for st in CERT_SETS:
+        if st in tab.index:
+            print(f"{st:<9} " + "  ".join(f"{v}={int(n)}" for v, n in tab.loc[st].items()))
+    tot = summ.verdict.value_counts().to_dict()
+    print(f"total agree={tot.get('agree', 0)} corrected={tot.get('corrected', 0)} pending={tot.get('pending', 0)} -> {p}")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -423,8 +507,15 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--from-parquet")
     p.add_argument("--queues", default=str(ANN / "queues.parquet"))
     p.add_argument("--practice-ref", default=str(ANN / "practice_ref.json"))
-    p.add_argument("--expert", default="teacher")
+    p.add_argument("--expert-reader", default="expert1")
+    p.add_argument("--teacher", default="teacher")
     p.set_defaults(fn=cmd_progress)
+    p = sub.add_parser("adjudicate", help="expert1's review labels -> practice_ref_adjudicated.json")
+    p.add_argument("--from-parquet")
+    p.add_argument("--practice-ref", default=str(ANN / "practice_ref.json"))
+    p.add_argument("--out", default=str(ANN / "practice_ref_adjudicated.json"))
+    p.add_argument("--expert-reader", default="expert1")
+    p.set_defaults(fn=cmd_adjudicate)
     a = ap.parse_args(argv)
     a.fn(a)
 
