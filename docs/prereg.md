@@ -15,7 +15,7 @@
   |---|---|
   | Project lead (student, peer annotator) | knows the hypotheses and the Discovery results |
   | Peers | the hypotheses at the level of the annotation guide |
-  | Graduate-student expert (anonymous) | the codebook and the guide only; **no** hypotheses, pilot, showcase or reviews (to be attested) |
+  | Graduate-student expert (anonymous; about 8 h, about 900 labels) | the codebook and the guide only; **no** hypotheses, pilot, showcase or reviews. **Blindness attestation is a REQUIRED item** (§3.2) |
   | English teacher | the showcase (Nov 1); gives ~8 items and draft feedback, descriptive only |
 
 **Code:**
@@ -38,7 +38,7 @@ Eras use **year** cuts: E 1800–1849, M 1850–1884, L 1885–1929. The window 
 
 | ID | Role | Hypothesis | Estimand (Confirmation half, primary set) | Test |
 |---|---|---|---|---|
-| **TF** two fictions | **PRIMARY** (α = 0.05; see the decision box) | Canonical and non-canonical works differ in where their obstacles' resistance comes from (locus mix) | Standardised locus shares, canonical vs non-canonical. (Δ_material, Δ_internal) = canonical − non-canonical, by g-computation over the standard population, each work at its own year. Genre is **not** adjusted: genre composition is part of what separates the two fields. | Two-sided 2-df Wald, then the symmetric classification |
+| **TF** two fictions | **PRIMARY** (α = 0.05) | Canonical and non-canonical works differ in where their obstacles' resistance comes from (locus mix) | Standardised locus shares, canonical vs non-canonical. (Δ_material, Δ_internal) = canonical − non-canonical, by g-computation over the standard population, each work at its own year. Genre is **not** adjusted: genre composition is part of what separates the two fields. | Two-sided 2-df Wald, then the symmetric classification |
 | **H1** locus shift | **SECONDARY** (Holm with H1\|canon and H1\|non-canon) | The locus mix of scene-level obstacles in PG-preserved fiction shifts between E and L, genre-standardised | v0.4 estimand: (Δ_material, Δ_internal), L − E | Two-sided 2-df Wald, then classification |
 | H1\|canon, H1\|non-canon | SECONDARY (Holm) | H1's era contrast within each canon stratum | as H1, in each stratum | as H1 |
 | TF-genre | descriptive | TF adjusted for genre | TF + genre fixed effects | CI and Wald p, no verdict |
@@ -48,15 +48,11 @@ Eras use **year** cuts: E 1800–1849, M 1850–1884, L 1885–1929. The window 
 
 Wording follows methods review P1. H1 is "the locus mix of scene-level obstacles". It is *motivated by* the inward-turn literature, and the paper does not claim to test Kahler, whose thesis concerns narrative up to about 1800. TF speaks to Woolf's "materialists" charge and to the canon/mass divide (Bourdieu's restricted versus large-scale production; Moretti; Underwood).
 
-> **DECISION (confirm with the user before registration): one primary or two?**
+> **DECIDED (user, 2026-11-01): TWO FICTIONS is the single PRIMARY test at α = 0.05. H1 is the first secondary test,** Holm-corrected with H1|canonical and H1|non-canonical.
 >
-> The user leaned towards **two co-primaries (TF and H1) at α = 0.025 each**. §7.7 shows H1's E-vs-L power under this design is about **0.02–0.10** under every truth simulated, including a genuine within-stratum trend of +4.4 pp (MDE about 21 pp). The early era has about 95 works per half, and the audit budget is split across canon cells.
+> Rationale (§7.7): under this design H1's E-vs-L power is about 0.02–0.10 (MDE about 15 pp with 900 expert labels). Splitting α would have cost TF about 10 points of power for almost no chance of an H1 rejection.
 >
-> Splitting α would cut TF's power from **0.59 to 0.47** (registered cell) to buy almost no chance of an H1 rejection.
->
-> **Recommendation: TF as the single primary at α = 0.05, with H1 as the first secondary**, Holm-corrected with the two within-stratum contrasts and reported with its MDE.
->
-> The code supports both: `models.confirmatory(primaries=("TF",))` is the default, and `primaries=("TF", "H1")` gives the split. The registered text must pick one.
+> Code: `models.confirmatory(primaries=("TF",))`, the default.
 
 **Classification** (TF and H1; v0.5 makes it symmetric, following methods review P10). It is applied only when the 2-df Wald test rejects at the test's α. Each component is judged *up*, *down* or *flat* by its **Bonferroni-adjusted CI at level 1 − α/2**, which gives directional error control across the two components (`models.classify_h1`):
 
@@ -73,10 +69,14 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
 ## 2. Design and population
 
 - **Corpus:** English fiction 1800–1929 preserved in Project Gutenberg, after the `docs/data_quality.md` filters.
-- **Works table:** `works_v2.parquet`. Authors are re-keyed by **PG agent ID**, with aliases merged, and Stratemeyer Syndicate house names are merged into one cluster (methods review P8). The split was repaired so that no canonical author spans the halves, without reading any labels. Authors are the clustering unit, and the 5-per-author-per-decade cap is re-applied on the new keys.
+- **Works table:** `data/work/works_v2.parquet`.
+  - `author_group` re-keys authors by **PG agent ID**, with aliases merged and Stratemeyer Syndicate house names in one cluster (methods review P8). It is the clustering unit.
+  - `split_v2` is the repaired split, built without reading labels.
+  - `primary_v2_capv2` is the primary-set flag with the 5-per-author-per-decade cap re-applied on `author_group`.
+  - Code: `models.apply_works_v2`.
 - **Primary set:**
   - date resolved inside 1800–1929;
-  - `genre ≠ historical`, an implementable stand-in for "contemporary setting" (methods review P7);
+  - not `historical_setting` (works_v2 flag), replacing the unimplementable "contemporary setting" (methods review P7);
   - non-teaching authors;
   - the author cap.
 - **Dates:**
@@ -85,8 +85,8 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
   - **Round-year placeholders:** years exactly 1900 (and other round hundreds) count as unverified, and those works are excluded unless verified (methods review P3.5).
   - **Tiers:** confidence tiers are redefined from the verified dates. Open Library agreement no longer defines "high".
 - **Canonicity:**
-  - `data/work/canon.parquet` (`docs/canon_measure.md`): a **metadata-only** binary `canonical` per work, built without labels and frozen at the registration commit.
-  - Canonical works are about 30% of E, 20% of M and 4% of L.
+  - `data/work/canon.parquet` (`docs/canon_measure.md`): a **metadata-only** binary `canonical` per work, built from `downloads`, `sitelinks` and `canon_score` at the `author_group` level, with no labels. It is frozen at the registration commit.
+  - In the Confirmation primary set: **4,211 works (E 109, M 545, L 3,557)**, of which **36% / 18% / 9%** are canonical by era.
 - **Passages:** **12 random passages per work** (random backbone `rand_a`, k < 12). This replaces the unimplemented adaptive stopping (methods review P9). Early-era works may contribute up to 24 if those passages were labelled before the audit draw, and within-work Hájek weights handle this. Enrichment passages never enter a confirmatory estimate.
 - **Unit and SEs:** the work is the unit. SEs are author-clustered (CR1) on the new author keys.
 - **Model labels:** codebook v0.9 production (`v09lean_r2`, pinned). **There is no v1.0 relabel.** DSL is valid for any predictor; a better model buys efficiency, not validity (§7.6: model accuracy is a weak lever).
@@ -112,6 +112,7 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
 - **Strata and allocation.**
   - Strata are era (3) × genre (8) × canonical (2).
   - The budget is split equally over the 6 era × canonical cells, then proportional to N within each cell. Each cell gets at least 2 items and at most N_cell.
+  - The real draw (annotation agent, 2026-11-01) gives **41 non-empty cells** and about 1,820 unique items.
   - π = n_cell / N_cell is written for **every** pool passage in `audit_frame.parquet`.
   - Canon balancing is what makes TF estimable: canonical works are 4% of L. Without canon strata, TF's MDE nearly doubles (§7.7).
 - **Hash deposit.** The frame's `cell_table_hash` is deposited (OSF addendum) before anyone opens it. The counts are metadata, so they are harmless, but they are not published before registration.
@@ -120,9 +121,10 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
   - About 1,820 unique items, labelled by the student and about 3 peers, roughly 500 labels each: about 2,000 labels including 10% overlap.
   - Assignment is random and balanced: every peer gets a random sample of every cell.
   - Peers are **certified first**: κ ≥ 0.60 on a 20-item Discovery pre-test against the graduate student's key.
-- **Expert anchor (graduate student).**
-  - About 450 items: a **stratified 25% random subsample of the audit, drawn within audit cells**, so P(expert | audit) is known per cell.
-  - Every expert item is also peer-labelled (nested design). These items double as the overlap with peers for κ.
+- **Expert anchor (graduate student, about 8 h).**
+  - **About 900 items: a stratified 50% random subsample of the audit, drawn within audit cells,** so P(expert | audit) is known per cell.
+  - Every expert item is also peer-labelled (nested design). These items double as the overlap with peers for κ: about 225 shared items per peer.
+  - **REQUIRED ITEM, the blindness attestation.** Before labelling, the graduate student signs a short attestation, deposited with the OSF registration. It states that they have not seen the hypotheses, the pilot or Discovery results, the showcase, the reviews or this document; that they label from the codebook and guide only; and that they do not know the dates, authors or titles of the items. If the attestation is missing, or is breached, the TF verdict carries the flag "expert not blind", and the peers-only and expert-only estimates are reported beside it.
 - **Teacher.** About 8 items plus draft feedback. These are **descriptive only**: teacher–expert agreement is reported, and the teacher's labels never enter an estimate.
 - **Human schema:** `has_obstacle`, a single main domain, `locus`, and `failure_cause` (communication only).
 - **Teaching set:** about 60 Discovery items, labelled by the student only.
@@ -134,7 +136,7 @@ Primary-set Confirmation:
   - M about 530;
   - L about 3,400.
 - **Passages:** about 48k random passages.
-- **Audit:** about 1,820 items, of which about 450 are expert-labelled.
+- **Audit:** about 1,820 items, of which about 900 are expert-labelled.
 
 There is no optional stopping.
 
@@ -165,9 +167,9 @@ The estimator has three levels (`dsl.pseudo_outcomes_anchored`, `dsl.prepare_anc
 
 **Annotator rules:**
 1. **Certification.** Peers need κ ≥ 0.60 on locus against the expert key on 20 Discovery items before labelling audit items.
-2. **Exclusion.** A peer whose locus κ against the expert, on their jointly labelled audit items (about 110 each, SE ≈ 0.06), is **below 0.40** is excluded. Their rows are dropped and π_audit is recomputed per cell (`annotators.exclusions`).
+2. **Exclusion.** A peer whose locus κ against the expert, on their jointly labelled audit items (about 225 each, SE ≈ 0.04), is **below 0.40** is excluded. Their rows are dropped and π_audit is recomputed per cell (`annotators.exclusions`).
 3. **Reporting.** Overlap κ is reported overall and by era. Peer–expert κ is reported by era (about 150 expert items per era). The teacher–expert agreement on about 8 items is descriptive.
-4. **Sensitivity estimators.** Peers only (the v0.4 estimand, attenuated) and expert only (DSL with the about 450 expert labels).
+4. **Sensitivity estimators.** Peers only (the v0.4 estimand, attenuated) and expert only (DSL with the about 900 expert labels).
 
 ### 5.2 Models
 - **TF:** multinomial logit of the work-level DSL soft outcomes ~ canonical + ns(year) + origin + log length. Standardised over the standard population at each work's own year, with canonical set to 1 vs 0 (`models.two_fictions`).
@@ -181,8 +183,8 @@ The estimator has three levels (`dsl.pseudo_outcomes_anchored`, `dsl.prepare_anc
 - **The STEP-1880 and LINEAR-trend contrasts explored in §7.6 are not adopted** (forking paths, methods review P5).
 
 ### 5.3 Multiplicity
-- **Primary:** TF at α = 0.05 (or TF and H1 at 0.025 each, per the decision box).
-- **Secondary:** Holm at 0.05 over {H1, H1|canon, H1|non-canon}. If H1 is made co-primary, the secondary set is the two within-stratum contrasts.
+- **Primary:** TF at α = 0.05.
+- **Secondary:** Holm at 0.05 over {H1, H1|canon, H1|non-canon}.
 - **Descriptive and estimation analyses:** CIs only.
 - **Open discovery:** BH-corrected, at most 2 promotions.
 
@@ -224,7 +226,7 @@ The verdict carries the class, e.g. "supported: inward". Nulls are reported with
 
 ## 6. Inference criteria and validation gates
 - **Benchmark gate:** as before.
-- **Simulation gate:** expert-anchored DSL coverage of the expert-construct estimand. It was **0.92–1.00** (median 0.96–0.97) across the TF and H1 cells (§7.7).
+- **Simulation gate:** expert-anchored DSL coverage of the expert-construct estimand. It was **0.92–1.00** across the TF and H1 cells at both expert budgets (§7.7).
 - **Construct-validity gate (methods review P1d):** the peer-mean vs expert locus κ, and the model vs expert κ by era, are reported. If the peer-mean vs expert κ is below 0.6, peers act only as the variance-reducing phase, which the estimator tolerates. If the model vs expert κ is below 0.4 in any era, TF and H1 are still estimated, but the paper flags weak model information.
 
 ## 7. Power and validation
@@ -252,27 +254,33 @@ The verdict carries the class, e.g. "supported: inward". Nulls are reported with
 
 Power is P(Wald p < α). The Monte Carlo SE is about ±0.06 at 60 replicates and ±0.045 at 120.
 
-**Registered design: era × genre × canon strata, expert-anchored estimator, peers at κ ≈ 0.6, 450 expert labels**
+**Registered design (v0.5 final): era × genre × canon strata, expert-anchored estimator, peers at κ ≈ 0.6, about 900 expert labels (50% of the audit). 60 replicates per row; `power_v05.py --expert-extra`**
 
-| Statistic | Truth | Estimate (truth) | SE (pp) | MDE (pp), α = 0.05 / 0.025 | **Power, α = 0.05 / 0.025** | Coverage |
+| Statistic | Truth | Estimate (truth) | SE (pp) | MDE (pp), α = 0.05 | **Power, α = 0.05** | Coverage |
 |---|---|---|---|---|---|---|
-| **TF** material | tf_full | −9.9 (−9.6) | 4.4 | **12.3 / 13.5** | **0.59 / 0.47** | 0.97 |
-| TF | tf_half | −7.2 (−6.6) | 4.4 | 12.3 / 13.5 | 0.32 / 0.17 | 0.95 |
-| TF | tf_trend | −10.8 (−10.9) | 4.5 | — | 0.60 / 0.53 | 0.93 |
-| TF | null | −0.7 (0) | 4.6 | — | **0.05 / 0.03** (size) | 0.97 |
-| **H1** material (E vs L) | tf_trend | +5.2 (+4.4) | 7.3 | **20.6 / 22.6** | **0.10 / 0.05** | 0.95 |
-| H1 | tf_full | +2.2 (+2.2) | 7.0 | — | 0.05 / 0.02 | 0.94 |
-| H1 | null | 0.0 (0.2) | 6.8 | — | 0.03 / 0.03 (size) | 0.97 |
-| H1-ML (M vs L) | tf_trend | — | 6.0 | 16.8 / — | 0.07 | — |
-| Composition share of the E → L material change | tf_full | +2.3 of +3.0 pp (truth +2.3 of +2.5) | — | — | — | — |
+| **TF** material (**PRIMARY**) | tf_full | −9.4 (−9.6) | 3.2 | **9.0** | **0.70** | 0.98 |
+| TF | tf_half | −6.2 (−6.6) | 3.3 | 9.2 | 0.37 | 0.98 |
+| TF | tf_trend | −10.3 (−10.9) | 3.3 | 9.2 | 0.77 | 1.00 |
+| TF | null | −0.1 (0) | 3.5 | 9.8 | **0.05** (size) | 1.00 |
+| **H1** material (E vs L; secondary) | tf_trend | +3.7 (+4.4) | 5.3 | **14.7** | 0.10 | 0.98 |
+| H1 | null | −0.3 (0.2) | 5.3 | 14.7 | 0.07 (size, α = 0.05) | 1.00 |
+| H1\|non-canon | tf_trend | +1.3 (+2.4) | 6.1 | 17.0 | 0.08 | 0.98 |
+| H1-ML (M vs L; descriptive) | tf_trend | +2.9 (+2.8) | 4.2 | 11.7 | 0.07 | 1.00 |
+| Composition share of the E → L material change | tf_trend | +2.3 of +4.2 pp | — | — | — | — |
+
+The internal-share MDE for TF is 8.8 pp at α = 0.025, i.e. about 8 pp at α = 0.05.
+
+**Registered statement: TF has power ≈ 0.70 against a 10 pp canon gap in the material share (MDE ≈ 9 pp at α = 0.05), and about 0.37 against a 6–7 pp gap.**
+- The real Confirmation primary set has more late canonical works than simulated (9% vs 4%), so these figures are slightly conservative.
+- H1 (secondary) has an MDE of about 15 pp and is expected to be uninformative unless the true shift is large.
 
 **Levers on TF power** (tf_full truth, α = 0.05 / 0.025):
 
 | Change from the registered design | TF MDE (pp), α = 0.05 | TF power, α = 0.05 / 0.025 | Comment |
 |---|---|---|---|
-| Registered (450 expert, κ 0.6 peers, canon strata) | 12.3 | 0.59 / 0.47 | |
-| **Expert labels 450 → about 906** (grad student 4 h → about 8 h) | **9.0** | **0.70 / 0.60** | the strongest lever |
-| Expert labels 450 → about 226 | 17.9 | 0.32 / 0.25 | |
+| **Registered: about 906 expert labels (50%)** | **9.0** | **0.70 / 0.60** | the strongest lever, adopted |
+| About 450 expert labels (25%, the earlier plan) | 12.3 | 0.59 / 0.47 | |
+| About 226 expert labels (12.5%) | 17.9 | 0.32 / 0.25 | |
 | Peers κ 0.6 → 0.75 | 11.6 | 0.45 / 0.43 | within Monte Carlo error of the registered row; peers matter little once the expert anchors |
 | **No canon strata** (era × genre only) | 22.6 | 0.23 / 0.18 | canon balancing is essential for TF. It costs H1 some precision: H1's MDE is 15.2–16.2 pp without canon strata against 19.7–20.6 pp with them, but H1 is under-powered either way. |
 | Expert-only estimator (peers ignored) | 13.5 | 0.50 / 0.33 | peers add about 10–15 points of power through g₂ |
@@ -280,10 +288,10 @@ Power is P(Wald p < α). The Monte Carlo SE is about ±0.06 at 60 replicates and
 | H1 with about 906 expert labels | 14.8 (H1) | 0.02 (tf_full) | H1 stays far below useful power |
 
 **Conclusions for the registration:**
-1. **TF is the only confirmatory test this design can power.** It reaches 0.59 at α = 0.05 for a 10 pp canon gap, and 0.70 with about 900 expert labels. Its size is ≤ 0.05.
-2. **H1 is untestable** at about 95 early works and this audit: its MDE is about 20 pp in every configuration. Hence the recommendation that H1 be secondary (decision box, §1).
-3. **Buy expert hours.** If the graduate student can label about 900 items (about 8 h), TF's power rises from 0.59 to 0.70 and the MDE falls from 12 to 9 pp. No other lever available before Nov 20 comes close.
-4. **The draw must use canon strata.** Without them, TF's MDE doubles.
+1. **TF is the confirmatory test this design powers:** 0.70 at α = 0.05 for a 10 pp canon gap (MDE 9 pp), with size ≤ 0.05.
+2. **H1 is under-powered:** MDE about 15 pp with 900 expert labels and about 20 pp with 450. It is secondary, as decided in §1.
+3. **Expert hours were the decisive lever,** and the user adopted about 8 h (about 900 labels).
+4. **The draw uses canon strata.** Without them, TF's MDE doubles.
 
 ### 7.6 Levers explored before v0.5 (`levers.py`; pilot-like truth; 20 replicates per cell; for the record, none adopted unless stated)
 
@@ -478,8 +486,8 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
   14. **Codebook (v0.4).** v1.0 is planned to contain the three-part obstacle test, a narrower SOCIAL_RANK_CONVENTION, and locus = proximate source with a required `locus_reason` (§4.1). These are pending the QA A/B; whatever passes is frozen in v1.0 before the relabel and before registration.
   15. **v0.5, the seal fix.** The audit draw stratifies on metadata only (era × genre × canonical). The v0.4 predicted-label strata would have exposed the naive Confirmation answer before registration (methods review P4).
   16. **v0.5, two fictions.** TF is the lead hypothesis. It was discovered on Discovery labels (literary review P1) and registered before Confirmation is unsealed. The canonicity measure is metadata-only (`docs/canon_measure.md`).
-  17. **v0.5, family.** TF is primary. H1 is secondary under the recommendation in §1; the alternative is co-primaries at 0.025, and the decision box must be resolved before registration. H2a–c and H3 are demoted to estimation (methods review P11).
-  18. **v0.5, measurement.** The estimand is the expert (graduate-student) construct, estimated with the expert-anchored three-level DSL. Peers enter as an intermediate phase. The teacher's items are descriptive. Exclusion uses κ against the expert. This replaces the v0.3–v0.4 peer-mean estimand.
+  17. **v0.5, family (decided by the user).** TF is the single primary at α = 0.05. H1 is the first secondary, Holm-corrected with the within-stratum contrasts. H2a–c and H3 are demoted to estimation (methods review P11).
+  18. **v0.5, measurement.** The estimand is the expert (graduate-student, about 900 labels = a 50% within-cell subsample of the audit; blindness attestation required) construct, estimated with the expert-anchored three-level DSL. Peers enter as an intermediate phase. The teacher's items are descriptive. Exclusion uses κ against the expert. This replaces the v0.3–v0.4 peer-mean estimand.
   19. **v0.5, population.** `works_v2` with PG-agent author keys and the split repair; primary set `genre ≠ historical`; hand-verified early-era dates; unresolved or out-of-window works excluded; round-year placeholders excluded unless verified; 12 passages per work, with adaptive stopping deleted.
   20. **v0.5, classification.** The classification is symmetric, with Bonferroni-adjusted component CIs. The social patterns are named.
   21. **v0.5, replication.** Replication is optional: it never counts as a failed check.
@@ -514,4 +522,11 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
   - levers record (§7.6);
   - registered-design power (§7.7): TF power 0.59 at α = 0.05 (0.70 with 900 expert labels), and H1 MDE about 20 pp;
   - primaries decision box (§1).
+- v0.5 final (2026-11-01, user decisions):
+  - TF is the single primary at α = 0.05; H1 is the first secondary.
+  - Expert subsample 50%: about 900 grad-student labels, with a required blindness attestation.
+  - Canonical strata confirmed: 41 cells in the real draw.
+  - `works_v2` fields registered (`author_group`, `split_v2`, `primary_v2_capv2`, `historical_setting`), with real primary-set counts.
+  - `select_annotation.main` retired.
+  - Registered power: TF 0.70, MDE 9 pp.
 
