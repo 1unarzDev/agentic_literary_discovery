@@ -93,11 +93,14 @@ class CoordinatorClient:
         return r.json()
 
     last_retry_after: float | None = None
+    last_directive: dict[str, Any] | None = None
 
     def lease(self, tier: str, stages: list[str], max_jobs: int) -> list[dict[str, Any]]:
         body = {"tier": tier, "stages": stages, "max_jobs": max_jobs,
                 "client_version": self.client_version}
         resp = self._json("POST", "/v1/lease", body)
+        self.last_directive = resp.get("directive") or resp.get("scheduler") or (
+            {k: resp[k] for k in ("gpu", "until", "reason") if k in resp} if "gpu" in resp else None)
         ra = resp.get("retry_after")
         self.last_retry_after = float(ra) if isinstance(ra, (int, float)) and ra > 0 else None
         return resp.get("jobs", []) or []
@@ -140,8 +143,8 @@ class CoordinatorClient:
     def put_result(self, job_id: str, body: bytes, headers: dict[str, str], partial: bool = False) -> dict[str, Any]:
         params = {"partial": "1"} if partial else None
         h = {**self._auth(), "Content-Type": "application/gzip", **headers}
-        if partial and "X-Passage-Ids" not in h:
-            h["X-Passage-Ids"] = encode_passage_ids(body)
+        if partial and "X-Passage-Ids" not in h and "X-Sealed" not in h:
+            h["X-Passage-Ids"] = encode_passage_ids(body)  # (sealed bodies carry it precomputed)
         r = self._http.put(self._url(f"/v1/result/{job_id}"), content=body, headers=h, params=params)
         self._check(r)
         try:

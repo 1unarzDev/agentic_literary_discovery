@@ -217,6 +217,10 @@ class Worker:
         self.ram_available_fn = ram_available_fn
         self.activity = "starting"
         self.last_quality: dict[str, Any] | None = None
+        self.sealed_recipient: str | None = None
+        self.sealed_blocked: str | None = None
+        self.directive: dict[str, Any] | None = None
+        self.client_factory: Callable[[str], CoordinatorClient] = lambda url: CoordinatorClient(url, cfg.token)
         self.next_window: float | None = None
         self.keep_awake: Any = None  # KeepAwake (set by `ald work`)
         self.last_contact: float | None = None
@@ -424,12 +428,21 @@ class Worker:
 
     def _enqueue_result(self, job_id: str, lines: list[dict[str, Any]], meta: dict[str, Any], partial: bool) -> None:
         body = encode_jsonl_gz(lines)
+        seal: dict[str, str] = {}
+        if (meta.get("job") or {}).get("split") == "confirmation" and self.sealed_recipient:
+            # Sealed split on a client-side-sealing coordinator: only ciphertext leaves this machine.
+            from . import sealed
+            from .client import encode_passage_ids
+            plain = body
+            body = sealed.encrypt(plain, self.sealed_recipient)
+            seal = {**sealed.seal_headers(plain, body), "X-Passage-Ids": encode_passage_ids(plain)}
         headers = {
             "X-Content-Sha256": sha256_bytes(body),
             "X-Pin-Hash": meta["pin_hash"],
             "X-Model-Digest": meta["model_digest"],
             "X-Backend-Version": meta["backend_version"],
             "X-Stats": json.dumps(self._stats(lines, float(meta.get("wall_s", 0.0))), separators=(",", ":")),
+            **seal,
         }
         if not partial:
             # A final blob supersedes any not-yet-acked partial of the same job.
@@ -555,6 +568,7 @@ class Worker:
                     ram_ok = getattr(self, "_ram_ok_stages", None)
                     lease_stages = [x for x in self.stages if ram_ok is None or x in ram_ok] or self.stages
                     jobs = self.client.lease(self.tier, lease_stages, n)
+                    self._take_directive(getattr(self.client, "last_directive", None))
                     self._offline = False
                     self.last_contact = self.clock.time()
                 except UpgradeRequired as e:
@@ -671,6 +685,7 @@ class Worker:
         stats = self.report()
         try:
             resp = self.client.heartbeat(ids, stats)
+            self._take_directive((resp or {}).get("directive") or (resp or {}).get("scheduler"))
             self._offline = False
             self.last_contact = self.clock.time()
         except httpx.TransportError as e:
@@ -837,6 +852,8 @@ class Worker:
             self._last_pause_check = now
             if self.paused():
                 return "paused"
+            if (self.directive or {}).get("gpu") == "pause" and self.directive_hold():
+                return "scheduler_pause"
             # Hand the job back well before the host runs out of memory (other programs may be growing).
             if self.ram_low(factor=0.75):
                 self.log(f"[ram] {self._ram_avail_gb:.1f} GB available: interrupting {hj.job_id}; "
@@ -1140,8 +1157,7 @@ class Worker:
         return self._update_required or getattr(self, "_update_available", False)
 
     def check_for_update(self, force: bool = False) -> None:
-        if not self.auto_update:
-            return
+        """Poll /v1/ping (every PING_POLL_S): coordinator redirect, sealed recipient, client updates."""
         now = self.clock.monotonic()
         if not force and now - self._last_ping < PING_POLL_S:
             return
@@ -1151,6 +1167,11 @@ class Worker:
         except (CoordinatorError, httpx.TransportError):
             return
         self.last_contact = self.clock.time()
+        self._apply_sealed(ping.get("sealed_recipient"))
+        if ping.get("redirect") and self.follow_redirect(str(ping["redirect"])):
+            return  # re-polled against the new coordinator
+        if not self.auto_update:
+            return
         d = decide(ping)
         self._update_available = d.update_available
         if d.required:
@@ -1255,6 +1276,82 @@ class Worker:
             atomic_write_json(marker, {"schedule": self.schedule or ""})
         except Exception as e:  # noqa: BLE001
             self.log(f"[wake] could not set up wake-ups: {e}")
+
+    # ------------------------------------------------------------------
+    # Migration: coordinator redirect, sealed recipient, scheduler directive
+    # ------------------------------------------------------------------
+    def _apply_sealed(self, offered: str | None) -> None:
+        from . import sealed
+        try:
+            self.sealed_recipient = sealed.resolve_recipient(offered)
+            self.sealed_blocked = None
+        except sealed.SealedKeyMismatch as e:
+            self.sealed_recipient = None
+            if self.sealed_blocked != str(e):
+                self.log(f"[sealed] REFUSING to work for this coordinator: {e}")
+            self.sealed_blocked = str(e)
+
+    def follow_redirect(self, target: str) -> bool:
+        """The coordinator moved (docs/migration_plan.md section 2.1). Returns True if we switched."""
+        target = target.rstrip("/")
+        cur = (self.cfg.coordinator_url or "").rstrip("/")
+        if not target.startswith(("https://", "http://")) or target == cur:
+            return False
+        guard_p = self.root / "redirect_state.json"
+        guard = read_json(guard_p, {}) or {}
+        if guard.get("left") == target and self.clock.time() - float(guard.get("at", 0)) < 3600:
+            return False  # bounced straight back: ignore for an hour (redirect loop)
+        try:
+            probe = self.client_factory(target).ping()
+        except Exception as e:  # noqa: BLE001
+            self.log(f"[migrate] redirect to {target} not followed: target unreachable ({e})")
+            return False
+        if not probe.get("ok") or probe.get("project") not in (None, "ald"):
+            self.log(f"[migrate] redirect to {target} not followed: not an ALD coordinator ({probe})")
+            return False
+        # Finish business with the old coordinator first: uploads, then hand back prefetched jobs.
+        try:
+            self.flush_outbox(force=True)
+        except Exception:  # noqa: BLE001
+            pass
+        queued = [j.job_id for j in self._queue]
+        self._queue.clear()
+        for jid in queued:
+            self.store.remove_job(jid)
+        self._release(queued)
+        atomic_write_json(guard_p, {"left": cur, "to": target, "at": self.clock.time()})
+        self.cfg.coordinator_url = target
+        try:
+            self.cfg.save()
+        except OSError as e:
+            self.log(f"[migrate] could not save the new coordinator URL: {e}")
+        self.client = self.client_factory(target)
+        self._registry_etag = None
+        self._last_registry_poll = -1e18
+        self._last_ping = -1e18
+        self.log(f"[migrate] coordinator moved: {cur} -> {target}")
+        return True
+
+    def directive_hold(self) -> str | None:
+        """The platform scheduler's GPU directive ({"gpu": run|yield|pause, "until", "reason"}): a reason not
+        to lease, or None to work."""
+        d = self.directive or {}
+        mode = d.get("gpu")
+        if mode not in ("yield", "pause"):
+            return None
+        until = d.get("until")
+        if until:
+            end = parse_ts(until, 0.0)
+            if end and self.clock.time() >= end:
+                self.directive = None
+                return None
+        return f"scheduler: {mode}" + (f" until {until}" if until else "") + (f" ({d.get('reason')})" if d.get("reason") else "")
+
+    def _take_directive(self, d: Any) -> None:
+        if isinstance(d, dict) and d.get("gpu") in ("run", "yield", "pause"):
+            if d != self.directive:
+                self.log(f"[scheduler] gpu={d.get('gpu')} until={d.get('until')} reason={d.get('reason')}")
+            self.directive = None if d.get("gpu") == "run" else d
 
     def refresh_service_definition(self) -> None:
         """After an auto-update, bring the installed unit / plist / task up to the current definition."""
@@ -1475,6 +1572,19 @@ class Worker:
                     self._save_state()
                     if self.exit_when_idle or self.clock.sleep(10.0, self.stop):
                         break
+                    continue
+                hold = self.directive_hold() or (f"sealed key mismatch: {self.sealed_blocked}" if self.sealed_blocked else None)
+                if hold:
+                    if self.activity != "yielding":
+                        self.log(f"[scheduler] not leasing: {hold}")
+                    self.activity = "yielding"
+                    self._unload_stage_models("scheduler directive" if self.directive else "sealed key mismatch")
+                    self._release_gpu_lock()
+                    self._last_idle_hb = -1e18  # ask for a fresh directive
+                    self._save_state()
+                    if self.exit_when_idle or self.clock.sleep(30.0, self.stop):
+                        break
+                    self.check_for_update()
                     continue
                 why_ram = self.ram_blocked()
                 if why_ram:

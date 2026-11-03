@@ -15,6 +15,7 @@ dependencies = [
     "jsonschema>=4.21",
     "rapidfuzz>=3.6",
     "rich>=13.7",
+    "pyrage>=1.2",  # age encryption of sealed (confirmation) results
 ]
 
 [project.scripts]

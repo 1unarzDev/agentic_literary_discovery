@@ -204,6 +204,8 @@ class FakeCoordinator:
         self.releases: list[list[str]] = []
         self.heartbeats: list[dict[str, Any]] = []
         self.leases: list[dict[str, Any]] = []
+        self.lease_extra: dict[str, Any] = {}
+        self.sealed_bodies: dict[str, bytes] = {}
         self.revoked: set[str] = set()
         self.down: set[str] = set()  # paths (prefixes) that raise ConnectError
         self.ping_resp: dict[str, Any] = {"ok": True, "min_client_version": "0.0.1",
@@ -215,9 +217,11 @@ class FakeCoordinator:
     def set_registry(self, raw: dict[str, Any], etag: str) -> None:
         self.registry_raw, self.etag = raw, etag
 
-    def add_job(self, job_id: str, stage: str, pin_hash: str, passages: list[dict[str, Any]]) -> None:
+    def add_job(self, job_id: str, stage: str, pin_hash: str, passages: list[dict[str, Any]],
+                split: str | None = None) -> None:
         self.jobs[job_id] = {"job_id": job_id, "stage": stage, "pin_hash": pin_hash,
-                             "shard_url": f"/v1/shard/{job_id}", "n_passages": len(passages)}
+                             "shard_url": f"/v1/shard/{job_id}", "n_passages": len(passages),
+                             **({"split": split} if split else {})}
         self.shards[job_id] = encode_jsonl_gz(passages)
         self.state[job_id] = "queued"
         self.covered[job_id] = set()
@@ -257,7 +261,7 @@ class FakeCoordinator:
                     if self.covered[jid]:
                         jj["skip_passage_ids"] = sorted(self.covered[jid])
                     out.append(jj)
-            return httpx.Response(200, json={"jobs": out})
+            return httpx.Response(200, json={"jobs": out, **self.lease_extra})
         if p.startswith("/v1/shard/"):
             jid = p.rsplit("/", 1)[1]
             if self.state.get(jid) != "leased":
@@ -272,8 +276,13 @@ class FakeCoordinator:
             if req.headers.get("X-Pin-Hash") != self.jobs[jid]["pin_hash"]:
                 return httpx.Response(412, json={"error": "pin mismatch"})
             partial = req.url.params.get("partial") == "1"
-            lines = decode_jsonl_gz(body)
-            if partial:
+            if req.headers.get("X-Sealed"):  # ciphertext: the server never decrypts
+                self.sealed_bodies[jid] = body
+                lines = [{"passage_id": pid} for pid in json.loads(gzip.decompress(
+                    __import__("base64").b64decode(req.headers["X-Passage-Ids"])))] if "X-Passage-Ids" in req.headers else []
+            else:
+                lines = decode_jsonl_gz(body)
+            if partial and not req.headers.get("X-Sealed"):
                 import base64
                 ids = json.loads(gzip.decompress(base64.b64decode(req.headers["X-Passage-Ids"])))
                 assert ids == [l["passage_id"] for l in lines]
