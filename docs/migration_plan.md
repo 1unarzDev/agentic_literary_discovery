@@ -39,7 +39,10 @@ Worker tokens are migrated as their sha256 hashes, so existing volunteers keep w
    To roll back, the platform ping redirects back the same way. A loop guard ignores a redirect to the URL we just left within 1 h.
 2. **Scheduler directive.** Lease and heartbeat responses may carry `{"gpu": "run" | "yield" | "pause", "until": iso | null, "reason": "..."}`. The worker obeys:
    - `run`: normal operation.
-   - `yield` / `pause`: finish the current shard, or upload a partial if `until` is near, then unload the model, stop leasing, idle until `until` or a later `run`, and say so in `ald status`.
+   - `yield`: the worker uploads a partial if the current shard is less than 50% done, otherwise it finishes the shard. Then it unloads the model and stops leasing until `run`. A heartbeat `yield: [job ids]` naming a held job counts as `yield`.
+   - `pause` (also drains): the worker starts nothing new, but the current shard runs to the end (no interruption). Then it unloads and idles.
+   - Once `until` has passed, the directive counts as `run`.
+   - These semantics apply from ald 0.1.26 on (0.1.23-0.1.25 interrupted on pause and finished on yield).
 
    `--gpu-lock` and the RAM guard stay until the directive is live.
 3. **Sealed results are encrypted on the client.** For jobs with `split == "confirmation"`, the gzip JSONL result (full or partial) is encrypted with age (X25519, `pyrage`) to the project recipient before upload. Details:

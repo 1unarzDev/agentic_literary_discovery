@@ -90,28 +90,69 @@ def test_redirect_not_followed_if_target_is_not_ald(env, registry_raw):
     assert w.follow_redirect("http://other.test") is False and w.cfg.coordinator_url == "http://coord.test"
 
 
-def test_scheduler_pause_and_yield(env):
-    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 6))
+def _run_with_directive(env, directive, at_chat, n_passages):
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", n_passages))
     env.coord.add_job("job-2", "label", label_pin(env), make_passages("w2", 2))
+    holder = {}
 
     def on_chat(body, n):
-        if n == 2:  # mid-job, the platform scheduler pauses ald
-            w._take_directive({"gpu": "pause", "until": None, "reason": "crane render"})
+        if n == at_chat:
+            holder["w"]._take_directive(directive)
             env.clock.advance(10)
 
     env.ollama.on_chat = on_chat
     w = env.make_worker()
+    holder["w"] = w
     w.run()  # exit_when_idle: returns once holding
-    assert env.coord.state["job-1"] == "queued" and [p["partial"] for p in env.coord.puts] == [True]
-    assert env.coord.state["job-2"] == "queued"  # nothing new leased while paused
-    assert any("[scheduler] not leasing: scheduler: pause" in m for m in env.logs)
-    # run resumes
+    return w
+
+
+def test_yield_early_uploads_partial_and_stops(env):
+    w = _run_with_directive(env, {"gpu": "yield", "until": None, "reason": "crane"}, at_chat=2, n_passages=8)
+    assert env.coord.state["job-1"] == "queued" and [p["partial"] for p in env.coord.puts] == [True]  # < 50% done
+    assert env.coord.state["job-2"] == "queued" and any("[scheduler] not leasing: scheduler: yield" in m for m in env.logs)
+    assert env.registry.stages["label"].model_ref in env.ollama.unloads
+
+
+def test_yield_late_finishes_the_shard(env):
+    _run_with_directive(env, {"gpu": "yield", "until": None, "reason": "crane"}, at_chat=6, n_passages=8)
+    assert env.coord.state["job-1"] == "done" and env.coord.state["job-2"] == "queued"  # >= 50%: finish, then stop
+
+
+def test_pause_never_interrupts_the_shard(env):
+    _run_with_directive(env, {"gpu": "pause", "until": None, "reason": "drain"}, at_chat=2, n_passages=8)
+    assert env.coord.state["job-1"] == "done" and not any(p["partial"] for p in env.coord.puts)
+    assert env.coord.state["job-2"] == "queued"  # nothing new started
+
+
+def test_directive_until_and_run(env):
+    w = env.make_worker()
+    w._take_directive({"gpu": "pause", "until": "2099-01-01T00:00:00Z", "reason": "drain"})
+    assert w.directive_hold()
     w._take_directive({"gpu": "run"})
     assert w.directive is None and w.directive_hold() is None
-    # yield with an `until` in the past is over
-    w._take_directive({"gpu": "yield", "until": "2000-01-01T00:00:00Z"})
+    w._take_directive({"gpu": "yield", "until": "2000-01-01T00:00:00Z"})  # until passed -> run
     assert w.directive_hold() is None
 
+
+def test_heartbeat_yield_list(env):
+    env.coord.add_job("job-h", "label", label_pin(env), make_passages("w1", 2))
+    w = env.make_worker()
+    w.startup()
+    [hj] = w.lease_jobs()
+    orig = env.coord.handler
+
+    def handler(req):
+        r = orig(req)
+        if req.url.path == "/v1/heartbeat":
+            body = r.json()
+            body["yield"] = ["job-h"]
+            return httpx.Response(200, json=body)
+        return r
+
+    w.client = CoordinatorClient("http://coord.test", FakeCoordinator.TOKEN, transport=httpx.MockTransport(handler))
+    w.heartbeat_once()
+    assert (w.directive or {}).get("gpu") == "yield"
 
 def test_gpu_wait_file_yields_after_the_shard(env):
     env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 4))

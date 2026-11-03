@@ -694,6 +694,9 @@ class Worker:
         try:
             resp = self.client.heartbeat(ids, stats)
             self._take_directive((resp or {}).get("directive") or (resp or {}).get("scheduler"))
+            yielded = set((resp or {}).get("yield") or []) & set(ids)
+            if yielded and not self.directive:  # the platform asked these held jobs to yield
+                self._take_directive({"gpu": "yield", "until": None, "reason": f"yield requested for {sorted(yielded)}"})
             self._offline = False
             self.last_contact = self.clock.time()
         except httpx.TransportError as e:
@@ -860,8 +863,11 @@ class Worker:
             self._last_pause_check = now
             if self.paused():
                 return "paused"
-            if (self.directive or {}).get("gpu") == "pause" and self.directive_hold():
-                return "scheduler_pause"
+            # Platform directive semantics (SPEC §7.3): "yield" = hand the GPU back soon: upload a partial if
+            # the shard is less than half done, else finish it. "pause" (also drains) = start nothing new, but
+            # let the current shard finish. Either way the run loop then unloads and stops leasing.
+            if (self.directive or {}).get("gpu") == "yield" and self.directive_hold() and hj.progress < 0.5:
+                return "scheduler_yield"
             # Hand the job back well before the host runs out of memory (other programs may be growing).
             if self.ram_low(factor=0.75):
                 self.log(f"[ram] {self._ram_avail_gb:.1f} GB available: interrupting {hj.job_id}; "
