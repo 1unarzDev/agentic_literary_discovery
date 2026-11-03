@@ -83,7 +83,7 @@ Worker tokens are migrated as their sha256 hashes, so existing volunteers keep w
 
 ## 4. Data migration, with manifests
 
-Tool: `pipeline/migrate_export.py`, run from this repo with wrangler auth and the admin token.
+Tools (built): `pipeline/export_for_platform.py` (export + manifests), `pipeline/seal_keygen.py` (key ceremony), `pipeline/unseal.py` (one-command unseal). Staging target (platform decision): `creation:/home/conception/research-import/ald/<stamp>/`, then `research-server import ald <dir>`.
 
 | data | how | verification |
 |---|---|---|
@@ -91,6 +91,13 @@ Tool: `pipeline/migrate_export.py`, run from this repo with wrangler auth and th
 | R2 `shards/`, `results/` (discovery), `registry/`, `dist/`, `install/` | `wrangler r2 object get` → platform storage | sha256 of every object = D1 `content_sha256` where recorded; `manifest_r2.jsonl` lists key, size and sha256 |
 | R2 `sealed/` (confirmation results + partials) | **streamed**: `wrangler r2 object get --pipe` → in-memory age encryption to the project recipient → ciphertext uploaded; plaintext never written to disk (this box or the platform) | plaintext sha256 = D1 `content_sha256`, computed while streaming; the ciphertext sha256 is recorded too; `manifest_sealed.jsonl` holds key, plain_sha256, cipher_sha256, size |
 | annotation tables | stay on Cloudflare | n/a |
+
+**Rule: real sealed data is encrypted only to the owner's key.**
+- `export_for_platform.py` refuses to encrypt real `sealed/` blobs to anything but `ald.sealed.PINNED_RECIPIENT`, the owner's key, pinned at the key ceremony.
+- Dry runs use `--synthetic-sealed`: synthetic stand-ins under the same keys, marked `synthetic`.
+- `unseal.py --dry-run` refuses any export that is not synthetic, and refuses to write under `data/`.
+
+These guards exist because a first local test on 2026-11-02 exported 5 real sealed blobs to a throwaway key and decrypted them into `data/work/results_sealed_unsealed/`. The plaintext was deleted unread within minutes. It was never uploaded or committed, and only job and worker ids were seen. The incident is recorded for the preregistration's deviations log.
 
 The R2 originals stay **untouched and readable only by the admin token** until the owner confirms the import. Then: R2 bucket read-only, D1 kept 30 days as a fallback, then retired.
 
