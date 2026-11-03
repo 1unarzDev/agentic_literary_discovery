@@ -307,3 +307,14 @@ def test_hysteresis_after_low_memory_interrupt(env):
     assert "waiting for" in w.ram_blocked()
     env.ram_avail = (2.5 + need + 0.5) * GB
     assert w.ram_blocked() is None and w._ram_backoff_until is None
+
+
+def test_unlearned_footprint_allows_one_probe_load(env):
+    """innovation (Linux, mmap): the default 0.8 x size guess would block forever; with nothing learned yet,
+    a load above the reserve is allowed and measured."""
+    from ald.scheduler import GB
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 2))
+    env.ram_avail = 10 * GB  # >= 8 GB reserve, but 10 - 0.8 x size could be < 8
+    w = env.make_worker()
+    w.run()
+    assert env.coord.state == {"job-1": "done"}

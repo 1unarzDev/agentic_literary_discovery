@@ -795,19 +795,24 @@ class Worker:
             return f"only {avail:.1f} GB of system RAM available (< {reserve:g} GB reserve)"
         loaded = self._loaded_models()
         need = 0.0
+        learned_all = True
+        fp = self._footprints()
         for name in self.stages:
             st = self.registry.stages.get(name) if self._registry else None
             if st is not None and not any(self.backend.same_model(m, st.model_ref) for m in loaded):
                 need = max(need, self.model_ram_gb(st))
+                learned_all = learned_all and st.model_ref in fp
         now = self.clock.monotonic()
         if now < getattr(self, "_ram_backoff_until", -1e18):
             return f"backing off after a low-memory interrupt ({(self._ram_backoff_until - now) / 60:.0f} min left)"
         if getattr(self, "_ram_backoff_until", None) is not None and avail < reserve + max(need, 0.5):
             return (f"{avail:.1f} GB available; after a low-memory interrupt waiting for "
                     f"{reserve + max(need, 0.5):.1f} GB (reserve + model)")
-        if avail - need < reserve:
+        if avail - need < reserve and learned_all:
             return (f"loading the model would leave {avail - need:.1f} GB of system RAM "
                     f"(< {reserve:g} GB reserve; model needs ~{need:.1f} GB)")
+        # Footprint not yet measured on this machine: one probe load is allowed while above the reserve
+        # (the mid-job guard and the backoff protect it); the measured value is used from then on.
         if getattr(self, "_ram_backoff_until", None) is not None:
             self._ram_backoff_until = None  # recovered
         return None
