@@ -266,8 +266,8 @@ def test_no_lease_when_model_load_would_breach_reserve(env):
     w = env.make_worker()
     w.cfg.min_free_ram_gb = 2.5
     w.run()
-    assert env.coord.state == {"job-1": "queued"}
-    assert any("loading the model would leave 1.5 GB" in m for m in env.logs)
+    assert env.coord.state == {"job-1": "queued"}  # label's learned 6.5 GB does not fit; only other stages leased
+    assert env.coord.leases and all("label" not in l["stages"] for l in env.coord.leases)
 
 
 def test_footprint_learned_from_first_load(env):

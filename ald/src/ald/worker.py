@@ -552,7 +552,9 @@ class Worker:
             # retry gets past them instead of being handed the same job again.
             for _attempt in range(3):
                 try:
-                    jobs = self.client.lease(self.tier, self.stages, n)
+                    ram_ok = getattr(self, "_ram_ok_stages", None)
+                    lease_stages = [x for x in self.stages if ram_ok is None or x in ram_ok] or self.stages
+                    jobs = self.client.lease(self.tier, lease_stages, n)
                     self._offline = False
                     self.last_contact = self.clock.time()
                 except UpgradeRequired as e:
@@ -794,27 +796,34 @@ class Worker:
         if avail < reserve:
             return f"only {avail:.1f} GB of system RAM available (< {reserve:g} GB reserve)"
         loaded = self._loaded_models()
-        need = 0.0
-        learned_all = True
+        now = self.clock.monotonic()
         fp = self._footprints()
+        ok: list[str] = []
+        worst = 0.0
         for name in self.stages:
             st = self.registry.stages.get(name) if self._registry else None
-            if st is not None and not any(self.backend.same_model(m, st.model_ref) for m in loaded):
-                need = max(need, self.model_ram_gb(st))
-                learned_all = learned_all and st.model_ref in fp
-        now = self.clock.monotonic()
+            if st is None:
+                continue
+            if any(self.backend.same_model(m, st.model_ref) for m in loaded):
+                ok.append(name)  # already resident: no further RAM to find
+                continue
+            need = self.model_ram_gb(st)
+            worst = max(worst, need)
+            # Learned: the load must leave the reserve. Unlearned: one measured probe load while above it.
+            if st.model_ref not in fp or avail - need >= reserve:
+                ok.append(name)
         if now < getattr(self, "_ram_backoff_until", -1e18):
             return f"backing off after a low-memory interrupt ({(self._ram_backoff_until - now) / 60:.0f} min left)"
-        if getattr(self, "_ram_backoff_until", None) is not None and avail < reserve + max(need, 0.5):
-            return (f"{avail:.1f} GB available; after a low-memory interrupt waiting for "
-                    f"{reserve + max(need, 0.5):.1f} GB (reserve + model)")
-        if avail - need < reserve and learned_all:
-            return (f"loading the model would leave {avail - need:.1f} GB of system RAM "
-                    f"(< {reserve:g} GB reserve; model needs ~{need:.1f} GB)")
-        # Footprint not yet measured on this machine: one probe load is allowed while above the reserve
-        # (the mid-job guard and the backoff protect it); the measured value is used from then on.
         if getattr(self, "_ram_backoff_until", None) is not None:
+            if avail < reserve + max(worst, 0.5):
+                return (f"{avail:.1f} GB available; after a low-memory interrupt waiting for "
+                        f"{reserve + max(worst, 0.5):.1f} GB (reserve + model)")
             self._ram_backoff_until = None  # recovered
+        if self.stages and not ok:
+            return (f"loading any model would leave less than the {reserve:g} GB reserve "
+                    f"({avail:.1f} GB available; smallest model needs ~"
+                    f"{min(self.model_ram_gb(self.registry.stages[s]) for s in self.stages):.1f} GB)")
+        self._ram_ok_stages = ok if len(ok) < len(self.stages) else None
         return None
 
     def paused(self) -> bool:
