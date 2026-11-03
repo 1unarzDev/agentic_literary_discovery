@@ -176,8 +176,12 @@ def main() -> None:
     seal_rows = [r for r in res if r["key"].startswith("sealed/")]
     extra = [o["key"] for p in ("registry/", "dist/", "install/") for o in r2.list(p)]
     plain += [(k, None) for k in extra]
-    if a.limit:
-        plain, seal_rows = plain[: a.limit], seal_rows[: a.limit]
+    if a.limit:  # per category (prefix), so a small fixture still has every kind of object
+        by: dict[str, list] = {}
+        for k, d in plain:
+            by.setdefault(k.split("/", 1)[0], []).append((k, d))
+        plain = [x for v in by.values() for x in v[: a.limit]]
+        seal_rows = seal_rows[: a.limit]
 
     # ---- plain objects
     mp = out / "manifest_r2.jsonl"
