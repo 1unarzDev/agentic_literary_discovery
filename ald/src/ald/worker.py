@@ -59,6 +59,7 @@ GPU_YIELD_CONTENDED_S = 30.0   # ... when the lock was contended in the last GPU
 GPU_YIELD_UNKNOWN_S = 20.0     # ... where waiters cannot be detected (macOS)
 GPU_CONTENDED_WINDOW_S = 900.0
 DESKTOP_VRAM_BASELINE_GB = 1.5  # VRAM other programs may hold without lowering ald's plan
+WAIT_FILE_MAX_AGE_S = 600.0  # <data>/gpu.wait older than this is stale
 RAM_BACKOFF_S = 600.0  # after a low-memory interrupt: no new lease for 10 min (then reserve + model needed)
 IDLE_HEARTBEAT_S = 300.0  # self-report while holding nothing (fleet view); cheap on D1 writes
 STATE_SAVE_S = 15.0
@@ -1332,6 +1333,25 @@ class Worker:
         self.log(f"[migrate] coordinator moved: {cur} -> {target}")
         return True
 
+    def wait_file(self) -> Path:
+        """Yield signal for other programs on every OS (Windows has no flock): while <data>/gpu.wait exists
+        and was touched within the last 10 min, ald finishes its shard, unloads and does not lease."""
+        return self.root / "gpu.wait"
+
+    def wait_file_hold(self) -> str | None:
+        p = self.wait_file()
+        try:
+            age = self.clock.time() - p.stat().st_mtime
+        except OSError:
+            return None
+        if age > WAIT_FILE_MAX_AGE_S:
+            return None  # stale (its owner crashed): ignore
+        try:
+            who = p.read_text(encoding="utf-8", errors="replace").strip()[:80]
+        except OSError:
+            who = ""
+        return f"{p} present" + (f" ({who})" if who else "")
+
     def directive_hold(self) -> str | None:
         """The platform scheduler's GPU directive ({"gpu": run|yield|pause, "until", "reason"}): a reason not
         to lease, or None to work."""
@@ -1573,7 +1593,8 @@ class Worker:
                     if self.exit_when_idle or self.clock.sleep(10.0, self.stop):
                         break
                     continue
-                hold = self.directive_hold() or (f"sealed key mismatch: {self.sealed_blocked}" if self.sealed_blocked else None)
+                hold = (self.directive_hold() or self.wait_file_hold()
+                        or (f"sealed key mismatch: {self.sealed_blocked}" if self.sealed_blocked else None))
                 if hold:
                     if self.activity != "yielding":
                         self.log(f"[scheduler] not leasing: {hold}")

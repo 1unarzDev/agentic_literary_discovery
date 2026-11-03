@@ -111,3 +111,24 @@ def test_scheduler_pause_and_yield(env):
     # yield with an `until` in the past is over
     w._take_directive({"gpu": "yield", "until": "2000-01-01T00:00:00Z"})
     assert w.directive_hold() is None
+
+
+def test_gpu_wait_file_yields_after_the_shard(env):
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 4))
+    env.coord.add_job("job-2", "label", label_pin(env), make_passages("w2", 2))
+
+    def on_chat(body, n):
+        if n == 2:  # another project (e.g. crane on COLLIN) asks for the GPU mid-shard
+            w.wait_file().write_text("crane render")
+            import os
+            os.utime(w.wait_file(), (env.clock.time(), env.clock.time()))
+
+    env.ollama.on_chat = on_chat
+    w = env.make_worker()
+    w.run()
+    assert env.coord.state == {"job-1": "done", "job-2": "queued"}  # shard finished, nothing new leased
+    assert any("gpu.wait present (crane render)" in m for m in env.logs)
+    import os
+    old = env.clock.time() - 3600
+    os.utime(w.wait_file(), (old, old))
+    assert w.wait_file_hold() is None  # stale: ignored
