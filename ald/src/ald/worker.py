@@ -419,6 +419,12 @@ class Worker:
                 "n_retried": sum(1 for l in lines if "retried" in (l.get("flags") or [])),
                 **({"schema_error_sample": sample} if sample else {})}
 
+    @staticmethod
+    def _blind_stats(lines: list[dict[str, Any]], wall_s: float) -> dict[str, Any]:
+        """SEALED split: counts and timing only. Flag / schema / quote / retry rates and generated tokens track
+        the outcome (no-obstacle rows carry no quote and are short), so they never leave the machine."""
+        return {"n_lines": len(lines), "wall_s": round(wall_s, 2)}
+
     def _stats(self, lines: list[dict[str, Any]], wall_s: float) -> dict[str, Any]:
         gen = sum(int(l.get("gen_tokens", 0) or 0) for l in lines)
         prompt = sum(int(l.get("prompt_tokens", 0) or 0) for l in lines)
@@ -442,7 +448,8 @@ class Worker:
             "X-Pin-Hash": meta["pin_hash"],
             "X-Model-Digest": meta["model_digest"],
             "X-Backend-Version": meta["backend_version"],
-            "X-Stats": json.dumps(self._stats(lines, float(meta.get("wall_s", 0.0))), separators=(",", ":")),
+            "X-Stats": json.dumps((self._blind_stats if (meta.get("job") or {}).get("split") == "confirmation"
+                                   else self._stats)(lines, float(meta.get("wall_s", 0.0))), separators=(",", ":")),
             **seal,
         }
         if not partial:
@@ -1085,7 +1092,8 @@ class Worker:
                     tuner.observe(lat, int(line.get("gen_tokens", 0) or 0))
                     if not hasattr(self, "_tok_window"):
                         self._tok_window = deque()
-                    self._tok_window.append((self.clock.monotonic(), int(line.get("gen_tokens", 0) or 0)))
+                    if hj.job.get("split") != "confirmation":  # gen tokens per passage would reveal output length
+                        self._tok_window.append((self.clock.monotonic(), int(line.get("gen_tokens", 0) or 0)))
                 hj.progress = len(done) / max(1, n_total)
                 elapsed = self.clock.monotonic() - t_start
                 rate = (ran / elapsed) if ran >= 5 and elapsed > 0 else self.rates.rate(hj.stage)
@@ -1105,7 +1113,7 @@ class Worker:
         if wall > 0 and ran > 0:
             self.rates.update(hj.stage, ran, wall)
         lines = [done[p] for p in order if p in done and p not in skip]
-        if lines:
+        if lines and hj.job.get("split") != "confirmation":  # quality of the sealed split is never reported
             q = self.quality(lines)
             n = len(lines)
             self.last_quality = {"stage": hj.stage, "schema_fail_rate": round(q["n_schema_invalid"] / n, 4),

@@ -233,11 +233,20 @@ workerRoutes.post("/v1/heartbeat", async (c) => {
   });
 });
 
+const BLIND_STAT_KEYS = ["n_lines", "wall_s"] as const;
+export function blindStats(stats: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of BLIND_STAT_KEYS) if (typeof stats[k] === "number") out[k] = stats[k];
+  if (out.n_lines === undefined && typeof stats.n_ok === "number" && typeof stats.n_flagged === "number")
+    out.n_lines = (stats.n_ok as number) + (stats.n_flagged as number);
+  return out;
+}
+
 // Worker self-report shown in the fleet view. Only these keys, only scalars, short strings.
 const STAT_KEYS = [
   "tok_s", "passages_done", "state", "stage", "job_id", "progress", "concurrency", "passages_per_hour",
   "keep_awake", "battery_percent", "power_plugged", "gpu_fraction", "gpu", "client_version", "service", "gpu_lock",
-  "quality_stage", "schema_fail_rate", "evidence_fail_rate", "next_window", "may_sleep",
+  "quality_stage", "schema_fail_rate", "evidence_fail_rate", "next_window", "may_sleep", // quality: discovery only (client)
 ] as const;
 
 export function sanitizeWorkerStats(stats: Record<string, unknown>): string | null {
@@ -371,7 +380,9 @@ workerRoutes.put("/v1/result/:job_id", async (c) => {
       throw new HttpError(400, "X-Stats must be a JSON object");
     }
   }
-  const statsJson = JSON.stringify(stats);
+  // SEALED split: keep only label-blind fields (counts and timing). Quality metrics (flagged / schema / quote /
+  // retries / gen tokens) track the outcome (no-obstacle rows carry no quote), so they must not be stored.
+  const statsJson = JSON.stringify(job.split === "confirmation" ? blindStats(stats) : stats);
   const prefix = job.split === "confirmation" ? "sealed/" : "";
   const now = nowIso();
 
@@ -440,8 +451,11 @@ workerRoutes.put("/v1/result/:job_id", async (c) => {
   const late = other ? 1 : 0;
   const nOk = stats.n_ok;
   const nFlag = stats.n_flagged;
+  const nLines = stats.n_lines;
   const nPassages =
-    typeof nOk === "number" && typeof nFlag === "number" && Number.isFinite(nOk + nFlag) ? Math.trunc(nOk + nFlag) : job.n_passages;
+    typeof nLines === "number" && Number.isFinite(nLines)
+      ? Math.trunc(nLines)
+      : typeof nOk === "number" && typeof nFlag === "number" && Number.isFinite(nOk + nFlag) ? Math.trunc(nOk + nFlag) : job.n_passages;
   const [ins] = await c.env.DB.batch([
     c.env.DB.prepare(
       `INSERT INTO results(job_id, worker_id, r2_key, content_sha256, pin_hash, model_digest, backend_version,

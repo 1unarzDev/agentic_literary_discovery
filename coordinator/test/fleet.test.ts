@@ -76,3 +76,31 @@ describe("trigger-maintained counters", () => {
     expect(hourly?.r).toBe(1);
   });
 });
+
+describe("sealed split never exposes quality", () => {
+  it("confirmation results store only counts/timing; fleet quality is discovery-only", async () => {
+    const { env } = await import("cloudflare:test");
+    const { addJobs, lease, makeWorker, upload, resultBlob, resetQueue } = await import("./helpers");
+    await resetQueue();
+    await env.DB.prepare("DELETE FROM hourly").run();
+    const pin = await makePin();
+    await addJobs([{ job_id: "conf-q", pin_hash: pin.pin_hash, split: "confirmation" }]);
+    const w = await makeWorker("sealed-w");
+    const l = await lease(w.token, ["label"], 1);
+    expect(l.body.jobs[0].job_id).toBe("conf-q");
+    const blob = await resultBlob(["p1", "p2", "p3"]);
+    const leaky = { n_ok: 1, n_flagged: 2, n_schema_invalid: 1, n_evidence_unverified: 1, n_retried: 2, gen_tokens: 99,
+                    schema_error_sample: "x", tok_s: 5, wall_s: 10, prompt_tokens: 1 };
+    const up = await upload(w.token, "conf-q", pin, blob, { headers: { "x-stats": JSON.stringify(leaky) } });
+    expect(up.status).toBe(200);
+    const row = await env.DB.prepare("SELECT stats_json, n_passages FROM results WHERE job_id = 'conf-q'").first<{ stats_json: string; n_passages: number }>();
+    expect(JSON.parse(row!.stats_json)).toEqual({ n_lines: 3, wall_s: 10 });
+    expect(row!.n_passages).toBe(3);
+    const h = await env.DB.prepare("SELECT SUM(n_ok) a, SUM(n_flagged) b, SUM(n_schema_invalid) c, SUM(n_evidence_unverified) d, SUM(passages) p FROM hourly").first<Record<string, number>>();
+    expect(h).toEqual({ a: 0, b: 0, c: 0, d: 0, p: 3 }); // throughput counted, quality not
+    const f = await admin("GET", "/v1/fleet");
+    for (const q of f.body.quality_24h) expect(q.n_flagged ?? 0).toBe(0);
+    const s = await admin("GET", "/v1/status");
+    expect(JSON.stringify(s.body)).not.toContain("schema_error_sample");
+  });
+});

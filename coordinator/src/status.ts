@@ -125,7 +125,9 @@ async function computeFleetStatus(env: AppEnv["Bindings"], withIds: boolean, now
     for (const k of ["n_ok", "n_flagged", "n_schema_invalid", "n_evidence_unverified", "results"] as const) e[k] = (e[k] as number) + (r[k] ?? 0);
     qm.set(r.stage, e);
   }
-  const quality = { results: [...qm.values()] };
+  // hourly holds quality counts for the DISCOVERY split only (migration 0007): confirmation is sealed and its
+  // flag/quote rates would reveal outcome prevalence. Results counts per stage include both splits.
+  const quality = { results: [...qm.values()].map((q) => ({ ...q, split: "discovery" })) };
 
   const tp = new Map((perWorker.results as { k: string; n_1h: number; n_24h: number }[]).map((r) => [r.k, r]));
   const queueOut: Record<string, Record<string, number>> = {};

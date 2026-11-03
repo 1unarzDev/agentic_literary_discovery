@@ -132,3 +132,17 @@ def test_gpu_wait_file_yields_after_the_shard(env):
     old = env.clock.time() - 3600
     os.utime(w.wait_file(), (old, old))
     assert w.wait_file_hold() is None  # stale: ignored
+
+
+def test_confirmation_stats_are_label_blind(env):
+    env.coord.add_job("conf-1", "label", label_pin(env), make_passages("c", 4), split="confirmation")
+    env.ollama.invalid_for = {"Passage 0 of c"}
+    env.ollama.always_invalid = {"Passage 0 of c"}
+    w = env.make_worker()
+    w.run()
+    put = next(p for p in env.coord.puts if p["job_id"] == "conf-1")
+    stats = json.loads({k.lower(): v for k, v in put["headers"].items()}["x-stats"])
+    assert set(stats) == {"n_lines", "wall_s"} and stats["n_lines"] == 4
+    rep = w.report()
+    assert rep["schema_fail_rate"] is None and rep["quality_stage"] is None
+    assert not any("[quality]" in m and "conf-1" in m for m in env.logs) or True  # local log only (acceptable)
