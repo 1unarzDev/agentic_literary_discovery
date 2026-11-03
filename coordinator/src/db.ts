@@ -91,30 +91,67 @@ export interface LeasedRow {
  * then random, and marks them leased. The `jobs_lease_log` trigger records the
  * lease history row inside the same statement.
  */
+// The UPDATE only touches the chosen job ids (primary key) and re-checks status, so concurrent leases never
+// double-assign; a lost race just returns fewer rows and the caller picks again.
 const LEASE_SQL = `
 UPDATE jobs
    SET status = 'leased', lease_worker = ?1, lease_expires = ?2, leased_at_ms = ?3,
        attempt = attempt + 1
- WHERE status = 'queued' AND job_id IN (
-   SELECT job_id FROM (
-     SELECT j.job_id, j.priority,
-            ROW_NUMBER() OVER (PARTITION BY COALESCE(j.dup_group, 'job:' || j.job_id)
-                               ORDER BY j.priority, random()) AS rn
-       FROM jobs j
-       JOIN pins p ON p.pin_hash = j.pin_hash AND p.active = 1
-      WHERE j.status = 'queued'
-        AND j.stage IN (SELECT value FROM json_each(?4))
-        AND (j.dup_group IS NULL OR NOT EXISTS (
-              SELECT 1 FROM jobs s
-               WHERE s.dup_group = j.dup_group AND s.job_id <> j.job_id
-                 AND (   (s.status = 'leased' AND s.lease_worker = ?1)
-                      OR EXISTS (SELECT 1 FROM leases l  WHERE l.job_id = s.job_id AND l.worker_id = ?1)
-                      OR EXISTS (SELECT 1 FROM results r WHERE r.job_id = s.job_id AND r.worker_id = ?1))))
-   ) WHERE rn = 1
-   ORDER BY priority, random()
-   LIMIT ?5
- )
+ WHERE status = 'queued' AND job_id IN (SELECT value FROM json_each(?4))
 RETURNING job_id, stage, pin_hash, n_passages, lease_expires, attempt`;
+
+const CANDIDATES_PER_PIN = 32;
+
+/**
+ * Lease candidates with bounded reads (D1 bills rows read): one index range scan per (stage, active pin) on
+ * jobs_lease2_idx(status, stage, pin_hash, priority) with LIMIT, instead of a window function over every queued
+ * job (~10k rows per lease). Lowest priority first, random within a priority, at most one job per dup_group,
+ * and no job whose dup_group sibling this worker holds, held or completed.
+ */
+async function pickCandidates(env: Env, workerId: string, stages: string[], want: number): Promise<string[]> {
+  const { results: pins } = await env.DB.prepare(
+    "SELECT pin_hash, stage FROM pins WHERE active = 1 AND stage IN (SELECT value FROM json_each(?1))",
+  )
+    .bind(JSON.stringify(stages))
+    .all<{ pin_hash: string; stage: string }>();
+  if (pins.length === 0) return [];
+  const res = await env.DB.batch(
+    pins.map((p) =>
+      env.DB.prepare(
+        `SELECT job_id, priority, dup_group FROM jobs INDEXED BY jobs_lease2_idx
+          WHERE status = 'queued' AND stage = ?1 AND pin_hash = ?2 ORDER BY priority LIMIT ?3`,
+      ).bind(p.stage, p.pin_hash, CANDIDATES_PER_PIN),
+    ),
+  );
+  type Cand = { job_id: string; priority: number; dup_group: string | null };
+  let cands = res.flatMap((r) => r.results as Cand[]);
+  const groups = [...new Set(cands.map((c) => c.dup_group).filter((g): g is string => !!g))];
+  if (groups.length) {
+    const { results: held } = await env.DB.prepare(
+      `SELECT s.dup_group AS g, s.job_id AS id FROM jobs s
+        WHERE s.dup_group IN (SELECT value FROM json_each(?1))
+          AND (   (s.status = 'leased' AND s.lease_worker = ?2)
+               OR EXISTS (SELECT 1 FROM leases l  WHERE l.job_id = s.job_id AND l.worker_id = ?2)
+               OR EXISTS (SELECT 1 FROM results r WHERE r.job_id = s.job_id AND r.worker_id = ?2))`,
+    )
+      .bind(JSON.stringify(groups), workerId)
+      .all<{ g: string; id: string }>();
+    cands = cands.filter((c) => !c.dup_group || !held.some((h) => h.g === c.dup_group && h.id !== c.job_id));
+  }
+  // Random order within each priority level, lowest priority value first.
+  const shuffled = cands.map((c) => ({ c, r: Math.random() })).sort((a, b) => a.c.priority - b.c.priority || a.r - b.r);
+  const out: string[] = [];
+  const usedGroups = new Set<string>();
+  for (const { c } of shuffled) {
+    if (out.length >= want) break;
+    if (c.dup_group) {
+      if (usedGroups.has(c.dup_group)) continue;
+      usedGroups.add(c.dup_group);
+    }
+    out.push(c.job_id);
+  }
+  return out;
+}
 
 /** Union of passage ids covered by partial uploads, per job. */
 export async function partialCoverage(env: Env, jobIds: string[]): Promise<Map<string, string[]>> {
@@ -150,11 +187,13 @@ export async function leaseJobs(
   const expires = nowMs + leaseTtlMs(env);
   // A few rounds: jobs fully covered by partial uploads are marked done
   // instead of being handed out, and the slot is refilled.
-  for (let round = 0; round < 3 && out.length < maxJobs; round++) {
+  for (let round = 0; round < 8 && out.length < maxJobs; round++) {
+    const pick = await pickCandidates(env, workerId, stages, maxJobs - out.length);
+    if (pick.length === 0) break;
     const { results } = await env.DB.prepare(LEASE_SQL)
-      .bind(workerId, expires, nowMs, JSON.stringify(stages), maxJobs - out.length)
+      .bind(workerId, expires, nowMs, JSON.stringify(pick))
       .all<LeasedRow>();
-    if (results.length === 0) break;
+    if (results.length === 0) continue; // lost every race this round: pick again from fresh candidates
     const cov = await partialCoverage(env, results.map((r) => r.job_id));
     const complete: string[] = [];
     for (const r of results) {

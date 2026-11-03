@@ -42,21 +42,10 @@ workerRoutes.get("/v1/ping", async (c) => {
     latest_client_version: cfg[CFG.latestClientVersion] ?? null,
     wheel_url: wheelUrl(new URL(c.req.url).origin, cfg[CFG.wheelFile]),
     registry_version: parseInt(cfg[CFG.registryVersion] ?? "0", 10),
-    queue: await queueSummary(c.env),
+    // No queue summary here: it was a GROUP BY over every job on every client ping (D1 rows read).
+    // Fleet totals: /v1/fleet (viewer token), served from trigger-maintained counters.
   });
 });
-
-// Worker-visible queue summary (no per-worker detail): remaining passages per stage, used for client ETA.
-async function queueSummary(env: { DB: D1Database }) {
-  const rs = await env.DB.prepare(
-    "SELECT stage, status, COUNT(*) AS n, COALESCE(SUM(n_passages),0) AS p FROM jobs GROUP BY stage, status",
-  ).all<{ stage: string; status: string; n: number; p: number }>();
-  const out: Record<string, Record<string, { jobs: number; passages: number }>> = {};
-  for (const r of rs.results ?? []) {
-    (out[r.stage] ??= {})[r.status] = { jobs: r.n, passages: r.p };
-  }
-  return out;
-}
 
 workerRoutes.get("/v1/registry", async (c) => {
   const cfg = await getConfig(c.env);
@@ -191,6 +180,8 @@ workerRoutes.post("/v1/lease", async (c) => {
     .run();
   const origin = new URL(c.req.url).origin;
   return json({
+    // Nothing leasable: tell the client to wait (it backs off at least this long).
+    ...(jobs.length === 0 ? { retry_after: intVar((c.env as unknown as Record<string, string | undefined>).IDLE_RETRY_AFTER_S, 300) } : {}),
     jobs: jobs.map((j) => ({
       job_id: j.job_id,
       stage: j.stage,

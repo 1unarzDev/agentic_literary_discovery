@@ -333,3 +333,14 @@ def test_mac_refresh_definition_keeps_args(tmp_path, monkeypatch):
     assert "refreshed" in service.refresh_definition(run=lambda c: P(0, "", ""), platform="darwin")
     import plistlib
     assert plistlib.loads(p.read_bytes())["ProgramArguments"][-2:] == ["--max-concurrency", "3"]
+
+
+def test_client_reads_retry_after():
+    import httpx
+    from ald.client import CoordinatorClient
+    t = httpx.MockTransport(lambda req: httpx.Response(200, json={"jobs": [], "retry_after": 300}))
+    c = CoordinatorClient("http://c.test", "tok", transport=t)
+    assert c.lease("t12", ["label"], 1) == [] and c.last_retry_after == 300.0
+    t2 = httpx.MockTransport(lambda req: httpx.Response(200, json={"jobs": [{"job_id": "j"}]}))
+    c2 = CoordinatorClient("http://c.test", "tok", transport=t2)
+    assert c2.lease("t12", ["label"], 1) == [{"job_id": "j"}] and c2.last_retry_after is None

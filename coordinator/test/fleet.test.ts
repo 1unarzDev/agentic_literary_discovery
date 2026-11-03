@@ -45,3 +45,34 @@ describe("presence", () => {
     expect(presence(iso(-3 * 3600_000), {}, now).presence).toBe("silent");
   });
 });
+
+describe("trigger-maintained counters", () => {
+  it("job_counts always equals a GROUP BY over jobs", async () => {
+    const { env } = await import("cloudflare:test");
+    const { addJobs, lease, makeWorker, upload, resultBlob, runCron, resetQueue } = await import("./helpers");
+    await resetQueue(); // jobs left by other tests (exercises the DELETE trigger too)
+    const pin = await makePin();
+    const ids = await addJobs(Array.from({ length: 6 }, () => ({ pin_hash: pin.pin_hash })));
+    const w = await makeWorker("counter-w");
+    const l = await lease(w.token, ["label"], 3);
+    const [a, b, c2] = l.body.jobs.map((j: { job_id: string }) => j.job_id);
+    const blob = await resultBlob(["p1", "p2", "p3"]);
+    const up = await upload(w.token, a, pin, blob);
+    expect(up.status, JSON.stringify(up.body)).toBe(200);
+    await callJson("POST", "/v1/release", { token: w.token, json: { job_ids: [b] } });
+    const notLeased = ids.find((id) => ![a, b, c2].includes(id))!;
+    await admin("POST", "/v1/admin/close_jobs", { job_ids: [notLeased] });
+    await env.DB.prepare("UPDATE jobs SET lease_expires = 1, attempt = 3 WHERE job_id = ?").bind(c2).run();
+    await runCron(); // expired + max attempts -> dead
+    const real = await env.DB.prepare(
+      "SELECT wave, stage, COALESCE(cell,'') AS cell, status, COUNT(*) AS n, SUM(n_passages) AS p FROM jobs GROUP BY 1,2,3,4",
+    ).all<Record<string, unknown>>();
+    const counted = await env.DB.prepare("SELECT wave, stage, cell, status, n, p FROM job_counts WHERE n <> 0").all<Record<string, unknown>>();
+    const key = (r: Record<string, unknown>) => `${r.wave}|${r.stage}|${r.cell}|${r.status}|${r.n}|${r.p}`;
+    expect(counted.results.map(key).sort()).toEqual(real.results.map(key).sort());
+    const statuses = new Set(real.results.map((r) => r.status));
+    expect([...statuses].sort()).toEqual(["closed", "dead", "done", "queued"]);
+    const hourly = await env.DB.prepare("SELECT SUM(passages) AS p, SUM(results) AS r FROM hourly WHERE worker_id = ?").bind(w.worker_id).first<{ p: number; r: number }>();
+    expect(hourly?.r).toBe(1);
+  });
+});

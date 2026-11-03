@@ -9,7 +9,7 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.toml" },
         miniflare: {
-          bindings: { ADMIN_TOKEN: "test-admin-token", TEST_MIGRATIONS: migrations },
+          bindings: { ADMIN_TOKEN: "test-admin-token", TEST_MIGRATIONS: migrations, STATUS_CACHE_S: "0" },
         },
       }),
     ],

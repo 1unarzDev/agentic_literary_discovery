@@ -92,10 +92,15 @@ class CoordinatorClient:
         self._check(r)
         return r.json()
 
+    last_retry_after: float | None = None
+
     def lease(self, tier: str, stages: list[str], max_jobs: int) -> list[dict[str, Any]]:
         body = {"tier": tier, "stages": stages, "max_jobs": max_jobs,
                 "client_version": self.client_version}
-        return self._json("POST", "/v1/lease", body).get("jobs", []) or []
+        resp = self._json("POST", "/v1/lease", body)
+        ra = resp.get("retry_after")
+        self.last_retry_after = float(ra) if isinstance(ra, (int, float)) and ra > 0 else None
+        return resp.get("jobs", []) or []
 
     def heartbeat(self, job_ids: list[str], stats: dict[str, Any]) -> dict[str, Any]:
         return self._json("POST", "/v1/heartbeat", {"job_ids": job_ids, "stats": stats})

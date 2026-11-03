@@ -1,32 +1,13 @@
 import { Hono } from "hono";
 import { AppEnv, requireAdmin, requireViewer } from "./auth";
 import { sealState } from "./db";
-import { STAGES, json, nowIso } from "./util";
+import { STAGES, intVar, json, nowIso } from "./util";
 
 export const statusRoutes = new Hono<AppEnv>();
 statusRoutes.use("/v1/status", requireAdmin);
 statusRoutes.use("/v1/fleet", requireViewer);
 
 const STATUSES = ["queued", "leased", "done", "dead", "closed"] as const;
-
-/**
- * Throughput counts passages from the per-shard result index: a full result
- * counts its n_passages (stats n_ok + n_flagged, else the job's n_passages);
- * a partial counts its passage ids, but only while that worker has not yet
- * uploaded a full result for the job (so checkpoints are not double counted).
- */
-const THROUGHPUT_SQL = (groupBy: "worker_id" | "stage") => `
-SELECT ${groupBy} AS k,
-       SUM(CASE WHEN created >= ?1 THEN n ELSE 0 END) AS n_1h,
-       SUM(n) AS n_24h
-  FROM (
-    SELECT worker_id, stage, n_passages AS n, created FROM results WHERE created >= ?2
-    UNION ALL
-    SELECT p.worker_id, p.stage, p.n_ids AS n, p.created FROM job_partials p
-     WHERE p.created >= ?2
-       AND NOT EXISTS (SELECT 1 FROM results r WHERE r.job_id = p.job_id AND r.worker_id = p.worker_id)
-  )
- GROUP BY ${groupBy}`;
 
 statusRoutes.get("/v1/status", async (c) => json(await fleetStatus(c.env, true)));
 
@@ -60,42 +41,91 @@ function parseStats(s: unknown): Record<string, unknown> | null {
   }
 }
 
+// Responses are cached (isolate memory, then a D1 row) so monitors and `ald fleet --watch` cost ~1 row per call.
+const memCache = new Map<string, { at: number; value: unknown }>();
+
 async function fleetStatus(env: AppEnv["Bindings"], withIds: boolean) {
+  const ttlMs = intVar((env as unknown as Record<string, string | undefined>).STATUS_CACHE_S, 120) * 1000;
+  const key = `fleet:${withIds ? "admin" : "viewer"}`;
   const now = Date.now();
-  const h1 = nowIso(now - 3600_000);
-  const h24 = nowIso(now - 24 * 3600_000);
+  if (ttlMs > 0) {
+    const m = memCache.get(key);
+    if (m && now - m.at < ttlMs) return m.value;
+    const row = await env.DB.prepare("SELECT value, updated_ms FROM kv_cache WHERE key = ?").bind(key).first<{ value: string; updated_ms: number }>();
+    if (row && now - row.updated_ms < ttlMs) {
+      const value = JSON.parse(row.value);
+      memCache.set(key, { at: row.updated_ms, value });
+      return value;
+    }
+  }
+  const value = await computeFleetStatus(env, withIds, now);
+  if (ttlMs > 0) {
+    memCache.set(key, { at: now, value });
+    await env.DB.prepare(
+      "INSERT INTO kv_cache(key, value, updated_ms) VALUES (?1, ?2, ?3) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_ms = excluded.updated_ms",
+    ).bind(key, JSON.stringify(value), now).run();
+  }
+  return value;
+}
+
+async function computeFleetStatus(env: AppEnv["Bindings"], withIds: boolean, now: number) {
+  const h1 = nowIso(now - 3600_000).slice(0, 13);
+  const h24 = nowIso(now - 24 * 3600_000).slice(0, 13);
   const db = env.DB;
-  const [workers, perWorker, perStage, queue, covered, cells, waves, hourly, quality] = await db.batch([
+  // Everything below reads the trigger-maintained counters (job_counts, hourly): a few hundred rows in total.
+  const [workers, counts, hourRows] = await db.batch([
     db.prepare(
       "SELECT id, name, tier, os, gpu, vram_gb, client_version, last_seen, tok_s, stats_json FROM workers WHERE disabled = 0 ORDER BY last_seen DESC",
     ),
-    db.prepare(THROUGHPUT_SQL("worker_id")).bind(h1, h24),
-    db.prepare(THROUGHPUT_SQL("stage")).bind(h1, h24),
-    db.prepare("SELECT stage, status, COUNT(*) AS n, SUM(n_passages) AS p FROM jobs GROUP BY stage, status"),
-    // Passages of still-open jobs already covered by partial uploads.
+    db.prepare("SELECT wave, stage, cell, status, n, p FROM job_counts WHERE n <> 0"),
     db.prepare(
-      `SELECT stage, COUNT(*) AS n FROM (
-         SELECT DISTINCT j.stage AS stage, jp.job_id, je.value
-           FROM job_partials jp JOIN jobs j ON j.job_id = jp.job_id AND j.status IN ('queued', 'leased'),
-                json_each(jp.passage_ids_json) je)
-        GROUP BY stage`,
-    ),
-    db.prepare(
-      `SELECT cell, stage, status, COUNT(*) AS n, SUM(n_passages) AS p
-         FROM jobs WHERE cell IS NOT NULL GROUP BY cell, stage, status ORDER BY cell, stage`,
-    ),
-    db.prepare("SELECT wave, stage, status, COUNT(*) AS n, SUM(n_passages) AS p FROM jobs GROUP BY wave, stage, status ORDER BY wave"),
-    // Fleet passages per hour over the last 24 h (full results only: partials would double count).
-    db.prepare(
-      `SELECT substr(created, 1, 13) AS h, SUM(n_passages) AS n FROM results WHERE created >= ?1 GROUP BY h ORDER BY h`,
-    ).bind(h24),
-    db.prepare(
-      `SELECT stage, SUM(json_extract(stats_json, '$.n_ok')) AS n_ok, SUM(json_extract(stats_json, '$.n_flagged')) AS n_flagged,
-              SUM(json_extract(stats_json, '$.n_schema_invalid')) AS n_schema_invalid,
-              SUM(json_extract(stats_json, '$.n_evidence_unverified')) AS n_evidence_unverified,
-              COUNT(*) AS results FROM results WHERE created >= ?1 GROUP BY stage`,
+      `SELECT hour, worker_id, stage, results, passages, n_ok, n_flagged, n_schema_invalid, n_evidence_unverified
+         FROM hourly WHERE hour >= ?1`,
     ).bind(h24),
   ]);
+  type H = { hour: string; worker_id: string; stage: string; results: number; passages: number; n_ok: number; n_flagged: number;
+             n_schema_invalid: number; n_evidence_unverified: number };
+  type C = { wave: string; stage: string; cell: string; status: string; n: number; p: number };
+  const hrs = hourRows.results as H[];
+  const agg = (by: "worker_id" | "stage") => {
+    const m = new Map<string, { k: string; n_1h: number; n_24h: number }>();
+    for (const r of hrs) {
+      const e = m.get(r[by]) ?? { k: r[by], n_1h: 0, n_24h: 0 };
+      e.n_24h += r.passages;
+      if (r.hour >= h1) e.n_1h += r.passages;
+      m.set(r[by], e);
+    }
+    return [...m.values()];
+  };
+  const perWorker = { results: agg("worker_id") };
+  const perStage = { results: agg("stage") };
+  const cnt = counts.results as C[];
+  const sumBy = (keyf: (r: C) => string | null) => {
+    const m = new Map<string, { n: number; p: number; r: C }>();
+    for (const r of cnt) {
+      const k = keyf(r);
+      if (k === null) continue;
+      const e = m.get(k) ?? { n: 0, p: 0, r };
+      e.n += r.n;
+      e.p += r.p;
+      m.set(k, e);
+    }
+    return [...m.values()];
+  };
+  const queue = { results: sumBy((r) => `${r.stage}\u0000${r.status}`).map((e) => ({ stage: e.r.stage, status: e.r.status, n: e.n, p: e.p })) };
+  const covered = { results: [] as { stage: string; n: number }[] }; // partial coverage of open jobs: not subtracted (approximation)
+  const cells = { results: sumBy((r) => (r.cell ? `${r.cell}\u0000${r.stage}\u0000${r.status}` : null)).map((e) => ({ cell: e.r.cell, stage: e.r.stage, status: e.r.status, n: e.n, p: e.p })) };
+  const waves = { results: sumBy((r) => `${r.wave}\u0000${r.stage}\u0000${r.status}`).map((e) => ({ wave: e.r.wave, stage: e.r.stage, status: e.r.status, n: e.n, p: e.p })) };
+  const hourTotals = new Map<string, number>();
+  for (const r of hrs) hourTotals.set(r.hour, (hourTotals.get(r.hour) ?? 0) + r.passages);
+  const hourly = { results: [...hourTotals.entries()].map(([h, n]) => ({ h, n })) };
+  const qm = new Map<string, Record<string, number | string>>();
+  for (const r of hrs) {
+    const e = (qm.get(r.stage) ?? { stage: r.stage, n_ok: 0, n_flagged: 0, n_schema_invalid: 0, n_evidence_unverified: 0, results: 0 }) as Record<string, number | string>;
+    for (const k of ["n_ok", "n_flagged", "n_schema_invalid", "n_evidence_unverified", "results"] as const) e[k] = (e[k] as number) + (r[k] ?? 0);
+    qm.set(r.stage, e);
+  }
+  const quality = { results: [...qm.values()] };
 
   const tp = new Map((perWorker.results as { k: string; n_1h: number; n_24h: number }[]).map((r) => [r.k, r]));
   const queueOut: Record<string, Record<string, number>> = {};

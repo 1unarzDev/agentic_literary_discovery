@@ -193,7 +193,7 @@ class Worker:
         self._threads: list[threading.Thread] = []
         self.passages_done = 0
         self.uploaded: list[dict[str, Any]] = []  # for status / tests
-        self._lease_backoff = Backoff(base=5, cap=300, rng=self.rng)
+        self._lease_backoff = Backoff(base=5, cap=600, rng=self.rng)
         self._backend_version_cache: str | None = None
         self.gpu_lock = GpuLock(gpu_lock, log=log)
         self._gpu_models_loaded = False
@@ -1530,6 +1530,10 @@ class Worker:
                     if not self.window.allow_new_lease(None):
                         break
                     delay = self._lease_backoff.next()
+                    # The coordinator says when to come back (nothing leasable); D1 bills every poll.
+                    ra = getattr(self.client, "last_retry_after", None)
+                    if ra:
+                        delay = max(delay, float(ra))
                     rem = self.window.remaining()
                     if rem is not None:
                         delay = max(0.0, min(delay, rem))
