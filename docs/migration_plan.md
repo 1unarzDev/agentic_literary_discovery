@@ -161,6 +161,26 @@ Write freeze: during the export the Cloudflare coordinator is set to `redirect` 
   - 20 synthetic sealed `.age` stand-ins;
   - manifests (83 entries) verified on creation, 0 mismatches.
 
+**Platform rules relevant to ALD** (live since 2026-11-03 05:23 UTC, crane-server:760f315, migration 0013_blind):
+- Sealed (confirmation) results store only `{n_lines, wall_s}`. `n_lines` comes from the `X-Passage-Ids` count, else `n_lines`. Everything else is dropped server-side, and earlier rows were scrubbed after a snapshot.
+- Heartbeats on confirmation jobs store no worker stats, and clear existing ones.
+- Confirmation jobs show no `attempt`, `last_error` or `stats` on `/v1/projects/ald/jobs`, `/v1/jobs` or the feed.
+- `spec.split=confirmation` without `outputs.class=sealed` gets **400**.
+  - We build every submitted job with `pipeline/platform_jobs.py` (`rc_job()` → sealed + `seal_id` for confirmation, summary for discovery; `check_jobs()` guards a batch).
+  - The ald client never submits jobs; it only uploads results.
+- Panel sections pushed with `PUT /v1/projects/ald/panel` that mention confirmation or the seal may only be **progress**, **workers** or **milestone**, otherwise 400. `pipeline/platform_jobs.panel_section(concerns_sealed=True)` enforces that, and also rejects outcome-related terms.
+
+**Privacy:**
+- `GET /v1/projects/ald/panel` needs an ald viewer or admin token, or the owner's PIN cookie; anonymous callers get **401**.
+- The public `/v1/feed` and its SSE stream exclude ald.
+- `/v1/feed/private` includes it for authorized callers.
+- Our viewer token is `~/.config/research-cluster/ald-viewer.token`, mode 600.
+
+**Campaign routes (ald submitter/admin):**
+- `POST /v1/projects/ald/campaigns/<c>/cancel` and `.../close`.
+- `POST .../hide` returns 409 while any job is queued or leased; `.../unhide` reverses it.
+- Done: the platform closed and hid campaign `wtest` (2 jobs) and disabled test workers `w_d63a93bcb6fefeae` and `w_2ed0063753b31e53`.
+
 **Cutover checklist:**
 1. [ ] (P) Importer `research-server import ald <dir>` passes on the synthetic fixture, with a report.
 2. [ ] Owner key ceremony → `PINNED_RECIPIENT` → client release → seal `ald-confirmation-v09` created with `min_lodge_hours: 24`.

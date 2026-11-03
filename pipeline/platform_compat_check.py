@@ -23,6 +23,9 @@ import httpx  # noqa: E402
 
 from ald.client import CoordinatorClient, CoordinatorError  # noqa: E402
 
+sys.path.insert(0, str(ROOT))
+from pipeline.platform_jobs import check_jobs  # noqa: E402
+
 PLATFORM = "https://research.lunarz.dev"
 ALD = f"{PLATFORM}/p/ald"
 TOK = Path.home() / ".config/research-cluster"
@@ -73,7 +76,9 @@ def main() -> None:
                 "items": {"count": len(passages), "id_field": "passage_id"},
                 "spec": {"stage": "label", "wave": "wtest", "split": "discovery"}, "outputs": {"class": "summary"}}
 
-    r = sub.post("/v1/projects/ald/jobs", json={"jobs": [job(ids["a"], False), job(ids["t1"], True), job(ids["t2"], True)]})
+    batch = [job(ids["a"], False), job(ids["t1"], True), job(ids["t2"], True)]
+    check_jobs(batch)
+    r = sub.post("/v1/projects/ald/jobs", json={"jobs": batch})
     check("jobs submit", r.status_code in (200, 201), f"{r.status_code} {r.text[:120]}")
 
     # ---- two throwaway workers (memory only)
