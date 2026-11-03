@@ -6,6 +6,11 @@
 - **Registration date:** _TBD (planned Nov 8–9, 2026). Confirmation labels are unsealed about Nov 9–11, for the Nov 20 submissions._
 - **Template:** OSF Preregistration (secondary data / observational).
 
+- **Sealed storage (from the platform migration, `docs/migration_plan.md`).**
+  - Confirmation results are stored **ciphertext-only** on the shared research platform. They are encrypted client-side with age (X25519) to the **owner's pinned recipient key**; the private key is held **offline** by the owner (a USB key plus a paper backup).
+  - Unsealing is **one-way**. It is logged in the platform's append-only audit log against this document's **OSF hash**, and `pipeline/unseal.py` refuses unless the logged hash matches the hash above and the unseal time is after registration.
+  - Seal incidents are recorded in §8.1.
+
 **Status of data at registration:**
 - Discovery-half model labels (codebook v0.9 production, `v09lean_r2`, pin `41ca3c7d`), the QA references, the pilot and the reviews (`docs/review/*.md`) have been seen. The two-fictions hypothesis was **discovered on Discovery** (literary review P1) and is confirmed here on Confirmation.
 - Confirmation model labels sit sealed under the R2 `sealed/` prefix and have not been read by any analyst. The audit draw reads **metadata only** (§3.4). This fixes the v0.4 design, whose predicted-label strata would have exposed the naive answer (methods review P4).
@@ -496,6 +501,12 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
 - **Unforeseen problems.** If an analysis cannot be run as registered (e.g., an era with no audited obstacles), the nearest pre-specified fallback is used: the identity link, then the raw DSL ratio contrast without covariates. The fallback is reported as such.
 
 
+### 8.1 Seal-integrity log (factual entries; disclosure recommended by the orchestrator, final decision by the user)
+
+| Date | Entry | Assessed impact |
+|---|---|---|
+| 2026-11-02 | 2026-11-02 ~20:58 CST: during testing of the platform-migration export tool, 5 sealed (confirmation-split) model-label result blobs (job ids `v09b_w02_conf_rand_a_conf_*`, ≈2,000 passages of model labels; no human labels) were exported, encrypted to a throwaway test key and decrypted to local disk by an automated test. They were deleted within minutes. No contents were read, displayed, analysed, uploaded or committed; only job ids appeared in logs. The R2 originals are untouched. Safeguards added: real sealed blobs can only be encrypted to the owner's pinned key; dry runs are restricted to synthetic data and refuse to write under `data/`. Assessed impact on the confirmatory analysis: none (no information about results was observed). | none |
+
 ## 9. Change log
 - v0.1 (2026-10-31): first draft from plan v2 §3–4.
 - v0.2 (2026-10-31): G0 eras; fixed spline knots; empirical era-year g-computation; work weights for adaptive stopping; power and coverage simulation; design recommendations R1–R6.
@@ -529,4 +540,14 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
   - `works_v2` fields registered (`author_group`, `split_v2`, `primary_v2_capv2`, `historical_setting`), with real primary-set counts.
   - `select_annotation.main` retired.
   - Registered power: TF 0.70, MDE 9 pp.
+- v0.5 (2026-11-02): seal-integrity log §8.1 (migration-tool test incident), and the ciphertext-only sealed storage with offline owner key and one-way logged unseal (header).
+
+---
+
+## Appendix A. OSF registration text (draft excerpts)
+
+**Seal integrity (proposed disclosure; the user decides).**
+"2026-11-02 ~20:58 CST: during testing of the platform-migration export tool, 5 sealed (confirmation-split) model-label result blobs (job ids `v09b_w02_conf_rand_a_conf_*`, ≈2,000 passages of model labels; no human labels) were exported, encrypted to a throwaway test key and decrypted to local disk by an automated test. They were deleted within minutes. No contents were read, displayed, analysed, uploaded or committed; only job ids appeared in logs. The R2 originals are untouched. Safeguards added: real sealed blobs can only be encrypted to the owner's pinned key; dry runs are restricted to synthetic data and refuse to write under `data/`. Assessed impact on the confirmatory analysis: none (no information about results was observed)."
+
+**Sealing.** Confirmation-split model labels are stored ciphertext-only (age/X25519), encrypted to an owner-held offline key. Unsealing is a one-way operation, logged against this registration's hash. Confirmation human-audit items were drawn using metadata only (era × genre × canonical), so the draw reveals no model-label information.
 
