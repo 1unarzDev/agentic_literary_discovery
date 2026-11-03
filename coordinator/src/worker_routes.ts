@@ -246,7 +246,8 @@ export function blindStats(stats: Record<string, unknown>): Record<string, unkno
 const STAT_KEYS = [
   "tok_s", "passages_done", "state", "stage", "job_id", "progress", "concurrency", "passages_per_hour",
   "keep_awake", "battery_percent", "power_plugged", "gpu_fraction", "gpu", "client_version", "service", "gpu_lock",
-  "quality_stage", "schema_fail_rate", "evidence_fail_rate", "next_window", "may_sleep", // quality: discovery only (client)
+  // No per-worker quality rates: the last job may be sealed (confirmation). Fleet quality = discovery counters.
+  "next_window", "may_sleep",
 ] as const;
 
 export function sanitizeWorkerStats(stats: Record<string, unknown>): string | null {
