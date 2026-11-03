@@ -193,7 +193,13 @@ def _store(recs: list[dict]) -> int:
 
 def build_views() -> None:
     con = duckdb.connect(str(WORK / "ald.duckdb"))
-    con.execute(f"""CREATE OR REPLACE VIEW raw AS SELECT * FROM read_parquet('{RES}/batch_*.parquet', union_by_name=true)""")
+    src = f"read_parquet('{RES}/batch_*.parquet', union_by_name=true)"
+    cols = {r[0] for r in con.execute(f"DESCRIBE SELECT * FROM {src}").fetchall()}
+    # batches written before the platform source existed have no `source` column: they came from Cloudflare
+    sel = "*" if "source" in cols else "*, 'cloudflare' AS source"
+    if "source" in cols:
+        sel = "* REPLACE (COALESCE(source, 'cloudflare') AS source)"
+    con.execute(f"CREATE OR REPLACE VIEW raw AS SELECT {sel} FROM {src}")
     # primary: one row per (stage, pin, passage); prefer non-twin full results, then earliest
     con.execute("""CREATE OR REPLACE VIEW results AS
         SELECT * EXCLUDE (rn) FROM (
