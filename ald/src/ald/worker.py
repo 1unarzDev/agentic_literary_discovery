@@ -1077,6 +1077,8 @@ class Worker:
         finally:
             ex.shutdown(wait=False, cancel_futures=True)
             ck.close()
+            if ram_before is not None and reason == "low_memory":
+                self._learn_footprint(st, ram_before)  # interrupted while loading: learn it anyway
         # Inference for this job is over: it is no longer "held" for heartbeats,
         # and its local files may be removed once the upload is acked.
         self._current = None

@@ -318,3 +318,20 @@ def test_unlearned_footprint_allows_one_probe_load(env):
     w = env.make_worker()
     w.run()
     assert env.coord.state == {"job-1": "done"}
+
+
+def test_footprint_learned_when_interrupted_during_load(env):
+    from ald.scheduler import GB
+    env.coord.add_job("job-1", "label", label_pin(env), make_passages("w1", 4))
+    env.ram_avail = 10 * GB
+
+    def on_chat(body, n):
+        if n == 1:
+            env.ram_avail = 5 * GB  # the load itself pushes RAM below 0.75 x reserve
+            env.clock.advance(10)
+
+    env.ollama.on_chat = on_chat
+    w = env.make_worker()
+    w.run()
+    model = env.registry.stages["label"].model_ref
+    assert w._footprints().get(model) == 5.0  # learned: no repeated probe after the backoff
