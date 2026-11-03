@@ -65,21 +65,33 @@ Worker tokens are migrated as their sha256 hashes, so existing volunteers keep w
 4. Delete any copy on the generating machine once the backups are verified (`seal_keygen.py --check` decrypts a test ciphertext).
 5. Write the public recipient into `ald/src/ald/sealed.py` (`PINNED_RECIPIENT`) and release a client. The platform serves the same value as `sealed_recipient`.
 
-**Unseal (around Nov 9-11, one command):**
-1. Register the preregistration on OSF and put its sha256 into `docs/prereg.md`, as today.
-2. Call the platform's one-way unseal endpoint with that hash; it is recorded in the append-only audit log. (P) The old Cloudflare `POST /v1/admin/unseal` works the same way for anything still there.
-3. Run:
-   ```sh
-   uv run --project ald --with pyrage python -I pipeline/unseal.py --key /media/usb/ald-sealed.agekey
-   ```
-   It:
-   - reads the prereg hash in `docs/prereg.md`, fetches the unseal record from the platform audit log, and **refuses unless both match** and the unseal time is after the registration;
-   - lists every sealed (confirmation) result and partial, downloads the ciphertext, and verifies each `X-Content-Sha256` against the manifest;
-   - decrypts with the key and verifies `X-Plain-Sha256`;
-   - writes plaintext **only** into `data/work/results_sealed_unsealed/<job_id>/<worker_id>[.part<n>].jsonl.gz`, plus `MANIFEST.json` (counts and hashes);
-   - is idempotent: re-running skips files that already verify.
-4. `pipeline/sync_results.py --sealed` ingests `data/work/results_sealed_unsealed/` the same way as discovery results.
-5. Put the key back offline.
+**Unseal timeline (target Nov 9-11).** On the platform, unseal takes two steps.
+- The seal is created with `prereg: {required: true, min_lodge_hours: 24}`. The value is ours to choose when the seal is created; SPEC §4.4 uses 24.
+- So the prereg hash must be **lodged at least 24 h before** the unseal: for an unseal on Nov 9 / 10 / 11, lodge by Nov 8 / 9 / 10 at the same hour.
+
+| when | who | step |
+|---|---|---|
+| before any confirmation work on the platform | owner | key ceremony (above); send the `age1…` line |
+| same day | ald | pin the key in `ald.sealed.PINNED_RECIPIENT`, release the client, then `POST /v1/projects/ald/seals {seal_id: "ald-confirmation-v09", recipient, custodian: "owner", prereg: {required: true, min_lodge_hours: 24}}` |
+| ≤ Nov 8-10 | owner / PI | register the preregistration on OSF; put the sha256 into `docs/prereg.md`; `uv run --project ald python -I pipeline/unseal.py --lodge --prereg-ref <OSF URL>` (records it in the hash-chained audit log) |
+| ≥ 24 h later | owner | `POST /v1/projects/ald/seals/ald-confirmation-v09/unseal {prereg_hash, confirm: "UNSEAL ald ald-confirmation-v09 <hash>"}` (or the one-step `/p/ald/v1/admin/unseal`) |
+| right after | owner | `uv run --project ald --with pyrage python -I pipeline/unseal.py --key /media/usb/ald-sealed.agekey` (below) |
+| right after | owner | the Cloudflare part (blobs sealed before cutover): `uv run --project ald python -I pipeline/unseal.py --source cloudflare --cloudflare-unseal`. This performs the old coordinator's one-way unseal with the same hash, and needs no key: those blobs were sealed server-side, not encrypted. |
+
+**`pipeline/unseal.py` (one command per source):**
+- It reads the prereg hash in `docs/prereg.md` and **refuses unless the seal is `unsealed` with exactly that hash**: `GET /v1/projects/ald/seals/<id>`. For Cloudflare it checks the hash returned by its one-way unseal.
+- It downloads every sealed object. Platform: `…/seals/<id>/objects[/<key>]`, which carries cipher and plain sha256. Cloudflare: `/v1/admin/blob`, checked against `content_sha256`.
+- It decrypts platform objects with the key file and verifies both hashes.
+- It writes plaintext **only** into `data/work/results_sealed_unsealed/<job_id>/<worker_id>[.part<n>].jsonl.gz`, plus `MANIFEST.json`.
+- It is idempotent.
+
+Then:
+- `pipeline/sync_results.py --sealed` ingests that directory the same way as discovery results.
+- The key goes back offline.
+
+Dry runs, tests only:
+- `--from-export <synthetic export> --dry-run --out <dir outside data/>`.
+- It refuses real sealed data and refuses to write under `data/`.
 
 ## 4. Data migration, with manifests
 
@@ -128,3 +140,39 @@ Write freeze: during the export the Cloudflare coordinator is set to `redirect` 
 - [ ] Installers from `/p/ald/install.*` work on a clean container.
 - [ ] Annotation UI still works on Cloudflare.
 - [ ] Owner confirms; R2 read-only; D1 retired after 30 days.
+
+## 7. Status (2026-11-03) and cutover checklist
+
+**Done:**
+- [x] Platform live (`research-cluster e56a6df` on creation): ALD compat API at `https://research.lunarz.dev/p/ald/v1`, per HANDOFF-ALD.md.
+- [x] **Compat API verified** with throwaway in-memory test workers (`pipeline/platform_compat_check.py`; discovery-only test campaign `wtest`, throwaway pin). **18/18:**
+  - ping (`project: ald`); input, pin and job submit; join via `admin/invite`;
+  - stage-filtered lease with `split` and the directive; holder-only shard (sha matches; non-holder 403);
+  - **412 on a wrong pin**; partial upload, then **`skip_passage_ids` on re-lease**; full upload, then **`duplicate`**; **403 for a non-leaser**;
+  - **dup twins never to the same worker** (`anti_affinity` scope worker); heartbeat extends and carries the directive.
+  - The test jobs stay in campaign `wtest` until the platform's campaign close/hide is live.
+- [x] **Sealed-stats leak closed** on Cloudflare (migration 0007):
+  - Confirmation results store only `{n_lines, wall_s}`; quality counters and fleet quality cover discovery only; per-worker quality rates are not stored.
+  - Clients ≥ 0.1.25 never send more for confirmation jobs.
+  - The platform applies the same rule server-side, which fast-boat-test-loop has confirmed.
+- [x] **Synthetic staging fixture** for the importer at `creation:/home/conception/research-import/ald/synthetic-20261102T230633/`, mode 700. Contents:
+  - real D1 export: 5,153 jobs, 66 results, 19 partials, 2 workers;
+  - 63 plain objects: 20 shards, 20 results, 20 dist, 2 install, 1 registry;
+  - 20 synthetic sealed `.age` stand-ins;
+  - manifests (83 entries) verified on creation, 0 mismatches.
+
+**Cutover checklist:**
+1. [ ] (P) Importer `research-server import ald <dir>` passes on the synthetic fixture, with a report.
+2. [ ] Owner key ceremony → `PINNED_RECIPIENT` → client release → seal `ald-confirmation-v09` created with `min_lodge_hours: 24`.
+3. [ ] Wheel + release + installers + registry uploaded to `/p/ald` (`PUT /v1/projects/ald/dist|releases|install`, `/p/ald/v1/admin/registry`).
+4. [ ] Pins registered; shard inputs uploaded; the unfinished queue re-submitted as rc-job/1 with the same ids:
+   - `dup_group` → `anti_affinity.keys`, scope host;
+   - discovery jobs get `outputs.class=summary`;
+   - confirmation jobs get `class=sealed, seal_id`.
+5. [ ] Workers imported: `POST /p/ald/v1/admin/workers` with the D1 rows (`token_sha256` unchanged).
+6. [ ] Freeze leasing on Cloudflare (all workers on a client with redirect support, ≥ 0.1.23); then set Cloudflare's ping `redirect` to `https://research.lunarz.dev/p/ald`.
+7. [ ] Verify both workers (innovation, COLLIN/"harmony") lease and upload on the platform. Keep Cloudflare up for late uploads.
+8. [ ] Real export (owner key) → importer → owner confirms → R2 read-only → D1 retired after 30 days.
+
+**Rollback:** clear the Cloudflare redirect, and set `/p/ald/v1/admin/redirect` back to Cloudflare. Clients follow within 10 min.
+
