@@ -181,7 +181,8 @@ def main() -> None:
         for k, d in plain:
             by.setdefault(k.split("/", 1)[0], []).append((k, d))
         plain = [x for v in by.values() for x in v[: a.limit]]
-        seal_rows = seal_rows[: a.limit]
+        seal_rows = ([r for r in seal_rows if r["part_n"] is None][: a.limit]
+                     + [r for r in seal_rows if r["part_n"] is not None][: a.limit])  # results AND partials
 
     # ---- plain objects
     mp = out / "manifest_r2.jsonl"
