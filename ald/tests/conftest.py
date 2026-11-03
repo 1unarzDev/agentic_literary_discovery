@@ -326,6 +326,15 @@ def hw16() -> HardwareInfo:
                         usable_vram_gb=15.99, accel="cuda")
 
 
+@pytest.fixture(autouse=True)
+def _isolated_ald_home(tmp_path_factory, monkeypatch):
+    """No test may ever read or write the real user config/data (a redirect test once overwrote a live
+    worker's config.json, token included)."""
+    monkeypatch.setenv("ALD_HOME", str(tmp_path_factory.mktemp("ald_home")))
+    for k in ("ALD_COORDINATOR", "ALD_TOKEN", "ALD_GPU_LOCK"):
+        monkeypatch.delenv(k, raising=False)
+
+
 @pytest.fixture
 def env(tmp_path, registry_raw, hw16):
     """A factory for workers sharing one fake coordinator / Ollama / data dir."""

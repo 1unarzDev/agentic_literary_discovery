@@ -344,3 +344,28 @@ def test_client_reads_retry_after():
     t2 = httpx.MockTransport(lambda req: httpx.Response(200, json={"jobs": [{"job_id": "j"}]}))
     c2 = CoordinatorClient("http://c.test", "tok", transport=t2)
     assert c2.lease("t12", ["label"], 1) == [{"job_id": "j"}] and c2.last_retry_after is None
+
+
+def test_tests_never_touch_the_real_config():
+    from ald import config as cfgmod
+    assert str(Path.home()) not in str(cfgmod.config_path().resolve()) or "pytest" in str(cfgmod.config_path())
+
+
+def test_config_survives_update_and_stale_writers(tmp_path):
+    """Values set with `ald config set` survive a client self-update (new version reads the old file, with a
+    key it does not know) and a long-running process that holds an older Config."""
+    from ald.config import Config, config_path
+    c = Config(coordinator_url="https://coord", token="tok", worker_id="w1", name="box", tier="t16")
+    c.save()
+    stale = Config.load()                     # e.g. the running worker / a benchmark, loaded earlier
+    user = Config.load()
+    user.update(min_free_ram_gb=5.0, gpu_lock="/tmp/g.lock", schedule="daily 22:00-07:00")  # `ald config set`
+    stale.update(tier="t12")                  # the stale holder writes one field later
+    raw = json.loads(config_path().read_text())
+    raw["some_future_key"] = 1                # a later release added a field
+    config_path().write_text(json.dumps(raw))
+    after = Config.load()                     # what the updated client reads
+    assert (after.min_free_ram_gb, after.gpu_lock, after.schedule, after.tier) == (5.0, "/tmp/g.lock", "daily 22:00-07:00", "t12")
+    assert (after.token, after.worker_id, after.coordinator_url) == ("tok", "w1", "https://coord")
+    after.update(name="box2")
+    assert json.loads(config_path().read_text())["some_future_key"] == 1  # unknown keys are kept too

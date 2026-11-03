@@ -1321,9 +1321,8 @@ class Worker:
             self.store.remove_job(jid)
         self._release(queued)
         atomic_write_json(guard_p, {"left": cur, "to": target, "at": self.clock.time()})
-        self.cfg.coordinator_url = target
         try:
-            self.cfg.save()
+            self.cfg.update(coordinator_url=target)
         except OSError as e:
             self.log(f"[migrate] could not save the new coordinator URL: {e}")
         self.client = self.client_factory(target)

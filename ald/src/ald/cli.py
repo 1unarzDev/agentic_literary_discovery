@@ -225,8 +225,7 @@ def doctor(
                              **{s: {k: r[k] for k in ("best_concurrency", "passages_per_hour", "tok_s")}
                                 for s, r in res.items() if "best_concurrency" in r}}
     if save and (cfg.coordinator_url or cfg.token or bench):
-        cfg.tier = tier["name"]
-        cfg.save()
+        cfg.update(tier=tier["name"], **({"bench": cfg.bench} if bench else {}))
 
     if as_json:
         console.print_json(json.dumps(report, default=str))
@@ -391,8 +390,7 @@ def setup(
         else:
             console.print(f"[green]{s}: {st.model_ref} digest verified ({st.model_digest[:12]})[/green]")
     if cfg.tier != tier:
-        cfg.tier = tier
-        cfg.save()
+        cfg.update(tier=tier)
     if not ok:
         raise typer.Exit(1)
 
@@ -424,12 +422,8 @@ def join(
     except (CoordinatorError, httpx.HTTPError) as e:
         console.print(f"[red]join failed: {e}[/red]")
         raise typer.Exit(1)
-    cfg.coordinator_url = url.rstrip("/")
-    cfg.token = resp["token"]
-    cfg.worker_id = resp.get("worker_id")
-    cfg.name = info["name"]
-    cfg.tier = tier
-    p = cfg.save()
+    p = cfg.update(coordinator_url=url.rstrip("/"), token=resp["token"], worker_id=resp.get("worker_id"),
+                   name=info["name"], tier=tier)
     console.print(f"[green]Joined as {cfg.name} (worker {cfg.worker_id}, tier {tier}). Token saved to {p}[/green]")
 
 
@@ -552,8 +546,7 @@ def config_set(key: str = typer.Argument(...), value: str = typer.Argument("", h
     except ValueError as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(2)
-    setattr(cfg, key, v)
-    cfg.save()
+    cfg.update(**{key: v})
     console.print(f"{key} = {ui.fmt_setting(v)}")
     if key in ("schedule", "active_hours"):
         from .scheduler import legacy_hours_to_schedule

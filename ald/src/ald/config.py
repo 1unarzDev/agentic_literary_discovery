@@ -148,6 +148,22 @@ class Config:
             cfg.ollama_url = env_ollama if env_ollama.startswith("http") else f"http://{env_ollama}"
         return cfg
 
+    def update(self, **fields: Any) -> Path:
+        """Change only ``fields``: re-read the file first, so values another process wrote meanwhile
+        (e.g. `ald config set` while a long-running worker or benchmark holds an older Config) survive."""
+        raw = read_json(config_path(), {}) or {}
+        for k, v in fields.items():
+            if k not in self.__dataclass_fields__:
+                raise KeyError(k)
+            raw[k] = v
+            setattr(self, k, v)
+        atomic_write_json(config_path(), raw, mode=stat.S_IRUSR | stat.S_IWUSR)
+        try:
+            os.chmod(config_path(), 0o600)
+        except OSError:
+            pass
+        return config_path()
+
     def save(self) -> Path:
         p = config_path()
         atomic_write_json(p, asdict(self), mode=stat.S_IRUSR | stat.S_IWUSR)
