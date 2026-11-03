@@ -97,7 +97,7 @@ const LEASE_SQL = `
 UPDATE jobs
    SET status = 'leased', lease_worker = ?1, lease_expires = ?2, leased_at_ms = ?3,
        attempt = attempt + 1
- WHERE status = 'queued' AND job_id IN (SELECT value FROM json_each(?4))
+ WHERE job_id IN (SELECT value FROM json_each(?4)) AND +status = 'queued' -- "+": look up by primary key, not the status index (measured 1,600 rows/lease)
 RETURNING job_id, stage, pin_hash, n_passages, lease_expires, attempt`;
 
 const CANDIDATES_PER_PIN = 32;
