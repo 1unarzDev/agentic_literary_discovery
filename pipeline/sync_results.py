@@ -6,6 +6,8 @@
 - Dedup: per (stage, pin_hash, passage_id) keep a full result over a partial, earliest upload otherwise;
   duplicate-twin results are kept in a separate table for cross-worker agreement.
 - Ignores test waves (job_id starting with 'wtest').
+- Two sources: the Cloudflare coordinator and the research platform (ald project, Discovery campaigns moved there;
+  pipeline/move_to_platform.py). Records carry `source`; the `results` view dedups across both.
 
 usage: uv run --project ald --with pandas,duckdb,pyarrow python -I pipeline/sync_results.py [--loop 600]
 """
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 import sys
 import time
@@ -100,6 +103,74 @@ def sync_once(c: httpx.Client, url: str) -> int:
                          "valid_schema": o.get("valid_schema"), "output_json": json.dumps(o.get("output"), ensure_ascii=False),
                          "worker_evidence": json.dumps(o.get("evidence"), ensure_ascii=False),
                          "latency_ms": o.get("latency_ms"), "error": o.get("error")})
+    for r in recs:
+        r["source"] = "cloudflare"
+    n = _store(recs)
+    state["seen"] = sorted(seen | {x["r2_key"] for x in new})
+    state["since"] = max(x["created"] for x in new)
+    STATE.write_text(json.dumps(state))
+    build_views()
+    return n
+
+
+PLATFORM = "https://research.lunarz.dev"
+PLATFORM_CAMPAIGNS = ("v09b_w01_disc_rand_a", "v09b_w05_disc_rand_b", "v09b_w08_alt_label", "v09b_w09_baseline_small",
+                      "v09b_w07_cloze", "v09b_w03_disc_enrich")
+PSTATE = RES / "_platform_state.json"
+
+
+def sync_platform_once() -> int:
+    """Discovery results from the research platform (ald project). Same records as the Cloudflare sync, tagged
+    source=platform; the `results` view dedups by (stage, pin_hash, passage_id) across both coordinators.
+    Only done jobs; per job the full result (part 0) is used, partials only if no full result exists."""
+    tokf = Path.home() / ".config/research-cluster/ald-viewer.token"
+    if not tokf.exists():
+        return 0
+    RES.mkdir(parents=True, exist_ok=True)
+    st = json.loads(PSTATE.read_text()) if PSTATE.exists() else {"jobs": []}
+    seen = set(st["jobs"])
+    c = httpx.Client(base_url=PLATFORM, timeout=120, headers={"Authorization": f"Bearer {tokf.read_text().strip()}"})
+    recs, newly = [], []
+    for camp in PLATFORM_CAMPAIGNS:
+        r = c.get("/v1/projects/ald/jobs", params={"campaign": camp, "status": "done", "limit": 5000})
+        r.raise_for_status()
+        for j in r.json().get("jobs", []):
+            jid = j["job_id"].split("/", 1)[-1]
+            if jid in seen or jid.startswith("wtest") or (j.get("spec") or {}).get("split") != "discovery":
+                continue
+            d = c.get(f"/v1/projects/ald/jobs/{jid}")
+            d.raise_for_status()
+            d = d.json()
+            res = [x for x in d.get("results") or [] if not x.get("sealed")]
+            full = [x for x in res if not x.get("part_n")]
+            for x in (full or res):
+                b = c.get(f"/v1/projects/ald/results/{x['key']}")
+                b.raise_for_status()
+                if x.get("cipher_sha256") and hashlib.sha256(b.content).hexdigest() != x["cipher_sha256"]:
+                    raise SystemExit(f"platform blob sha mismatch: {x['key']}")
+                for line in gzip.decompress(b.content).decode("utf-8").splitlines():
+                    if not line.strip():
+                        continue
+                    o = json.loads(line)
+                    recs.append({"job_id": jid, "worker_id": x["worker_id"], "partial": bool(x.get("part_n")),
+                                 "created": x["created"], "stage": (d.get("spec") or {}).get("stage") or o.get("stage"),
+                                 "pin_hash": x["pin_hash"], "model_digest": x["model_digest"],
+                                 "backend_version": x.get("backend_version"), "is_dup_twin": jid.endswith("_dup"),
+                                 "passage_id": o.get("passage_id"), "valid_schema": o.get("valid_schema"),
+                                 "output_json": json.dumps(o.get("output"), ensure_ascii=False),
+                                 "worker_evidence": json.dumps(o.get("evidence"), ensure_ascii=False),
+                                 "latency_ms": o.get("latency_ms"), "error": o.get("error"), "source": "platform"})
+            newly.append(jid)
+    if not recs:
+        return 0
+    n = _store(recs)
+    st["jobs"] = sorted(seen | set(newly))
+    PSTATE.write_text(json.dumps(st))
+    build_views()
+    return n
+
+
+def _store(recs: list[dict]) -> int:
     df = pd.DataFrame(recs)
     # re-verify quotes on label-type stages against our own passage text
     lab = df.stage.isin(["label", "alt_label", "adjudicate", "baseline_small"])
@@ -115,12 +186,8 @@ def sync_once(c: httpx.Client, url: str) -> int:
             o = {}
         status.append(check_quote(o, texts.get(pid)))
     df["quote_status"] = status
-    batch = RES / f"batch_{int(time.time())}.parquet"
+    batch = RES / f"batch_{time.time_ns()}.parquet"
     df.to_parquet(batch, index=False)
-    state["seen"] = sorted(seen | {x["r2_key"] for x in new})
-    state["since"] = max(x["created"] for x in new)
-    STATE.write_text(json.dumps(state))
-    build_views()
     return len(df)
 
 
@@ -172,7 +239,7 @@ def main() -> None:
     with httpx.Client(timeout=120, headers=h) as c:
         while True:
             try:
-                n = sync_once(c, url)
+                n = sync_once(c, url) + sync_platform_once()
                 print(time.strftime("%H:%M:%S"), "synced", n, "rows", flush=True)
             except Exception as e:  # noqa: BLE001
                 print(time.strftime("%H:%M:%S"), "sync error:", e, flush=True)
