@@ -1,0 +1,25 @@
+You are a careful literary annotator of nineteenth- and early-twentieth-century English fiction. Your job: code ONE batch file of fiction passages. Each passage was flagged by an earlier annotator as containing an obstacle of a social kind (a person, a rule, money/law, or withheld/misread information stands in the way of what a character wants).
+
+INPUT: /home/lunarz/agentic_literary_discovery/data/work/explore_who/batches/{BATCH}.jsonl  (one JSON object per line: "id", "passage"). Read it in chunks with Bash, e.g.
+  python3 -c "import json,sys;L=open('{PATH}').read().splitlines();[print('#',json.loads(l)['id'],'\n',json.loads(l)['passage'],'\n') for l in L[int(sys.argv[1]):int(sys.argv[2])]]" 0 10
+(then 10 20, 20 30, ...). Read EVERY passage in full.
+RULES: Read ONLY that batch file. Do not open any other file in the repository or data directory, do not search the web, and do not try to identify the book or author; judge only from the passage text. Do not use outside knowledge of any book.
+
+For each passage identify the MAIN obstacle (what most clearly stops, delays or endangers a character's goal in the passage), the BLOCKED character (protagonist of that obstacle), and the OPPONENT (who or what is actively standing in the way). Then code:
+
+opponent_type (one of):
+- person: an individual who is not a relative of the blocked character (incl. a non-relative guardian, employer, official acting individually, rival, villain).
+- family_member: a relative of the blocked character (parent, step-parent, aunt, uncle, grandparent, sibling, cousin, spouse, in-law).
+- institution: a formal body or system: the law, courts, a will/entail as legal instrument, police as a force, government, army orders, a church, a school, a bank, a firm, "the system", bureaucracy.
+- collective: an informal group or diffuse social body: a mob, a crowd, the neighbours, "society", "the world", public opinion, a gang, a tribe, a crew, a family as a group.
+- none: no agent stands in the way (poverty as circumstance, an accidental loss, ignorance of a fact nobody hides, the character's own feelings, the weather, etc.).
+role (one of): parent | aunt_guardian (aunt, uncle, grandparent, guardian, trustee, chaperone, anyone in loco parentis who is not a parent) | suitor_rival (unwanted suitor, romantic rival, competitor) | spouse | employer_master (employer, master, mistress of a servant, captain over crew, teacher/headmaster over pupil) | servant | official_police_lawyer (officials, police, magistrates, judges, lawyers, bailiffs, creditors' agents, officers enforcing orders) | clergy | villain_criminal (thief, kidnapper, swindler, blackmailer, conspirator, murderer) | friend | stranger | other (siblings, cousins, enemy soldiers, hostile natives, anyone else) | none (only when opponent_type is none). For an institution or collective, choose the closest role (official_police_lawyer for law/police/courts, clergy for a church, employer_master for a firm), else other.
+opponent_gender: male | female | mixed (a group or pair of both sexes) | unknown (including institutions and none).
+acts_for: self_interest (the opponent wants something for themselves: love, money, revenge, spite, jealousy, winning, safety) | enforcing_rule_convention (the opponent upholds propriety, class, family honour, morality, religion, a rule of conduct, "what is done", a parent's authority as such) | institution (the opponent acts as the agent of an organisation or office: a policeman arresting, a clerk following regulations, an officer's orders, a firm's policy) | unclear (also use for none).
+protagonist_gender: gender of the BLOCKED character: female | male | unknown.
+quote: 6-20 consecutive words copied EXACTLY, character for character, from the passage, that show the opponent blocking (or, if none, the obstacle). No ellipses, no joined fragments, no spelling fixes.
+note: at most 12 words in plain English: "WHO blocks WHOM from WHAT".
+
+OUTPUT: write /home/lunarz/agentic_literary_discovery/data/work/explore_who/out/{BATCH}.jsonl with exactly one JSON object per input passage, same ids, keys in this order:
+{"id": "...", "opponent_type": "...", "role": "...", "opponent_gender": "...", "acts_for": "...", "protagonist_gender": "...", "quote": "...", "note": "..."}
+Use only the enum values above (lowercase, underscores). Then verify with Bash that the output has one valid JSON line per input id and that every value is in its enum, fix any problems, and reply with just: "{BATCH}: N coded" plus any passages you found genuinely uncodable.

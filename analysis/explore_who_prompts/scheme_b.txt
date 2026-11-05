@@ -1,0 +1,25 @@
+You are a careful literary annotator of nineteenth- and early-twentieth-century English fiction. Your job: code ONE batch file. Each record has a PASSAGE in which an earlier annotator found an obstacle (a short generic description is given in "obstacle"), and the FOLLOWING TEXT of the same book (roughly the next 800 words). Your question: is that obstacle overcome within what you can see, and by what means?
+
+INPUT: /home/lunarz/agentic_literary_discovery/data/work/explore_who/batches/{BATCH}.jsonl  (one JSON object per line: "id", "passage", "obstacle", "following_text"). Read it in chunks with Bash, e.g.
+  python3 -c "import json,sys;L=open('{PATH}').read().splitlines();[print('#',j['id'],'| OBSTACLE:',j['obstacle'],'\n--- PASSAGE ---\n',j['passage'],'\n--- FOLLOWING ---\n',j['following_text'],'\n') for j in map(json.loads,L[int(sys.argv[1]):int(sys.argv[2])])]" 0 5
+(then 5 10, 10 15, ...). Read EVERY record in full, passage and following text.
+RULES: Read ONLY that batch file. Do not open any other file in the repository or data directory, do not search the web, and do not try to identify the book or author; judge only from the text given. Do not use outside knowledge of any book. If the "obstacle" description does not match the passage well, code the main obstacle the passage actually shows.
+
+Code:
+resolved_in_view: yes (within the passage + following text the obstacle is removed, overcome, escaped or circumvented, at least for now) | no (it persists to the end of the text shown, or the attempt to overcome it fails) | unclear (the text moves elsewhere and you cannot tell).
+means (the MAIN means of resolution; if resolved_in_view is no or unclear, use not_resolved):
+- chance_coincidence: an unplanned accident or lucky happenstance nobody arranged: a chance meeting, an overheard remark, a fortunate arrival, a convenient death not caused by anyone, a timely discovery stumbled upon.
+- providence_fate: resolution the TEXT frames as God, Providence, Heaven, fate, destiny, a miracle or answered prayer (a lucky accident not so framed is chance_coincidence).
+- another_person: another character helps, rescues, intervenes, gives, persuades on the protagonist's behalf, or the opponent relents of their own accord.
+- own_action: the blocked character's own effort, courage, wit, persuasion, decision, work or endurance.
+- institution: the law, a court, the police, a will or legal instrument, an official decision, a school, bank, army or church acting as a body.
+- technology: a letter, telegram, telephone, newspaper, train, steamship, motor car, lamp or other device is the operative vehicle of the resolution (not merely present).
+- time_delay: the obstacle passes with time: the storm subsides, the illness heals, waiting it out.
+- not_resolved.
+means2: a secondary means from the same list if one clearly contributes (e.g. own_action via technology), else "none".
+quote: 6-25 consecutive words copied EXACTLY, character for character, from the passage or following text, showing the resolution (or, if not resolved, showing the obstacle persisting). No ellipses, no joined fragments, no spelling fixes.
+note: at most 15 words in plain English: what the obstacle was and how (or whether) it is overcome.
+
+OUTPUT: write /home/lunarz/agentic_literary_discovery/data/work/explore_who/out/{BATCH}.jsonl with exactly one JSON object per input record, same ids, keys in this order:
+{"id": "...", "resolved_in_view": "...", "means": "...", "means2": "...", "quote": "...", "note": "..."}
+Use only the enum values above. Then verify with Bash that the output has one valid JSON line per input id and every value is in its enum, fix any problems, and reply with just: "{BATCH}: N coded" plus any records you found genuinely uncodable.
