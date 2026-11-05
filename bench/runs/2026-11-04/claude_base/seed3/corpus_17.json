@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.0313,
+    0.0203
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition shift (juvenile/adventure overrepresented late)",
+    "sparse early sample (752 pre-1876 works vs 6014 late)",
+    "date uncertainty (52% of works medium/low date confidence)",
+    "origin imbalance (67% unknown origin)",
+    "single passage per work (binary rate, high variance)",
+    "annotation/classifier noise in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p000585",
+    "p003048",
+    "p002473",
+    "p002411",
+    "p001799",
+    "p006642"
+  ],
+  "rationale": "Method: there are 6766 works with one passage each, so each work's rate is count__domains__DISTANCE_TRAVEL/n_passages, which is binary. The work-level counts match the passage-level domain labels 100%. Works dated 1876 or later count as late. Within each of the 8 genres I took the equal-weight mean rate for late works minus early works, then averaged those 8 differences equally. The estimate is -0.0048. The 95% CI, from a bootstrap of 2000 resamples stratified by genre and period, is [-0.031, 0.020] and includes zero. The genre differences point in different directions: adventure +0.05 and juvenile +0.017, but collection -0.056, romance -0.026 and historical -0.019, with the rest near zero. Robustness checks: the estimate changes sign by date confidence (high -0.034, medium +0.005, low +0.036) and by origin (UK -0.028, US -0.005, unknown +0.006). It is about zero (+0.0007) in a window of 20 years either side of the cutoff, and unchanged when 1876 is excluded. Decade rates hover around 0.09-0.11 with no trend, and the early decades are noisy because they are small. Coverage: the early period is thin, with 39-247 works per genre, which limits precision; differences of about 3 points cannot be ruled out. Alternative explanations for any apparent difference include genre mix, dating error, origin imbalance and labeling noise. The cited passage IDs are DISTANCE_TRAVEL-labeled passages from both periods. They show the construct but cannot establish a trend. Conclusion: no robust shift."
+}

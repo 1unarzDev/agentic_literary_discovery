@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0038,
+    0.0447
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "date uncertainty (low/medium date_confidence; high-confidence share differs by period)",
+    "small and unbalanced early sample (752 early vs 6014 late works)",
+    "genre composition differences across periods",
+    "annotation/classifier noise in domain labels",
+    "origin unknown for ~2/3 of works",
+    "single passage per work (sampling noise)"
+  ],
+  "evidence_passage_ids": [
+    "p002729",
+    "p004774",
+    "p002352",
+    "p002487",
+    "p006180",
+    "p000820"
+  ],
+  "rationale": "Methods: rate = count__domains__DISTANCE_TRAVEL / n_passages per work (each work has exactly 1 passage; 6766 works, 1800-1925). Early = year<1876, late = year>=1876. Within each of 8 genres, mean work rate late minus early (equal work weights), then averaged across genres equally. 95% CI from 1000 bootstrap resamples of works stratified by genre x period. Result: +0.025 passage-rate units (CI 0.004 to 0.045). Six of 8 genres are positive (collection +0.075, romance +0.059, juvenile +0.042, historical +0.030, domestic_realist +0.018, other +0.007); adventure (-0.022) and sensation_mystery (-0.006) are negative. By decade the rate goes from about 0.06-0.10 before 1880 to about 0.11-0.12 after 1890, but the early decades are small and noisy (the 1860s are 0.105). Robustness: the point estimate stays positive in every subset (UK +0.033, US +0.019, unknown origin +0.028, juvenile excluded +0.023), but the CI includes zero when restricted to high date-confidence works (+0.015, CI -0.026 to 0.055) or to a 1850-1899 window (+0.018, CI -0.008 to 0.047). Coverage: early periods are thin (37-165 works per genre-period cell), with one passage per work. Alternative explanations: date misassignment near the cutoff; differences in the sampling or makeup of each period; label noise in the domain annotation; and the effect being driven by a few genres. Conclusion: there is a modest increase that is statistically supported, but it is only moderately robust. Passage IDs only illustrate passages coded for the travel/distance domain and cannot by themselves show a trend."
+}

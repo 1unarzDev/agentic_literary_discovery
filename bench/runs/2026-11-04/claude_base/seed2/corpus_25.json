@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0082,
+  "ci": [
+    -0.0159,
+    0.0305
+  ],
+  "confidence": 0.15,
+  "named_confounds": [
+    "genre composition change (juvenile/adventure dominate)",
+    "small early-period samples per genre",
+    "date uncertainty (many low/medium-confidence dates)",
+    "one passage per work sampling noise",
+    "annotation/classifier noise in domain labels",
+    "unknown origin for most works"
+  ],
+  "evidence_passage_ids": [
+    "p001648",
+    "p005799",
+    "p004677",
+    "p001528",
+    "p000233",
+    "p004129"
+  ],
+  "rationale": "Each of the 6766 works has 1 passage. Rate = DISTANCE_TRAVEL count / n_passages per work. For each genre I averaged works equally, took late (year>=1876) minus early, then averaged the 8 genres equally. Estimate +0.0082. The 95% CI from a stratified bootstrap (5000 resamples within genre x period) is [-0.016, 0.031], which includes zero. Genre-level differences go both ways (adventure, juvenile and sensation are slightly lower late; historical, romance and collection are higher). Decade rates stay flat at about 0.10-0.12. Restricting to high-confidence dates gives +0.023, and a 1857-1895 window gives +0.011; neither is clearly different from zero. The early cells are small (38-264 works per genre), the label is binary per passage, and dates are uncertain, so noise could hide or fake a small change. The cited passages are examples of the construct only and do not show a trend. The data do not support a robust historical shift."
+}

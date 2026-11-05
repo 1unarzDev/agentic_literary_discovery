@@ -1,0 +1,28 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0021,
+  "ci": [
+    -0.0211,
+    0.0253
+  ],
+  "confidence": 0.15,
+  "named_confounds": [
+    "early-period sparsity (1125 of 6766 works before 1876)",
+    "genre composition change over time",
+    "low/medium date confidence",
+    "single passage per work (binary rates)",
+    "annotation label noise"
+  ],
+  "evidence_passage_ids": [
+    "p002987",
+    "p004467",
+    "p004285",
+    "p006009",
+    "p003082",
+    "p000318",
+    "p004699",
+    "p001389"
+  ],
+  "rationale": "Each of the 6766 works has one passage, so a work's rate is 0 or 1 for DISTANCE_TRAVEL. Late means year >= 1876. I took the late-minus-early mean within each of the 8 genres, then averaged the genres with equal weight: effect +0.0021. The 95% CI, [-0.021, 0.025], comes from a bootstrap of works resampled within each genre-period cell (2000 reps). Genres disagree on direction: adventure, juvenile, romance and domestic_realist go down a little, while sensation_mystery and other go up. The estimate's sign flips under robustness checks: high-confidence dates only give +0.003, high plus medium give -0.005, dropping 'other' gives -0.005, a 1866 cutoff gives -0.010 and an 1886 cutoff gives +0.004. Decade means fall from the early 1800s to the 1870s and then rise again, which is not one monotonic change at the cutoff. The early period is thin; small early genre cells, some with about 40-50 works, widen the uncertainty. Other things that could create or hide a difference: genre mix within periods, uneven dating precision, and noise in the passage annotations. The cited passages are early and late examples tagged DISTANCE_TRAVEL; they show the construct but do not establish a trend. Conclusion: no robust shift at this cutoff."
+}

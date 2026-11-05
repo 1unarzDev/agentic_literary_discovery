@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0808,
+    -0.0212
+  ],
+  "confidence": 0.75,
+  "named_confounds": [
+    "genre composition differs between periods",
+    "few early works (752 early vs 6014 late)",
+    "uncertain dating (date_confidence)",
+    "one author contributing many works",
+    "origin mix",
+    "reprint/edition selection"
+  ],
+  "evidence_passage_ids": [
+    "p003194",
+    "p005581",
+    "p001783",
+    "p003776",
+    "p000109",
+    "p001765"
+  ],
+  "rationale": "Methods: The data cover 6,766 works dated 1800\u20131925, with one passage per work. The outcome is count__domains__DISTANCE_TRAVEL / n_passages. A work counts as late if its year is 1876 or later. For each genre I took the unweighted mean across works of late minus early, then averaged the 8 genres with equal weight. The 95% CI comes from 1,000 bootstrap resamples drawn within each genre-period cell. Result: the effect is -0.050 (CI -0.081 to -0.021). All 8 genres decline, by between -0.040 and -0.060. An author-cluster bootstrap gives a CI of [-0.080, -0.024]. Composition and dating checks: the share of each genre, origin and date_confidence level is almost the same in the early and late periods (within about 3 points). Mean n_editions and the number of works per author are also similar, so the assigned years show little association with this metadata. The decline holds within each date_confidence level (high -0.040, medium -0.053, low -0.071) and within each origin (UK -0.067, US -0.043, unknown -0.058). An OLS model adjusting for genre, origin, date_confidence, log n_editions and log author productivity, with SEs clustered by author, gives -0.050 [-0.076, -0.024]. Restricting to a window of 1856\u20131895 gives -0.065. Uncertainty: when I keep only high-confidence dates, the effect is -0.040 but the CI reaches zero ([-0.084, 0.001]), which partly reflects a smaller sample. The early period is thin (752 works, and very few before 1840). Decade means are noisy: about 0.13\u20130.19 in the 1840s\u20131870s, a dip to 0.07 in the 1880s, then about 0.10\u20130.12. Alternative explanations: the corpus may not be a representative sample of each period's publishing, and early texts that survived or were digitised may favour travel narratives. The coder that assigns passage labels could also behave differently on older prose. Each work contributes only one passage, so the rate for any single work is very noisy. The cited passage IDs are examples of passages tagged with the travel domain; they show what the label captures but cannot by themselves establish a trend. Overall I judge the decrease moderately robust."
+}

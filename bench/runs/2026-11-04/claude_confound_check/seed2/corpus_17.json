@@ -1,0 +1,24 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.0322,
+    0.0213
+  ],
+  "confidence": 0.08,
+  "named_confounds": [
+    "sparse early-period coverage (few pre-1876 works per genre)",
+    "genre composition",
+    "dating uncertainty (low/medium date_confidence)",
+    "origin imbalance (mostly unknown origin)"
+  ],
+  "evidence_passage_ids": [
+    "p002411",
+    "p000585",
+    "p003048",
+    "p002473",
+    "p001988"
+  ],
+  "rationale": "Data: 6,766 works, each with 1 passage; the DISTANCE_TRAVEL rate is the count divided by n_passages (mean 0.107). The cutoff is 1876. Only about 860 works fall before it, so the early cells in each genre are small. Estimand: take the work-weighted late-minus-early difference in mean rate within each of the 8 genres, then average the genres equally. Result: -0.0048. A 95% CI from 1,000 bootstrap draws, resampled within genre-by-period cells, is [-0.032, 0.021] and includes zero. Genre differences point in both directions (adventure +0.05, collection -0.06, the rest close to zero). Artifact checks: genre, origin and date_confidence shares are nearly the same before and after the cutoff; mean n_editions (1.02 vs 1.09) and author productivity (20 vs 21) are similar. I also fit an OLS of the rate on a late indicator plus genre, origin, date_confidence, log editions and log author productivity, with standard errors clustered by author. Late coefficient: +0.0037, CI [-0.019, 0.026]. Splitting by date confidence gives estimates of mixed sign (high -0.034, medium +0.005, low +0.036), and none is clearly robust. Splitting by origin gives the same picture. Decade means move around without a trend (roughly 0.04-0.17 early, where samples are small; about 0.10-0.11 after 1870). Alternative explanations for any apparent difference: noise in the thin early cells, imprecise dates and genre mix, not a historical change. The cited passage IDs are only examples of passages tagged DISTANCE_TRAVEL; they cannot establish a trend. Conclusion: no robust shift."
+}

@@ -1,0 +1,25 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.032,
+    0.069
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition shift (juvenile overrepresented late, historical/domestic early)",
+    "sparse early sample (11% of works pre-1876)",
+    "dating uncertainty (date_confidence)",
+    "author productivity / prolific authors",
+    "one passage per work (sampling noise)"
+  ],
+  "evidence_passage_ids": [
+    "p003155",
+    "p003778",
+    "p000163",
+    "p004717",
+    "p003686"
+  ],
+  "rationale": "Rate = count__domains__DISTANCE_TRAVEL / n_passages (n_passages=1 for every work, so each work is a single binary passage). Cutoff 1876; within each of 8 genres I took the equal-work mean late minus early, then averaged genres equally: +0.052 (stratified bootstrap 95% CI 0.032-0.069). The increase appears in all 8 genres (+0.04 to +0.06). Checks: year is associated with genre (juvenile 21%->34%, historical 22%->10%), but the estimand already stratifies on genre. Origin, date_confidence, n_editions and author productivity are balanced across periods. The estimate is stable when restricted to high-confidence dates (0.049), medium (0.055) and low (0.045). In an OLS with genre, origin, date confidence, log editions and log author productivity, clustered by author, it is 0.051 (CI 0.033-0.070, p<1e-7). Decade means rise from about 0.03-0.07 before 1880 to about 0.11-0.12 after 1890. Caveats: only 752 works are early, so early cells are small; each work is represented by one coded passage; coding is from an automated classifier. The cited passages are well-dated, high-confidence late passages coded DISTANCE_TRAVEL. They show the construct but do not establish the trend on their own."
+}

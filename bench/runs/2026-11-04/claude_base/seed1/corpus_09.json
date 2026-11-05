@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.026,
+  "ci": [
+    0.005,
+    0.047
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "genre composition shift (juvenile-heavy late corpus)",
+    "sparse and imbalanced pre-1876 sample (752 vs 6014 works)",
+    "date uncertainty (low/medium date_confidence for over half of works)",
+    "origin mix (two-thirds unknown origin)",
+    "one passage per work sampling noise",
+    "annotation/classifier drift in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p004955",
+    "p001389",
+    "p004371",
+    "p002266",
+    "p001165",
+    "p004673"
+  ],
+  "rationale": "Methods: every work contributes exactly one passage (n_passages=1), so a work's rate is count__domains__DISTANCE_TRAVEL/n_passages, which is 0 or 1. Cutoff is 1876 (late means year>=1876). Within each of the 8 genres I took the unweighted mean over works for each period, then averaged the late-minus-early differences across genres with equal weight. For the 95% CI I used an analytic SE that treats genre-period cells as independent; a stratified bootstrap was started but did not finish within the time limit. Coverage: 6766 works dated 1800-1925, but only 752 fall before 1876, and decades before 1850 have 12-73 works each. Result: effect +0.026 (SE 0.011), 95% CI about [0.005, 0.047]. Robustness is weak. Genre-level differences range from -0.060 (adventure) to +0.075 (historical). With low-confidence dates removed the effect is +0.019 (SE 0.013, CI includes 0). High-confidence dates only give +0.041 (SE 0.014). The UK-only (+0.021, SE 0.025) and US-only (+0.006, SE 0.029) subsets show no significant effect, and works of unknown origin drive the estimate. Restricting to 1850-1900 gives +0.024 (SE 0.014). Decade means rise from about 0.07-0.10 in the 1850s-1870s to a flat about 0.11 from the 1880s on, and earlier decades swing a lot because they are so small. Alternative explanations: a sparse, noisy early sample; errors in dating moving works across the cutoff; differences in how the corpus was assembled over time; and drift in how domains were labelled. Each could produce a small difference like this one. Passage IDs only show that the domain label was applied in both periods; they cannot establish a trend. The point estimate suggests a small increase, but the CI only just excludes zero and the result does not hold across subsets, so I abstain rather than claim a robust shift."
+}

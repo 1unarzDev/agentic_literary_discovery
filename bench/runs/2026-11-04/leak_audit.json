@@ -1,0 +1,25 @@
+{
+  "features": [
+    "rows",
+    "works",
+    "passages",
+    "authors",
+    "years",
+    "minimum_year",
+    "maximum_year",
+    "mean_year",
+    "year_entropy",
+    "multiyear",
+    "work_columns",
+    "passage_columns",
+    "missing_cells",
+    "works_bytes",
+    "passages_bytes",
+    "csv_bytes"
+  ],
+  "varying_features": [],
+  "accuracy": 0.3333333333333333,
+  "chance": 0.3333333333333333,
+  "n_corpora": 30,
+  "scope": "Marginal structure/storage only; excludes target effects and nuisance-year associations"
+}

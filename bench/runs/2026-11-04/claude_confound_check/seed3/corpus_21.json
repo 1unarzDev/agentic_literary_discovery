@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0045,
+    0.0468
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence composition shift (high-confidence dating 34% early vs 48% late)",
+    "n_editions differs by period (early works more reprinted)",
+    "sparse early cells (early n per genre 37-165; romance early 40)",
+    "single passage per work (high binomial noise)",
+    "low-confidence dating drives much of the contrast"
+  ],
+  "evidence_passage_ids": [
+    "p001993",
+    "p003569",
+    "p003574",
+    "p003587",
+    "p006592",
+    "p001576",
+    "p003221"
+  ],
+  "rationale": "There are 6766 works, each with exactly one passage (n_passages=1), so each work's rate is 0 or 1. Early means year<1876 (752 works) and late means year>=1876 (6014 works). For the estimand I averaged works equally within each genre-period cell, took the late-minus-early difference in each genre, and averaged those equally across the 8 genres. The result is +0.025 in passage-rate units, with a 95% stratified bootstrap CI of [0.004, 0.047]. The direction is mixed: adventure and sensation_mystery go down slightly, while collection, romance and juvenile go up. Composition checks: genre mix, origin and author productivity are similar across the two periods. Date confidence is not: 34% of early works are high-confidence vs 48% of late works, and early works have more editions (mean 1.26 vs 1.06). A regression with author-clustered errors, adjusting for genre, origin, date_confidence, log editions and log author productivity, gives late = +0.025 with CI [0.001, 0.050], which only just excludes zero. Restricting to high-confidence dates makes the estimate shrink to +0.015, and its CI includes zero (bootstrap [-0.032, 0.049]; OLS with genre controls and clustered errors [-0.021, 0.052]). The low-confidence subset shows the largest effect (+0.043), which suggests imprecise dating may be inflating the contrast. Decade means rise loosely over time, but early decades are tiny and noisy. Other possible explanations: early cells are small and early works are reprinted more often, so the early sample may be selected differently; the single-passage-per-work sampling is noisy; and the passage annotations themselves may be inconsistent. The cited passage IDs are passages tagged with DISTANCE_TRAVEL; they show the construct but cannot establish a trend. Because the effect does not hold up when restricted to well-dated works and the adjusted CI is marginal, I abstain."
+}

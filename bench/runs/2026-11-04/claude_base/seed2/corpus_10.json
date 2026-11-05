@@ -1,0 +1,30 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0042,
+    0.0456
+  ],
+  "confidence": 0.45,
+  "named_confounds": [
+    "Very few early works in some genres (romance n=40, collection n=37, adventure n=77 before 1876)",
+    "Uncertain dating: 1833 works have low date confidence, and the effect shrinks in the high-confidence subset",
+    "Genre mix changes over time (late period is dominated by juvenile works)",
+    "Annotation noise: only one coded passage per work",
+    "Origin is unknown for most works",
+    "Early cells are sparse, so the result is sensitive to the cutoff and window chosen"
+  ],
+  "evidence_passage_ids": [
+    "p004559",
+    "p003496",
+    "p002623",
+    "p003722",
+    "p003729",
+    "p005368",
+    "p001360",
+    "p000444",
+    "p006759"
+  ],
+  "rationale": "Methods: 6766 works, each with exactly one coded passage (n_passages=1). The rate is count__domains__DISTANCE_TRAVEL / n_passages. Early means year < 1876 and late means year >= 1876. Within each of the 8 genres I took the unweighted mean across works for each period, then the late-minus-early difference, then averaged those differences equally across genres. The 95% CI comes from a percentile bootstrap (4000 draws) that resamples works within each genre-by-period cell. Main estimate: +0.025 passage-rate units, CI [0.004, 0.046]; about 1.1% of bootstrap draws were <= 0. Coverage: only 770 early works against 6014 late ones, and the early cells are thin. Robustness: the result is fragile. Most of the main estimate comes from romance (early rate 0/40 vs 0.059 late) and collection (0.027 vs 0.102). Without those two genres the effect is +0.011, CI [-0.016, 0.037]. Using only high date-confidence works gives +0.015, CI [-0.027, 0.051]. A \u00b120-year window around the cutoff gives +0.013 (no CI computed). Low date-confidence works give the largest effect (+0.043), which points to dating artifacts. Two genres go down (adventure and sensation_mystery). Decade means do not rise steadily: the 1860s (0.105) are higher than the 1870s (0.059), and rates sit around 0.09-0.12 after 1880. Other explanations: changes in which genres and works were sampled, misdating that pushes travel-heavy works into the late period, a few small early cells driving the pooled number, and noise from coding a single passage per work. The cited passage IDs are late-period passages coded with the DISTANCE_TRAVEL domain. They show that the construct appears in the data but cannot establish a trend. Conclusion: the headline estimate is positive with a CI that excludes zero, but it does not hold up under reasonable sensitivity checks, so I am abstaining rather than claiming a robust historical shift."
+}

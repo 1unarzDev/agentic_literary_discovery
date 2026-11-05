@@ -1,0 +1,25 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0034,
+    0.0455
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "sparse and uneven pre-1876 coverage (about 750 of 6766 works; very few before 1840)",
+    "genre-mix change over time (juvenile and adventure, which have high base rates, make up much of the late corpus)",
+    "dating uncertainty (27% of works are low-confidence dates, and the effect shrinks when only high-confidence dates are kept)",
+    "one passage per work, so each work-level rate is a noisy 0/1 indicator",
+    "possible drift in the annotation or passage sampling across periods",
+    "different mixes of origin (UK/US/unknown) before and after the cutoff"
+  ],
+  "evidence_passage_ids": [
+    "p005413",
+    "p004727",
+    "p002229",
+    "p001104"
+  ],
+  "rationale": "Methods: I used works.parquet with count__domains__DISTANCE_TRAVEL / n_passages as each work's rate. Every work has n_passages=1, so each rate is 0 or 1. Works with year >= 1876 count as late. Within each genre I averaged works equally and took late minus early, then averaged that difference equally across the 8 genres. For the 95% CI I ran a stratified bootstrap with 2000 resamples, resampling works within each genre-by-period cell. Result: the effect is +0.025 (CI 0.003 to 0.045), and 1.3% of bootstrap draws were at or below zero. Genre differences were positive in 6 of 8 genres; adventure (-0.022) and sensation_mystery (-0.006) went slightly down. Sensitivity checks: the effect was positive every time but varied in size. Keeping only high-confidence dates gave 0.015, dropping low-confidence dates gave 0.020, and excluding the other and collection genres gave 0.020. Moving the cutoff gave 0.030 at 1856, 0.015 at 1866, 0.026 at 1886 and 0.018 at 1896. Every origin subset was positive: UK 0.033, US 0.019, unknown 0.028. Decade means rise from roughly 0.03-0.08 before 1860 to roughly 0.11-0.12 after 1890, with noise in the sparse early decades. Coverage: the early period is thin. Several genres have only 37-77 early works, and romance has an early rate of 0 from just 40 works, which pulls the average up. Alternative explanations: the change in the corpus's genre and sub-genre makeup, dating errors that move works across the cutoff, and annotation or sampling drift could each produce or inflate a modest increase. Conclusion: the evidence for a small increase is modest. The effect points the same way in every check, but the CI lower bound is close to zero and the effect weakens under stricter dating. The cited passage IDs are late-period passages tagged with this domain. They show what the construct looks like but cannot establish the trend on their own."
+}

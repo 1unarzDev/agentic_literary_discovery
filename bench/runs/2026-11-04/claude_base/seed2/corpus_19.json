@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0149,
+  "ci": [
+    -0.0405,
+    0.0107
+  ],
+  "confidence": 0.15,
+  "named_confounds": [
+    "genre composition shift (late period dominated by juvenile/adventure)",
+    "sparse early-period samples per genre (43-251 works)",
+    "date uncertainty (half of works have low/medium date confidence)",
+    "origin imbalance and heterogeneity (UK +0.016 vs US -0.046)",
+    "one passage per work so work-level rates are binary and noisy",
+    "annotation/classifier error in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p003039",
+    "p000884",
+    "p000090",
+    "p001878",
+    "p002577"
+  ],
+  "rationale": "I used works.parquet: 6,766 works, each with exactly one passage, all dated. I split works at cutoff 1876 (early <1876, late >=1876). The work-level rate is count__domains__DISTANCE_TRAVEL divided by n_passages. Within each genre I took the equal-weight mean of works in each period and the late-minus-early difference, then averaged the 8 genres with equal weight. Estimate: -0.0149 passage-rate units. A 95% CI from 2,000 stratified bootstrap resamples (works resampled within genre x period) is [-0.040, 0.011], which includes zero. Genre-level differences go both ways: collection +0.08, adventure and juvenile about 0, and domestic, historical, other, romance and sensation between -0.02 and -0.06. The early-period samples are small, so these genre differences are imprecise. Sensitivity checks: high-confidence dates only gave -0.010, medium -0.039, low -0.025; UK +0.016, US -0.046, unknown origin -0.013; a narrower 1846-1905 window gave -0.013. Decade means stay flat at about 0.10-0.16 with no monotone trend. Alternative explanations for the small negative point estimate include sampling noise in the thin early cells, unreliable dates, origin mix and labeling error. The cited passage IDs are only examples of passages tagged with this construct; they cannot show a trend. Conclusion: the data do not support a robust historical shift."
+}

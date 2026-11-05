@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0022,
+    0.0452
+  ],
+  "confidence": 0.45,
+  "named_confounds": [
+    "sparse early-period cells (e.g. romance n=40 early, 0 hits; collection n=37)",
+    "date uncertainty (52% of works medium/low date confidence)",
+    "author clustering (prolific authors up to 110 works)",
+    "genre composition shift toward juvenile/adventure after 1876",
+    "single passage per work (rate is a 0/1 indicator)",
+    "annotation/classifier drift"
+  ],
+  "evidence_passage_ids": [
+    "p004183",
+    "p005034",
+    "p004962",
+    "p002078",
+    "p000849"
+  ],
+  "rationale": "Methods: 6,766 works, each with one passage, so the work-level rate is a 0/1 indicator for DISTANCE_TRAVEL. I split works at year >= 1876 (late) versus earlier, took the mean rate within each genre-by-period cell (so works within a genre are weighted equally), and averaged the late-minus-early differences over the 8 genres with equal weight. Result: effect +0.025, 95% CI [0.002, 0.045] from a 2,000-draw bootstrap that resampled works within each genre-by-period cell. An author-cluster bootstrap gave a similar CI of [0.0004, 0.048]. Coverage: only 932 early works against 5,834 late ones, and several early cells are small (collection 37, romance 40 with zero hits, other 51, sensation 57). The difference is positive in 6 of 8 genres; adventure and sensation_mystery go slightly down. Decade means rise from about 0.03-0.08 before 1860 to about 0.11-0.12 after 1890, but the early decades are noisy. Robustness: the effect shrinks to 0.015 with CI [-0.029, 0.050] when I keep only high-date-confidence works, to 0.012 with one work per author, to 0.018 within 1850-1899, and to 0.020 when romance is dropped (romance's 0/40 early cell drives much of the result). The lower bounds of the full-sample CIs sit just above zero, and the effect is not stable across reasonable alternative specifications. Alternative explanations: early cells are small and noisy, dates are uncertain, prolific authors carry heavy weight, the genre mix shifts within each genre's sample, and annotation could drift with changes in style or vocabulary. Passage IDs are examples of works coded for the construct; they do not establish a trend. Conclusion: there is a weak signal of an increase, but it does not meet the bar for a robust historical shift, so I abstain."
+}

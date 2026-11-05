@@ -1,0 +1,25 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0082,
+  "ci": [
+    -0.0157,
+    0.031
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "date_confidence imbalance (early works mostly high-confidence dates, late works often low/medium)",
+    "small early sample (752 vs 6014 works)",
+    "genre composition",
+    "origin composition",
+    "author productivity"
+  ],
+  "evidence_passage_ids": [
+    "p003397",
+    "p001858",
+    "p004045",
+    "p005139",
+    "p001768"
+  ],
+  "rationale": "Data: 6766 works, each with one coded passage (n_passages=1), so a work's rate is either 0 or 1. Cutoff is 1876. Estimand: for each of 8 genres, take the late-minus-early difference in mean DISTANCE_TRAVEL rate (each work weighted equally), then average the genres equally. Result: +0.0082. A 95% bootstrap CI, resampling works within each genre (2000 draws), is [-0.016, 0.031], which includes 0. The genre-level differences go in both directions: adventure, juvenile and sensation_mystery are lower late, while historical, romance and collection are higher. Composition checks: year is clearly associated with date_confidence. 72% of early works have high-confidence dates, against 43% of late works. Genre and origin shares are roughly balanced across the cutoff, and n_editions and author productivity are similar on both sides. Restricted to well-dated (high-confidence) works, the effect is +0.023. For low-confidence works it is -0.017 and for medium-confidence works +0.009. By origin it is UK -0.017 and US +0.032. A passage-weighted regression adjusting for genre, origin, date_confidence, log editions and log author productivity, with standard errors clustered by author, gives +0.005 [-0.019, 0.030]. Decade means stay flat at about 0.10-0.12 from the 1820s through the 1910s. The early period is thin, and the decades before 1820 have very few works. So no robust shift is supported, because the estimate is small, its sign is unstable across strata, and every CI includes zero. The cited passage IDs are examples coded with the DISTANCE_TRAVEL domain at confidence 0.9 or higher. They show what the construct looks like but do not establish any trend."
+}

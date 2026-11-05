@@ -1,0 +1,102 @@
+{
+  "condition": "confound_check",
+  "token_budget": 8000,
+  "isolated": true,
+  "token_budget_enforcement": "prompt_only",
+  "workdir": "/home/lunarz/.cache/bench-agent-runs/bench-agent-59exqxmb",
+  "status": "ok",
+  "returncode": 0,
+  "elapsed": 69.29196781600331,
+  "summary": {
+    "model": "claude-opus-5-5",
+    "cli_version": "2.1.318",
+    "tools_available": [
+      "Bash",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Read",
+      "Write"
+    ],
+    "duration_ms": 67972,
+    "duration_api_ms": 30879,
+    "num_turns": 5,
+    "total_cost_usd": 0.1091744,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 6617,
+      "cache_read_input_tokens": 46447,
+      "output_tokens": 3338,
+      "output_tokens_details": {
+        "thinking_tokens": 226
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 6617
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1182,
+          "cache_read_input_tokens": 12109,
+          "cache_creation_input_tokens": 1126,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 1126,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "modelUsage": {
+      "claude-opus-5-5": {
+        "inputTokens": 10,
+        "outputTokens": 3338,
+        "cacheReadInputTokens": 46447,
+        "cacheCreationInputTokens": 6617,
+        "webSearchRequests": 0,
+        "costUSD": 0.1091744,
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "thinkingTokens": 226,
+        "cacheCreationEphemeral5mInputTokens": 6617,
+        "cacheCreationEphemeral1hInputTokens": 0,
+        "canonicalModel": "claude-opus-5-5",
+        "provider": "firstParty",
+        "costBasis": "list"
+      }
+    },
+    "is_error": false,
+    "subtype": "success",
+    "tool_calls": [
+      {
+        "tool": "Bash",
+        "input": "cd /home/lunarz/.cache/bench-agent-runs/bench-agent-59exqxmb; ls; cat task.json; python -I -c \"\nimport pandas as pd\nw=pd.read_parquet('works.parquet');p=pd.read_parquet('passages.parquet')\nprint(w.head());print(w.dtypes);print(p.head());print(p.dtypes);print(len(w),len(p))\nfor c in w.columns:\n  if w[c].nunique()<20: print(w[c].value_counts())\nfor c in p.columns:\n  if p[c].nunique()<20: print(p[c].value_counts())\n\""
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /home/lunarz/.cache/bench-agent-runs/bench-agent-59exqxmb; cat > /tmp/a.py <<'EOF'\nimport pandas as pd,numpy as np,statsmodels.formula.api as smf\nw=pd.read_parquet('works.parquet')\nw['r']=w['count__domains__DISTANCE_TRAVEL']/w.n_passages\nw['late']=(w.year>=1876).astype(int)\nprint(w.year.isna().sum(), w.r.mean())\ndef est(d):\n    g=d.groupby(['genre','late']).r.mean().unstack()\n    return (g[1]-g[0]).mean(), g\ne,g=est(w);print(e);print(g)\nrng=np.random.default_rng(0);bs=[]\nfor _ in range(1000):\n    s=w.groupby('genre',group_keys=False).apply(lambda x:x.sample(len(x),replace=True,random_state=rng.integers(1e9)))\n    bs.append(est(s)[0])\nprint(np.percentile(bs,[2.5,97.5]))\nfor c in ['genre','origin','date_confidence']: print(pd.crosstab(w[c],w.late,normalize='columns').round(3))\nprint(w.groupby('late').n_editions.mean())\nw['prod']=w.groupby('author_key').work_id.transform('count');print(w.groupby('late')['prod'].mean())\nfor dc in ['high','medium','low']: print(dc,est(w[w.date_confidence==dc])[0])\nfor o in ['UK','US','unknown']: print(o,est(w[w.origin==o])[0])\nm=smf.ols('r~late+C(genre)+C(origin)+C(date_confidence)+np.log(n_editions)+np.log(prod)',w).fit(cov_type='cluster',cov_kwds={'groups':w.author_key.astype('category').cat.codes});print(m.params['late'],m.conf_int().loc['late'].values)\nprint(w.groupby('decade').r.mean().round(3))\nEOF\npython -I /tmp/a.py"
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /home/lunarz/.cache/bench-agent-runs/bench-agent-59exqxmb; python - <<'EOF'\nimport re\ns=open('/tmp/a.py').read()\ns=s.replace(\"\"\"    s=w.groupby('genre',group_keys=False).apply(lambda x:x.sample(len(x),replace=True,random_state=rng.integers(1e9)))\n    bs.append(est(s)[0])\"\"\",\"\"\"    idx=np.concatenate([rng.choice(ix,len(ix)) for ix in w.groupby(['genre','late']).indices.values()])\n    bs.append(est(w.iloc[idx])[0])\"\"\")\nopen('/tmp/a.py','w').write(s)\nEOF\npython -I /tmp/a.py 2>&1 | tail -60; python -I -c \"\nimport pandas as pd;w=pd.read_parquet('works.parquet');print(pd.crosstab(w.genre,w.year>=1876))\""
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /home/lunarz/.cache/bench-agent-runs/bench-agent-59exqxmb; python -I - <<'EOF'\nimport pandas as pd,numpy as np,statsmodels.formula.api as smf\nw=pd.read_parquet('works.parquet');w['r']=w['count__domains__DISTANCE_TRAVEL'];w['late']=(w.year>=1876).astype(int)\ndef est(d):\n    g=d.groupby(['genre','late']).r.mean().unstack();return (g[1]-g[0]).mean()\nrng=np.random.default_rng(1)\nfor name,d in [('high',w[w.date_confidence=='high']),('hm',w[w.date_confidence!='low']),('ed1',w[w.n_editions==1])]:\n    bs=[est(d.iloc[np.concatenate([rng.choice(ix,len(ix)) for ix in d.groupby(['genre','late']).indices.values()])]) for _ in range(800)]\n    print(name,est(d),np.percentile(bs,[2.5,97.5]))\nh=w[w.date_confidence=='high']\nprint(smf.logit('r~late+C(genre)+C(origin)',h).fit(disp=0).summary().tables[1].data[1:3])\nprint(smf.logit('r~year+C(genre)+C(origin)+C(date_confidence)',w).fit(disp=0).pvalues['year'])\np=pd.read_parquet('passages.parquet');m=p.merge(w[['work_id','year','genre']],on='work_id')\nm=m[m.domains.apply(lambda x:'DISTANCE_TRAVEL' in list(x))&(m.confidence>=0.9)]\nprint(m.sort_values('year').groupby('late' if False else (m.year>=1876)).head(4)[['passage_id','year','genre','technology_named']])\nEOF"
+      }
+    ],
+    "n_tool_calls": 4
+  },
+  "final_text": "```json\n{\n  \"claim\": \"abstain\",\n  \"direction\": \"unknown\",\n  \"effect\": 0.0253,\n  \"ci\": [0.0032, 0.0455],\n  \"confidence\": 0.35,\n  \"named_confounds\": [\n    \"date_confidence composition shift (high-confidence dates 34% of early works vs 48% of late works; medium-confidence 37% vs 25%)\",\n    \"genre composition linked to year (juvenile 21% early vs 34% late; historical 22% vs 10%)\",\n    \"sparse early period (752 works before 1876 vs 6014 after; romance and collection have only 37-40 early works each)\",\n    \"n_editions differs by period (mean 1.26 early vs 1.06 late)\",\n    \"author clustering\"\n  ],\n  \"evidence_passage_ids\": [\"p004115\", \"p000153\", \"p005406\", \"p000460\", \"p005663\", \"p004228\", \"p003808\", \"p001689\"],\n  \"rationale\": \"Data: 6,766 works, each with exactly one coded passage. So the passage rate for a work is 0 or 1, based on whether its passage is tagged DISTANCE_TRAVEL. Overall rate is 0.107. Every work has a year. Cutoff is 1876: 752 early works, 6,014 late. Method: within each genre, I took the mean of the work-level rates in each period and computed late minus early. I then averaged those differences equally across the 8 genres. The 95% CI comes from 1,000 bootstrap resamples drawn within each genre-by-period cell. Main result: +0.0253, CI [0.0032, 0.0455]. 6 of 8 genres go up; adventure and sensation_mystery go slightly down. The romance early rate is 0 out of 40 works and collection is 1 out of 37, so a few small cells drive part of the average. Artifact checks: years are clearly related to genre mix and to date_confidence. Origin mix is stable, and author productivity is similar in both periods (mean 20.6 vs 21.0 works per author). An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with errors clustered by author, gives +0.0255, CI [0.001, 0.050]. That barely excludes zero. A logit using continuous year with the same kinds of controls gives p=0.028. The result does not hold up when restricted to well-dated works: high-confidence dates only gives +0.015, CI [-0.023, 0.050]; high plus medium gives +0.020, CI [-0.009, 0.045]. Low-confidence-dated works give the largest effect (+0.043), which points to a dating artifact. Restricting to single-edition works gives +0.032, CI [0.009, 0.051]. Decade means rise slowly and unevenly, and the early decades rest on very few works. Conclusion: the full-sample contrast is small, sits close to zero, and is not significant among well-dated works. It may come from dating error or from sparse early cells, so I am not claiming a robust shift. The cited passage IDs are travel-tagged passages (early and late, coder confidence of at least 0.9). They show what the construct looks like but cannot establish a trend.\"\n}\n```",
+  "stderr": "",
+  "corpus_id": "corpus_08"
+}

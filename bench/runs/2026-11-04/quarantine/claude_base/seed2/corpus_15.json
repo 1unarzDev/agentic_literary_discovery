@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0808,
+    -0.0216
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition change (early period small, late dominated by juvenile)",
+    "date uncertainty (46% medium/low date confidence)",
+    "prolific-author clustering (1669 authors, top author 110 works)",
+    "origin mix (67% unknown origin)",
+    "annotation/classifier drift across period language",
+    "sparse early sample (961 works pre-1876 vs 6014 after)"
+  ],
+  "evidence_passage_ids": [
+    "p006674",
+    "p000619",
+    "p000379",
+    "p004045",
+    "p004463",
+    "p001296"
+  ],
+  "rationale": "Construct: share of passages tagged DISTANCE_TRAVEL (count/n_passages; every work has 1 passage, 6766 works). Estimand: for each of 8 genres, mean work-level rate late (year>=1876) minus early, then the unweighted mean across genres. Effect = -0.050. 95% CI [-0.081,-0.022] from a 2000-rep bootstrap of works stratified by genre x period. All 8 genres decline (e.g. domestic_realist 0.091->0.038, juvenile 0.205->0.153, adventure 0.195->0.144). Robustness: high date confidence only -0.062, medium -0.038, low -0.035. UK -0.059, US -0.022, unknown origin -0.054. Dropping works within 10 years of the cutoff gives -0.067. Decade means fall fairly steadily from about 0.16-0.20 (1800s-1860s) to about 0.10-0.11 (1880s-1920s), so the result doesn't depend on one cutoff artifact. Caveats: early cells are small (37-165 works per genre), so the CI is wide relative to the effect. Works are clustered within prolific authors, and an author-clustered CI would probably be somewhat wider; I attempted one but did not complete it. The tags come from annotation, and the cited passage IDs only illustrate what the tag captures; they don't prove a trend. Possible alternative explanations: sampling or selection differences between the sparse early archive and the dense late one, imprecise dating, and tagging that responds to surface vocabulary rather than narrative function. Even so, the consistent sign across genres, date-confidence strata and origins supports a modest real decrease."
+}

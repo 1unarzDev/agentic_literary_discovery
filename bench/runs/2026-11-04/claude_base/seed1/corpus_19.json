@@ -1,0 +1,25 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0149,
+  "ci": [
+    -0.0405,
+    0.0107
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition change over time (late period dominated by juvenile works)",
+    "small early-period samples per genre (43-251 works)",
+    "imprecise dating (about 27% of works low date confidence)",
+    "unknown origin for most works (UK vs US differ in sign)",
+    "one passage per work, so passage rate is binary per work"
+  ],
+  "evidence_passage_ids": [
+    "p000884",
+    "p000090",
+    "p001878",
+    "p002577",
+    "p001176"
+  ],
+  "rationale": "Methods: 6,766 works, one passage each. Rate = count__domains__DISTANCE_TRAVEL / n_passages. Works dated 1876 or later count as late. For each genre I took the mean work rate late minus the mean early, then averaged the 8 genres with equal weight. The 95% CI comes from a bootstrap of 2,000 resamples, resampling works within each genre-by-period cell. Result: effect = -0.0149, CI [-0.040, 0.011], which includes zero. The sign is mixed across genres. Collection rises (+0.08, but only 43 early works). Domestic, historical, other, romance and sensation fall by 0.02-0.06. Adventure and juvenile are flat. Decade means stay at about 0.10-0.16 with no monotone trend. Robustness checks: high date confidence only gives -0.010, first editions only gives -0.017, and dropping the other and collection genres gives -0.023. By origin the sign flips: US -0.046, UK +0.016. Coverage: the early period is thin (1,019 works, few before 1850). Alternative explanations: any apparent drop could come from genre and sample makeup, dating error near the cutoff, or noise in the passage annotations, not real historical change. The passage IDs show annotated travel and distance passages; they illustrate the construct and do not establish a trend. Conclusion: the data do not support a robust shift."
+}

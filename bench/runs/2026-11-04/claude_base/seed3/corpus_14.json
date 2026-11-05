@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0077,
+  "ci": [
+    -0.033,
+    0.016
+  ],
+  "confidence": 0.15,
+  "named_confounds": [
+    "genre composition change (late period dominated by juvenile works)",
+    "early-period sparsity (752 early vs 6014 late works)",
+    "date uncertainty (about 27% low-confidence dates)",
+    "origin mix (large unknown-origin share)",
+    "author clustering",
+    "annotation/classifier noise in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p006041",
+    "p005821",
+    "p003710",
+    "p000553",
+    "p000323",
+    "p004291"
+  ],
+  "rationale": "Methods: 6766 works, each with exactly one passage, and every year field is filled in. Each work's rate is count__domains__DISTANCE_TRAVEL divided by n_passages. Works dated 1876 or later count as late. Within each of the 8 genres, works get equal weight in the late and early means. The estimate is the plain average across genres of late minus early. Result: -0.0077. A stratified bootstrap (2000 resamples within genre x period) gives a 95% CI of [-0.033, 0.016], which includes zero. The genre-level differences point in both directions: adventure, juvenile, romance and sensation_mystery go up, while collection, domestic_realist, historical and other go down. The decade means stay roughly flat at 0.10-0.13 with no trend. Sensitivity checks also disagree on sign: high-confidence dates -0.024, medium-confidence dates +0.003, one work per author -0.031, UK +0.005, US -0.040, unknown origin +0.001, excluding works within 10 years of the cutoff -0.016. Coverage: the early period is thin, with 47-207 works per genre, so early estimates are noisy. Alternative explanations for any apparent difference include changes in genre and origin mix, dating error near the cutoff, repeated authors, and labeling noise. The cited passage IDs carry the DISTANCE_TRAVEL label. They only show that the construct is present and say nothing about a trend. Conclusion: the data do not support a robust historical shift. They are consistent with no change, though a small effect of a few percentage points in either direction cannot be ruled out."
+}

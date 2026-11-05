@@ -1,0 +1,28 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": -0.0258,
+  "ci": [
+    -0.0523,
+    -0.0008
+  ],
+  "confidence": 0.42,
+  "named_confounds": [
+    "author productivity / prolific-author composition (late works mean author output 22 vs 10 early)",
+    "genre composition and genre-specific effects (decline concentrated in adventure and historical)",
+    "date_confidence imbalance (low-confidence dating more common late)",
+    "sparse early period (752 early vs 6014 late works; few pre-1840 works)",
+    "single passage per work (binary per-work rates, high noise)"
+  ],
+  "evidence_passage_ids": [
+    "p000616",
+    "p004194",
+    "p003572",
+    "p003991",
+    "p001671",
+    "p005316",
+    "p003796",
+    "p005731"
+  ],
+  "rationale": "Method: each of the 6766 works has exactly one passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages (0 or 1). Works were split at year >= 1876. I took the late-minus-early difference within each of the 8 genres, giving each work equal weight inside its genre, and then averaged the 8 genre differences equally. The result is -0.026 passage-rate units. A 95% CI from a bootstrap within genre-period cells (1000 resamples) is [-0.052, -0.001], so it only just excludes zero. Most of the drop comes from adventure (-0.08) and historical (-0.10). Several genres show no change, and domestic_realist and sensation_mystery rise slightly. Artifact checks: genre, origin and n_editions shares are similar in the two periods. Low-confidence dates are more common in the late period (28% vs 23%). Author productivity differs a lot: late works come from much more prolific authors (mean 22 works per author vs 10). The checks pull in different directions. Restricting to high-confidence dates gives -0.044 [-0.082, -0.009]. Works by authors with 5 or fewer works give -0.045 [-0.085, -0.013]. Averaging to one value per author gives -0.029 [-0.059, -0.004]. But among prolific authors the effect is +0.002 [-0.036, 0.038]. An OLS model adjusting for genre, origin, date_confidence, editions and productivity, with SEs clustered by author, gives -0.025 [-0.050, +0.001], which includes zero. Decade means do not show a clean break: rates peak around 1830-1880 and then fall. The early period is also thinly sampled. Alternative explanations: changes in which authors and subgenres were sampled (especially fewer travel-heavy adventure and historical works per author later), noise from dating, and the small early sample. A modest decrease is plausible, but it is small, depends on the specification, sits near zero, and is not consistent across genres or the productivity strata. So I abstain rather than claim a robust shift. The cited passage IDs are passages coded DISTANCE_TRAVEL from both periods. They show the construct but cannot establish a trend."
+}

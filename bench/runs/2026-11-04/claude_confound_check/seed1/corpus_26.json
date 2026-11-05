@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0049,
+    0.0454
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence composition differs by period",
+    "decade heaping of imputed years in low-confidence works",
+    "small and unbalanced early sample (752 early vs 6014 late; 37-165 early works per genre)",
+    "n_editions differs by period",
+    "genre-specific early cells with zero or near-zero rates (e.g. romance)"
+  ],
+  "evidence_passage_ids": [
+    "p006353",
+    "p002976",
+    "p002439",
+    "p005543",
+    "p004499",
+    "p005719"
+  ],
+  "rationale": "Method: each work has one passage, so a work's rate is count__domains__DISTANCE_TRAVEL divided by n_passages. Works are split at 1876 (late = year >= 1876). I averaged works equally within each genre and period, took late minus early for each of the 8 genres, then averaged the genres equally. The 95% CI comes from 1000 bootstrap resamples of works within each genre-by-period cell. Full sample: effect +0.025 passage-rate units, CI [0.005, 0.045]. Five of the 8 genres go up and adventure and sensation_mystery go down slightly. Decade means rise roughly from about 0.03-0.08 before 1860 to about 0.11-0.12 after 1890, but the early decades are small. A regression adjusting for genre, origin, date_confidence, log editions and log author productivity, with errors clustered by author, gives +0.025, CI [0.001, 0.050], which barely excludes zero. Artifact checks: date confidence is linked to period. High-confidence dates make up 34% of early works but 48% of late works, and medium-confidence dates make up 37% versus 25%. Low-confidence years cluster on decade boundaries (512 end in 0). Mean n_editions is also higher in the early period (1.26 vs 1.06). Origin mix is about the same in both periods. The effect is largest among low-confidence works (+0.043) and shrinks among well-dated ones. High-confidence only: +0.015, CI [-0.027, 0.052]. High plus medium: +0.020, CI [-0.007, 0.044]. Genre-adjusted, high-confidence only, clustered by author: CI [-0.021, 0.052]. Because the contrast does not survive restriction to well-dated works, the evidence does not establish a robust historical shift. A modest increase is plausible but not shown. Other possible explanations are how the corpus was sampled across periods, imputed dates, and the shifting genre and edition mix. The passage IDs listed only show that DISTANCE_TRAVEL tags exist in late and early works. They cannot establish a trend."
+}

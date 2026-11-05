@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0129,
+  "ci": [
+    -0.0398,
+    0.0138
+  ],
+  "confidence": 0.18,
+  "named_confounds": [
+    "genre composition shift (juvenile works dominate late period)",
+    "sparse early-period samples per genre (35-259 works)",
+    "date uncertainty (low/medium date_confidence for ~53% of works)",
+    "origin imbalance and sign reversal across UK/US subsets",
+    "one sampled passage per work limits within-work precision",
+    "reprint/edition selection"
+  ],
+  "evidence_passage_ids": [
+    "p004436",
+    "p005351",
+    "p005848",
+    "p000003",
+    "p003238",
+    "p004836"
+  ],
+  "rationale": "Each of the 6766 works has one coded passage, so its rate is count__domains__DISTANCE_TRAVEL/n_passages. I split works at 1876 (early <1876, late >=1876), averaged works with equal weight within each genre-by-period cell, took the late-minus-early difference for each of the 8 genres, and averaged those differences with equal weight. Effect = -0.013 passage-rate units. A 95% stratified bootstrap (2000 resamples within genre-by-period cells) gives [-0.040, 0.014], which includes zero. Genre differences point both ways: adventure, collection and sensation_mystery rise, while romance (-0.066), historical and juvenile fall. Sensitivity checks also disagree in sign: high-date-confidence works only -0.022; high plus medium -0.002; single-edition works -0.015; UK +0.010; US -0.086; unknown origin about 0; dropping 1866-1885 -0.014. Pooled decade means rise from about 0.08 to 0.14, but this mostly reflects composition: late works are heavily juvenile and adventure, which have high rates. The equal-genre estimand removes that effect. Early cells are small, many dates are uncertain, and each work contributes only one passage, so precision is low. The cited passage IDs are examples coded for the construct and do not show a trend. Conclusion: the data do not support a robust historical shift."
+}

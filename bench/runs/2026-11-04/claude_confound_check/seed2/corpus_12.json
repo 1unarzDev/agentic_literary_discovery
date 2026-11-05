@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0032,
+    0.0463
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "date_confidence composition (high-confidence share 34% early vs 48% late; effect concentrated in low-confidence dates)",
+    "author clustering / author productivity",
+    "genre mix (juvenile 21% early vs 34% late)",
+    "n_editions imbalance (1.26 early vs 1.06 late)",
+    "sparse early cells (37-165 works per genre before 1876)"
+  ],
+  "evidence_passage_ids": [
+    "p006684",
+    "p006172",
+    "p001162",
+    "p005340",
+    "p000196",
+    "p002765"
+  ],
+  "rationale": "Data: 6,766 works, each with one passage (so n_passages=1 and the rate is a 0/1 indicator for DISTANCE_TRAVEL), with 752 works before 1876 and 6,014 from 1876 on. Every work has a year. Estimand: within each of the 8 genres, the mean rate of late works minus the mean rate of early works, then the unweighted average of those 8 differences. Result: +0.025 passage-rate units. A bootstrap that resamples works within each genre-by-period cell (1,000 draws) gives a 95% CI of [0.003, 0.046]. Robustness checks: (1) OLS with controls for genre, origin, date_confidence, log n_editions and log author productivity, with standard errors clustered by author, gives +0.026 [0.001, 0.050], p=0.04, which is marginal. (2) A bootstrap that resamples whole authors gives [-0.0003, 0.048], which includes 0. (3) Using only works with high date confidence, the effect falls to +0.015 with CI [-0.024, 0.053]. The effect is largest among low-confidence dates (+0.043), which points to a dating artifact. Composition: the late period has more juvenile works (a genre with a high base rate of this construct) and more high-confidence dates. Early works have more editions. Within-genre differences are mixed in sign: adventure and sensation_mystery decrease, while romance and collection increase from small early samples (40 and 37 works). Decade means rise roughly from the 1820s to the 1910s, but early decades are sparse and noisy (the 1800s show 0.167 from only 12 works). The cited passage IDs are works whose passage is annotated DISTANCE_TRAVEL in both periods. They show what the construct looks like but cannot establish a trend. Conclusion: the main estimate is positive but small and only marginally significant. It does not survive author clustering or restriction to well-dated works, so a robust historical shift is not supported and I abstain. The point estimate and CI above are reported for transparency."
+}

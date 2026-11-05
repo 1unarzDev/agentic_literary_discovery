@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.033,
+    0.07
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "early-period sparsity (only ~750 of 6766 works before 1876)",
+    "genre composition change over time",
+    "date uncertainty (about half the works have low/medium date confidence)",
+    "origin mix (UK/US/unknown)",
+    "annotation/classifier drift across period language",
+    "one passage per work: passage sampling noise"
+  ],
+  "evidence_passage_ids": [
+    "p006486",
+    "p005490",
+    "p000612",
+    "p004473",
+    "p005502",
+    "p006677"
+  ],
+  "rationale": "Rate = count__domains__DISTANCE_TRAVEL / n_passages (every work has 1 passage). Early = year<1876, late = >=1876. I averaged works equally within each genre-period cell, took late minus early for each genre, then averaged the 8 genres equally: +0.052. The 95% CI [0.033, 0.070] comes from a stratified bootstrap over works within genre-period cells (4000 reps). All 8 genres go up, by +0.045 to +0.060. The result holds in robustness checks: high/medium/low date confidence gives +0.044/+0.070/+0.044; UK/US/unknown origin gives +0.029/+0.068/+0.054; dropping 1866-1885 gives +0.044; single-edition works only gives +0.049. Decade means are about 0.05 or lower in the 1850s-1870s and 0.10-0.13 from the 1880s to the 1920s, so the change looks like a step around the 1880s rather than noise. Caveats: there are few early works (some genre cells have n=37-77, and two early cells are at 0), and each work contributes only one passage. Alternative explanations: plot conventions or which works were selected into the corpus may have changed rather than the construct itself; the passage-level labels may behave differently on later prose; misdated works add noise. The cited passages are tagged DISTANCE_TRAVEL and span 1823-1925. They only illustrate the label and do not by themselves show a trend."
+}

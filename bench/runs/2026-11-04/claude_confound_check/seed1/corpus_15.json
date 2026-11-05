@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0806,
+    -0.0218
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition (juvenile share rises late, historical/domestic share falls)",
+    "small early sample (about 750 pre-1876 works)",
+    "date imprecision (low/medium date_confidence)",
+    "origin mix (US effect weaker)",
+    "author productivity / repeated authors"
+  ],
+  "evidence_passage_ids": [
+    "p000619",
+    "p000379",
+    "p004045",
+    "p004463",
+    "p001296",
+    "p006674"
+  ],
+  "rationale": "Methods: The corpus has 6,766 works, each with exactly one passage, so a work's rate is count__domains__DISTANCE_TRAVEL / n_passages (0 or 1). Works dated 1876 or later count as late. Following the estimand, I averaged works equally within each genre-period cell, took late minus early in each of the 8 genres, and averaged the genres equally. Result: -0.050. A bootstrap with 2,000 resamples, done separately within each genre-period cell, gives a 95% CI of [-0.081, -0.022]. The rate falls in every one of the 8 genres, by between 0.04 and 0.06. Artifact checks: Genre mix and origin, edition count, date confidence and author productivity together explain very little of year (R^2 = 0.037). The biggest composition change is genre: juvenile works rise from 21% to 34% of the sample and historical works fall from 22% to 10%. Equal genre weighting, and stratifying by genre, removes this, because the decline appears inside each genre. An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with standard errors clustered by author, gives late = -0.051 [-0.077, -0.025]. Restricting to well-dated works (high date_confidence) gives -0.062. Restricting to single-edition works gives -0.049. By origin: UK -0.059, unknown -0.054, and US -0.022, which is weaker and less certain. Decade means fall fairly steadily, from about 0.15-0.20 before 1840 to about 0.10-0.11 after 1880, so the drop is gradual rather than a sharp break at 1876. Uncertainty and alternative explanations: The early period is thin (about 750 works, with few before 1840). The binary outcome is noisy. The domain labels come from an annotation process whose sensitivity could have changed with the language of different eras. The corpus may also sample early texts selectively, for example by favouring travel-heavy canonical works, and that would not reflect the wider body of writing. The cited passage IDs are passages labelled DISTANCE_TRAVEL. They only illustrate the construct and do not establish the trend. Conclusion: the decrease is moderate but holds up under every check above."
+}

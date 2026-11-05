@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.026,
+  "ci": [
+    0.004,
+    0.046
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "genre composition shift (late period dominates sample)",
+    "date uncertainty near cutoff (low/medium date_confidence)",
+    "origin mix (large unknown-origin share)",
+    "sparse early cells per genre",
+    "annotation/classifier drift in domain labels",
+    "heterogeneous genre effects (adventure declines)"
+  ],
+  "evidence_passage_ids": [
+    "p001389",
+    "p004371",
+    "p002266",
+    "p003598",
+    "p001165",
+    "p001117"
+  ],
+  "rationale": "Data: 6766 works with one coded passage each (1800-1925); 752 early (<1876) vs 6014 late works across 8 genres. Estimand: per-genre mean of work-level DISTANCE_TRAVEL passage rates, late minus early, averaged with equal weight across genres. Point estimate +0.026 (rate goes from roughly 0.07 to 0.10). 95% CI [0.004, 0.046] from 2000 stratified bootstrap resamples within genre x period cells. Checks: a binomial GLM controlling for genre, origin and date confidence gives a late log-odds coefficient of 0.31 (robust SE 0.14). Restricting to high date-confidence works gives +0.041; high plus medium gives +0.019. Restricting to 1850-1900 gives +0.024. Seven of 8 genres go up; adventure goes down (0.20 to 0.14). By decade, rates sit around 0.05-0.10 before 1880 and stay flat near 0.11 after that, so the change looks like a modest step rather than a strong trend. Caveats: early cells are small (35-270 works per genre), so the lower CI bound is close to zero and the size of the effect depends on which dating subset is used. Other possible explanations: changes in which works were sampled or survived, genre-specific labelling, coder or classifier drift, and misdated works near the cutoff. The cited passage IDs only show that the construct appears in the passages; they do not establish the trend. Overall the evidence for a small increase is moderate, not strong."
+}

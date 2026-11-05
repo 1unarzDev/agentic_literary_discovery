@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.08,
+    -0.023
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "genre composition change (juvenile-heavy late corpus)",
+    "sparse early sample (727 of 6766 works pre-1876)",
+    "date uncertainty (52% medium/low date confidence)",
+    "author clustering (prolific authors up to 110 works)",
+    "annotation/classifier drift across period language",
+    "one passage per work sampling noise",
+    "unknown origin for 67% of works"
+  ],
+  "evidence_passage_ids": [
+    "p006199",
+    "p001783",
+    "p000759",
+    "p001996",
+    "p001925",
+    "p003302"
+  ],
+  "rationale": "Methods: rate = count__domains__DISTANCE_TRAVEL / n_passages per work (every work has exactly 1 passage, so the rate is binary). Early = year<1876, late = year>=1876. For each of the 8 genres I took the unweighted mean across works in each period and computed late minus early. Then I averaged the 8 genre differences with equal weight. Estimate: -0.050. The 95% CI from a stratified bootstrap (genre x period, 2000 reps) is [-0.081, -0.023]. An author-cluster bootstrap gives [-0.080, -0.024]. Every genre declines, by 0.04 to 0.06 (for example domestic_realist 0.091 to 0.038, juvenile 0.205 to 0.153). Robustness: the estimate stays negative when split by date confidence (high -0.040, medium -0.053, low -0.071), when limited to 1850-1899 (-0.050), and when works of unknown origin are dropped (-0.050). Coverage: 6766 works and 6766 passages, all linked, no missing years. The early period is thin (727 works; some genre cells have only 37-57 works), and decade-level rates are noisy and not monotonic (pre-1876 decades range 0.04-0.19, post-1876 decades 0.07-0.12). So the change looks more like a level difference across the cutoff than a smooth trend. Alternative explanations: what gets included in the corpus may differ by period (early survivors may be canonical or travel-heavy); annotators or classifiers may tag domains differently in older prose; the subgenre mix within each genre may shift; prolific authors may carry outsized weight; dates may be wrong for works near the cutoff. The passage IDs listed are DISTANCE_TRAVEL-tagged examples from both periods. They only show the construct and do not establish the trend. The consistent direction across genres, the two bootstrap methods, and the sensitivity checks support a moderate-confidence decrease."
+}

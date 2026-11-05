@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0034,
+    0.0451
+  ],
+  "confidence": 0.55,
+  "named_confounds": [
+    "date uncertainty (low-confidence dates show larger effect)",
+    "small and unbalanced early sample (752 early vs 6014 late works)",
+    "genre composition shift over time",
+    "one passage per work (binary rate, high variance)",
+    "annotation/classifier noise in domain labels",
+    "origin mix (large unknown share)"
+  ],
+  "evidence_passage_ids": [
+    "p004148",
+    "p001391",
+    "p000185",
+    "p003634",
+    "p004933",
+    "p005258"
+  ],
+  "rationale": "Data: 6766 works across 8 genres, each with exactly one annotated passage, so a work's rate of DISTANCE_TRAVEL is 0 or 1. Estimand: for each genre I took the mean work rate for late works (year >= 1876) minus the mean for early works, then averaged the 8 genre differences with equal weight. Result: +0.0253 passage-rate units. A 95% CI from a 2000-replicate bootstrap, resampling works within each genre x period cell, is [0.0034, 0.0451]. Six of 8 genres rise; adventure and sensation_mystery dip slightly. Dropping any one genre leaves the effect between 0.018 and 0.032. Using a strict > 1876 cutoff gives 0.030. Splitting by origin gives UK 0.033, US 0.019 and unknown 0.028. By decade, the rate climbs from roughly 0.03-0.08 before 1860 to about 0.11-0.12 after 1890, with a dip in the 1870s right around the cutoff. Caveats: the early period is thin (37-165 works per genre). Early romance had 0 of 40 works with the domain, which makes that cell fragile. The effect depends on date quality: 0.015 for high-confidence dates (bootstrap CI [-0.030, 0.050], which includes zero), 0.022 for medium and 0.043 for low. Dating error or composition differences could therefore inflate the result. The lower CI bound is close to zero. Other possible explanations include changes in which works were sampled, drift in the domain labels, and genre conventions rather than a real historical change. Overall the evidence for a small increase is modest and not strongly robust. The cited passages only show what the label looks like in late, high-confidence-dated works; they do not establish the trend."
+}

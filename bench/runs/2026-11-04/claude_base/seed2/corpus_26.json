@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0042,
+    0.0466
+  ],
+  "confidence": 0.68,
+  "named_confounds": [
+    "date uncertainty (low/medium-confidence dates make up about half the works, and the effect shrinks to 0.015 with a CI spanning zero when only high-confidence dates are used)",
+    "thin and unbalanced early sample (about 750 early works against about 6,000 late; some early genre cells have only 37\u201357 works)",
+    "one passage per work, so passage-level coding noise equals work-level noise",
+    "genre composition and labelling differences across periods",
+    "differences in the LLM/annotator coding of the domain across periods",
+    "unknown origin for most works (UK/US mix may change over time)"
+  ],
+  "evidence_passage_ids": [
+    "p003739",
+    "p004499",
+    "p006027",
+    "p006353",
+    "p005547",
+    "p001446",
+    "p006470",
+    "p006685"
+  ],
+  "rationale": "Method: each work's rate is its DISTANCE_TRAVEL count divided by n_passages. Every work has exactly one passage, so each rate is 0 or 1. Works were split at the 1876 cutoff (early <1876, late >=1876). Within each genre I took the unweighted mean across works for each period, then the late-minus-early difference, then the unweighted mean across the 8 genres. Estimate: +0.0253 passage-rate units. The 95% CI from a stratified bootstrap (resampling works within genre\u00d7period, 2000 reps) is [0.0042, 0.0466]. Coverage: 6,766 works, all dated; 750 early and 6,014 late. Robustness: dropping any one genre gives estimates from 0.018 to 0.032, all positive. The direction is positive in each origin subset (UK 0.033, US 0.019, unknown 0.028) and in each date-confidence tier (high 0.015, medium 0.022, low 0.043). Excluding 1866\u20131885 gives 0.018. Decade means rise roughly from about 0.03\u20130.08 before 1850 to about 0.11\u20130.12 after 1890, though the early decades are sparse. Caveats: 6 of 8 genres increase, while adventure and sensation_mystery decrease slightly. In the high-date-confidence subset alone the CI includes zero ([-0.027, 0.052]). Part of the effect comes from small early cells, e.g. romance has 0 of 40 early works. Alternative explanations: survivorship and sampling differences between the thin early sample and the dense late one, misdating, period-dependent annotation behaviour, and genre-label drift. The cited passage IDs are works coded with the construct and only illustrate it; they do not establish the trend. The conclusion is a modest, borderline-robust increase."
+}

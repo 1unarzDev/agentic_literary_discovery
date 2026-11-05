@@ -1,0 +1,24 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.032,
+    0.069
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition shift (late period dominated by juvenile/adventure)",
+    "dating uncertainty (low/medium date_confidence)",
+    "origin mix (UK/US/unknown)",
+    "author productivity / reprint popularity (n_editions)",
+    "sparse early-period cells (752 early vs 6014 late works)"
+  ],
+  "evidence_passage_ids": [
+    "p004648",
+    "p004473",
+    "p005502",
+    "p006677"
+  ],
+  "rationale": "Each work contributes one passage (n_passages=1), so the work rate is the 0/1 DISTANCE_TRAVEL indicator. Estimand: within each of 8 genres, mean rate for works dated >=1876 minus mean for works before 1876, then an unweighted mean across genres. Result: +0.052 passage-rate units. The 95% CI from 1000 bootstrap resamples within genre x period cells is [0.032, 0.069]. All 8 genres move upward (by +0.04 to +0.06). Artifact checks: genre mix differs a lot between periods, which equal-genre weighting handles. Mean n_editions (1.09 vs 1.08) and author productivity (19.5 vs 21.1) are similar across periods. The origin and date_confidence shares are close. The contrast holds within each stratum: high date_confidence +0.044, medium +0.070, low +0.044; UK +0.029, US +0.068, unknown origin +0.054. A passage-weighted WLS with genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives +0.051 [0.032, 0.071]. By decade, rates are about 0.05 in the 1850s-1870s and 0.10-0.13 from the 1880s on, a step that matches the cutoff. Caveats: the early period is thin (752 works, with very few before 1840), so early genre cells are noisy (two genres have 0 early hits). The annotation of the construct could drift over time. Remaining confounding by unmeasured selection, such as which works got digitized, can't be ruled out. The cited passages are late-period passages tagged DISTANCE_TRAVEL. They show the construct, but they don't establish the trend."
+}

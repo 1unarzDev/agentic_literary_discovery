@@ -1,0 +1,25 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0029,
+    0.0451
+  ],
+  "confidence": 0.55,
+  "named_confounds": [
+    "genre composition shift (juvenile/adventure dominate late period)",
+    "sparse early-period cells (37-165 works per genre before 1876)",
+    "date uncertainty (52% of works low/medium date confidence)",
+    "single passage per work (high per-work sampling noise)",
+    "gradual trend vs discrete change at cutoff",
+    "origin mix (67% unknown origin)"
+  ],
+  "evidence_passage_ids": [
+    "p006752",
+    "p001318",
+    "p001154",
+    "p004621"
+  ],
+  "rationale": "Data: 6766 works with one coded passage each (n_passages=1), all dated; 752 early (<1876) vs 6014 late works; 726 passages tagged DISTANCE_TRAVEL. Method: per-work rate = count/n_passages, averaged equally within genre x period, late minus early per genre, then averaged equally across the 8 genres; 95% CI from 2000 stratified bootstrap resamples of works within genre x period. Primary estimate +0.025 passage-rate units, CI [0.003, 0.045], so it is positive but the lower bound sits just above zero. Five of eight genres go up, while adventure, sensation_mystery and other are flat or down; romance has 0/40 early hits. Sensitivity checks: high date-confidence works only gave +0.015 with CI [-0.025, 0.051]; a 1866-1886 window gave +0.010; dropping the other/collection genres gave +0.020; by origin, UK +0.033, US +0.019, unknown +0.028. Decade means climb fairly smoothly from about 0.06-0.10 in the mid-1800s to about 0.11-0.12 after 1890, which looks more like gradual drift than a break at 1876. Alternative explanations: the early cells are small and noisy; dating errors could move works across the cutoff; the late period could be picking up shifts in subgenre or publication mix that the genre labels miss; and the passage annotation could differ by period. The direction is consistently positive, but the effect shrinks and loses significance under reasonable checks, so the data do not establish a robust historical shift. I abstain and put the probability of a real increase slightly above even. The cited passages only show that the construct is coded; they do not show a trend."
+}

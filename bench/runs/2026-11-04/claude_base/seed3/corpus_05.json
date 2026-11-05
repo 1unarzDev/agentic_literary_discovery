@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0027,
+    0.0455
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date uncertainty (low/medium date_confidence)",
+    "early-period sparsity and genre-composition imbalance",
+    "author clustering (prolific authors)",
+    "single-passage-per-work sampling noise",
+    "annotation/classifier drift across periods",
+    "origin mix (large unknown-origin share)"
+  ],
+  "evidence_passage_ids": [
+    "p000235",
+    "p005186",
+    "p000813",
+    "p006623",
+    "p001469"
+  ],
+  "rationale": "Methods: I worked from works.parquet (6,766 works, each with exactly one annotated passage, so n_passages=1). The rate is count__domains__DISTANCE_TRAVEL/n_passages. Works dated year>=1876 count as late. Within each of 8 genres I took the unweighted mean across works for early and for late, took late minus early, and averaged those 8 differences with equal weight. Point estimate: +0.025, i.e. about 2.5 percentage points more passages in the travel domain (overall base rate about 0.107). For the 95% CI I ran 4,000 bootstrap resamples within each genre-by-period cell: [0.003, 0.046]. A bootstrap that resamples whole authors gave [0.0003, 0.048]. Coverage: early works are scarce (752 vs 6,014 late), and some genre-early cells have only 37-77 works. Robustness: 6 of 8 genres are positive; adventure (-0.022) and sensation_mystery (-0.006) are negative. With only high-date-confidence works the effect is +0.015, CI [-0.026, 0.051]. In a 1850-1900 window it is +0.014, CI [-0.015, 0.040]. Results split by UK, US and unknown origin are all positive (0.019-0.033). Decade means rise from the 1810s to the 1860s, dip in the 1870s (0.059), then sit around 0.09-0.12. That looks more like a gradual or noisy pattern than a clean break at 1876. Alternative explanations: works with uncertain dates may be placed on the wrong side of the cutoff; the small early sample and the different genre mix between periods could create the difference; a few prolific authors weigh heavily; and the annotation scheme may have behaved differently on texts from different periods. The headline CI only just excludes zero and becomes compatible with zero under reasonable sensitivity checks, so I do not consider the increase robust and I abstain. The cited passage IDs are passages annotated with DISTANCE_TRAVEL. They show what the construct looks like but do not establish a trend."
+}

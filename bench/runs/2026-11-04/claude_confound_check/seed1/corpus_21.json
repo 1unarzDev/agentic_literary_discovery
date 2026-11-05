@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0034,
+    0.0465
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "date_confidence composition (early period has more low/medium-dated works)",
+    "sparse early-period cells per genre (e.g. romance 0/40, collection 1/37)",
+    "genre imbalance across cutoff (juvenile dominates late)",
+    "n_editions differs by period",
+    "one passage per work: low per-work information"
+  ],
+  "evidence_passage_ids": [
+    "p001993",
+    "p003569",
+    "p003574",
+    "p003587",
+    "p006592",
+    "p001576"
+  ],
+  "rationale": "Data: 6766 works, each with exactly 1 passage, so the work rate is 0/1. All years are present (1800-1925). Cutoff is 1876: 752 early works and 6014 late. Estimand: in each genre, take the mean rate of late works minus early works, then average the 8 genres equally. Point estimate +0.025 passage-rate units, 95% CI [0.003, 0.046] from a bootstrap stratified by genre and period (2000 reps). A passage-weighted regression adjusting for genre, origin, date_confidence, log editions and author productivity, with author-clustered SEs, gave a similar +0.025 [0.001, 0.050]. Artifact checks: period is linked to date_confidence (34% of early works are high-confidence vs 48% of late) and to n_editions (early mean 1.26 vs late 1.06). Genre mix is also very unbalanced across the cutoff. Restricting to high-confidence dates, the effect falls to +0.015 with CI [-0.029, 0.052], which includes zero. Within-stratum estimates differ: low 0.043, medium 0.022, high 0.015. The late-by-date_confidence interaction is not significant. Many early genre cells are small (37-77 works), and the per-genre signs are mixed: adventure and sensation decrease, romance, collection and juvenile increase. Decade means rise from the 1820s to the 1910s but are noisy, and the 1870s dip. The pooled contrast is only marginally significant and does not survive restriction to well-dated works. So I abstain rather than claim a robust shift. The cited passage IDs are late, well-dated passages coded for distance/travel. They illustrate the construct only and are not evidence of a trend."
+}

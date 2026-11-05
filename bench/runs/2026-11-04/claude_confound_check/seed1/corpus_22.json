@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.084,
+    -0.023
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "early-period sparsity (752 early vs 6014 late works)",
+    "date_confidence / dating error",
+    "origin composition (UK subgroup does not show the decline)",
+    "author clustering / author productivity",
+    "genre composition"
+  ],
+  "evidence_passage_ids": [
+    "p002331",
+    "p001411",
+    "p003042",
+    "p002133",
+    "p004088",
+    "p005795"
+  ],
+  "rationale": "Method: each work has exactly one passage (n_passages=1), so a work's rate is 0 or 1 for whether its passage is tagged DISTANCE_TRAVEL. Within each genre I took the late (year>=1876) mean minus the early mean, giving every work in a genre the same weight. I then averaged across the 8 genres with equal weight. The estimate is -0.050. A bootstrap of 400 resamples within genre-by-period cells gives a 95% CI of [-0.084, -0.023]. Resampling by author instead gives [-0.080, -0.023]. All 8 genres show a decline of roughly 0.04 to 0.05. Composition checks: the share of each genre, origin and date_confidence level is broadly similar in both periods. Mean n_editions is 1.10 early vs 1.08 late. Mean author productivity is 19 early vs 21 late. Year distributions are similar across date_confidence levels. Adjustment: a regression of the rate on the late indicator, controlling for genre, origin, date_confidence, log n_editions and log author productivity, with errors clustered by author, gives -0.051 (CI -0.076 to -0.026). Restricted to high-confidence dates the estimate is -0.043 (CI -0.088 to -0.004). It is also negative within the medium (-0.086) and low (-0.025) date-confidence groups, with no CIs computed for those two. By decade, the rate is about 0.11 to 0.18 in the 1830s through 1870s and about 0.09 to 0.11 from the 1880s on. That pattern fits a drop around the cutoff, though the early decades are thin. Caveats: the early period is small (752 works), so the cutoff contrast leans on few early works per genre. UK-origin works show a slight increase (+0.014) based on very small early cells. The high-confidence CI comes close to zero. Tags come from an automated passage classifier, and its error rate could differ by period. Cited passage IDs are only examples of the travel tag, not evidence of the trend itself. Overall the decrease holds up under the checks I ran, but it is modest and depends on a small early sample."
+}

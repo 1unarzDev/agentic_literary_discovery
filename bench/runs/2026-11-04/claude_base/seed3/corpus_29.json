@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0183,
+  "ci": [
+    -0.0092,
+    0.046
+  ],
+  "confidence": 0.3,
+  "named_confounds": [
+    "early-period sparsity (only ~750 of 6766 works before 1876)",
+    "genre-specific heterogeneity driven by juvenile, sensation_mystery and the 'other' residual genre",
+    "date uncertainty (27% of works low date confidence; effect turns negative in that subset)",
+    "author clustering (1669 authors, up to 110 works each)",
+    "origin composition (67% unknown origin)",
+    "single passage per work, so work rates are binary"
+  ],
+  "evidence_passage_ids": [
+    "p003957",
+    "p004260",
+    "p002517",
+    "p000973",
+    "p001688",
+    "p002355"
+  ],
+  "rationale": "Method: each work has exactly one passage (n_passages=1), so the work rate is count__domains__DISTANCE_TRAVEL divided by n_passages, which is 0 or 1. I split works into early (year<1876) and late (year>=1876), averaged works with equal weight within each genre x period cell, took late-minus-early in each of the 8 genres, and averaged those differences with equal genre weight. Point estimate: +0.018 passage-rate units. The 95% CI from a 1000-replicate author-cluster bootstrap is [-0.009, 0.046]; a genre x period stratified bootstrap gives [-0.006, 0.041]. Both include zero. Genre differences are mixed: adventure -0.007, collection -0.012, domestic_realist -0.015, historical +0.002, romance +0.010, sensation_mystery +0.042, juvenile +0.052, other +0.075. The positive average comes mostly from three genres, and one of them is the residual 'other' category. Without 'other' the estimate falls to +0.010. Sensitivity checks: high date confidence +0.031, medium +0.026, low -0.013; UK +0.023, US +0.042, unknown origin +0.012; using only 1850-1899 gives +0.012. Decade means rise from about 0.05-0.06 (1830s-1860s) to about 0.10-0.13 after 1880, but the early decades are thin. Coverage: 6766 works, 1800-1925, heavily weighted toward the late period, with early cells of only 47-280 works per genre. Other possible explanations for the apparent increase: changes in genre mix inside the broad labels, errors in dating that move works across the cutoff, a few prolific authors dominating some cells, and passage sampling or annotation artifacts. The cited passage IDs come from works coded as having the distance/travel domain. They show that the construct is present but cannot establish a trend. Conclusion: the direction is weakly positive, but it is not statistically robust and not consistent across genres, so I abstain."
+}

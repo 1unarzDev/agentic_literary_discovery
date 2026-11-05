@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0129,
+  "ci": [
+    -0.0395,
+    0.0132
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition change (juvenile share rises 12%->35%, domestic_realist falls 34%->15%)",
+    "small early-period cells (35-259 works per genre before 1876)",
+    "date uncertainty (54% of works medium/low date_confidence)",
+    "origin heterogeneity (US-only contrast differs from UK)",
+    "author productivity clustering"
+  ],
+  "evidence_passage_ids": [
+    "p002060",
+    "p003320",
+    "p004399",
+    "p003702",
+    "p001460",
+    "p005789"
+  ],
+  "rationale": "Data: 6,766 works with one coded passage each, so n_passages=1 throughout. All works have a year. The rate is count__domains__DISTANCE_TRAVEL / n_passages, and works dated 1876 or later count as late. Estimand: for each of the 8 genres, take the mean work rate late minus the mean work rate early, then average the 8 differences with equal weight. Result: -0.0129. A 95% CI from a bootstrap that resamples works within each genre-by-period cell (1000 reps) is [-0.039, 0.013], which includes zero. The per-genre differences point both ways: adventure, collection and sensation_mystery go up; historical, juvenile and romance go down. Robustness checks: (1) Year is strongly tied to genre composition (juvenile share rises from 12% to 35%), but the equal-genre estimand already compares within genres. (2) Origin, date_confidence, n_editions and author productivity are only weakly linked to period. (3) OLS with genre, origin, date_confidence, log editions and log author productivity, using author-clustered SEs, gives late=-0.014, CI [-0.036, 0.009]. (4) Using only high-confidence dates gives -0.022, bootstrap CI [-0.064, 0.013]. (5) By origin, UK +0.010, unknown 0.000, US -0.086; this heterogeneity points to noise rather than one robust shift. Rates by decade rise slightly overall, but that is likely compositional and not significant within genres. Alternative explanations for any apparent change: genre mix, few and noisy early works, misdated works, and coding drift in passage annotation. The cited passage IDs are well-dated passages coded for the distance/travel domain. They show the construct exists in the corpus but are not evidence of a trend. Conclusion: no robust historical shift in distance/travel passage rates around 1876."
+}

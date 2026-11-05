@@ -1,0 +1,23 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0021,
+  "ci": [
+    -0.0221,
+    0.0251
+  ],
+  "confidence": 0.1,
+  "named_confounds": [
+    "origin composition shift (unknown-origin share 40% early vs 70% late)",
+    "sparse early cells (40-254 works per genre pre-1876)",
+    "date_confidence heterogeneity",
+    "one passage per work (binary rates)"
+  ],
+  "evidence_passage_ids": [
+    "p005471",
+    "p002363",
+    "p002962",
+    "p005210"
+  ],
+  "rationale": "Data: 6,766 works, each with one passage (n_passages=1), all dated. The cutoff is 1876, which leaves 752 early and 6,014 late works. Rate = DISTANCE_TRAVEL count / n_passages. Estimand: take the mean rate across works within each genre and period, compute late minus early per genre, then average equally across the 8 genres. The point estimate is +0.0021. A 95% bootstrap CI (works resampled within genre x period, 2000 reps) is [-0.022, 0.025], so it includes zero. Direction is mixed by genre: six of eight genres fall slightly, while 'other' and sensation_mystery rise. Artifact checks: year is strongly linked to origin, with unknown origin making up 40% of early works and 70% of late ones. n_editions, author productivity and date_confidence are roughly balanced across periods. Within-stratum estimates all include zero: high date confidence +0.003 [-0.039, 0.039]; low +0.019; medium -0.014; UK -0.017; US -0.024; unknown origin +0.026. A WLS model with genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives late = -0.012 [-0.035, 0.012]. By decade, rates drift gently down from the 1800s to the 1870s and then hold flat, with no break at the cutoff. The cited passages only show what the construct looks like and do not establish a trend. Conclusion: there is no robust late-minus-early shift."
+}

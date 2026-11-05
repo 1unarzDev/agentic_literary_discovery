@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0042,
+    0.0466
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "date_confidence (imprecise dating)",
+    "genre composition and small early-period cells",
+    "origin (UK/US/unknown) mix",
+    "annotation/classifier confidence",
+    "single sampled passage per work",
+    "reprint/edition selection"
+  ],
+  "evidence_passage_ids": [
+    "p001906",
+    "p006092",
+    "p002445",
+    "p004231",
+    "p001895",
+    "p006353",
+    "p005839"
+  ],
+  "rationale": "Method: The rate for each work is count__domains__DISTANCE_TRAVEL / n_passages. Every work has n_passages = 1, so each rate is 0 or 1. I averaged rates over works within each genre and period (early: year < 1876; late: year >= 1876), took the late-minus-early difference in each genre, and then averaged the 8 genres equally. Result: +0.0253 passage-rate units. The 95% CI comes from a percentile bootstrap with 2000 resamples of works, stratified by genre and period: [0.004, 0.047]. Coverage: 6766 works, all dated, but only 752 are early (1800s\u20131870s) against 6014 late. Early genre cells are small (37\u2013165 works), and romance has 0 of 40 early works coded for the domain. Six of the 8 genres increase; adventure and sensation_mystery decrease slightly. Decade means rise roughly from about 0.03\u20130.07 (1810s\u20131840s) to about 0.11\u20130.12 (1890s\u20131910s), with a dip in the 1870s. Robustness: The effect is positive in UK, US and unknown-origin subsets (0.019\u20130.033). It is positive in every date-confidence stratum, but it is largest among low-confidence dates (0.043) and smaller among high-confidence dates (0.015). For high-confidence dates alone the bootstrap CI includes zero ([-0.027, 0.052]). Restricting to 1850\u20131899 gives 0.018, and a window of 1866\u20131886 around the cutoff gives only 0.010. So the change looks like a gradual long-run rise rather than a sharp break at 1876, and its size is sensitive to dating quality and the thin early sample. Alternative explanations: the early sample may differ in which works survived or were reprinted; imprecise dates may move works across the cutoff; topics may shift within genres (for example juvenile and adventure fiction); and one sampled passage per work adds a lot of noise. Passage IDs are cited only as examples of passages coded for the domain, early and late (including one that names the railway). They do not establish the trend. Conclusion: the full sample shows a modest increase with a CI that excludes zero, but the evidence is only moderately robust."
+}

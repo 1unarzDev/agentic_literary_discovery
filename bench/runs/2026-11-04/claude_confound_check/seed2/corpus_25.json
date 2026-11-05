@@ -1,0 +1,24 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0082,
+  "ci": [
+    -0.016,
+    0.031
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "date_confidence composition (early works mostly high-confidence, late works more low/medium-confidence)",
+    "genre composition (juvenile share slightly higher early)",
+    "author productivity differs slightly by period",
+    "sparse early sample (only ~750 works before 1876)",
+    "one passage per work (binary rates, high noise)"
+  ],
+  "evidence_passage_ids": [
+    "p003306",
+    "p003397",
+    "p001858",
+    "p004045"
+  ],
+  "rationale": "Data: 6,766 works, each with exactly one coded passage, so each work's rate is 0 or 1. All works are dated; 752 fall before the 1876 cutoff and 6,014 at or after it. 726 passages are coded DISTANCE_TRAVEL. Method: I computed the DISTANCE_TRAVEL rate for each work, averaged works equally within each genre and period, took late minus early within each genre, then averaged the 8 genres equally. The estimate is +0.008, with a 95% CI of [-0.016, 0.031] from a bootstrap that resamples works within each genre-by-period cell (1,000 draws). The CI includes zero. Genre-level differences go both ways: adventure -0.03, juvenile -0.015, historical +0.04, romance +0.035, and the rest are near zero. Decade means stay flat at about 0.10-0.12 from the 1830s to the 1910s, with a dip to 0.09 in the 1920s. Artifact checks: date_confidence is strongly tied to period (72% of early works are high-confidence versus 43% of late works). Genre and origin mixes are similar across periods, and n_editions and author productivity rise slightly in the late period. Within each date-confidence stratum the estimate stays null: high-confidence works only give +0.023 [-0.002, 0.051], medium +0.009, and low -0.017, each with a CI that includes zero. An OLS model adjusting for genre, origin, date_confidence, log editions and author productivity, with standard errors clustered by author, gives a late coefficient of +0.005 [-0.019, 0.030]. Interpretation: there is no robust change in the travel/distance passage rate across 1876. The small positive point estimate is within noise and could reflect differences in composition or genre-specific fluctuation. The cited passages only show how the construct is coded; they do not establish any trend."
+}

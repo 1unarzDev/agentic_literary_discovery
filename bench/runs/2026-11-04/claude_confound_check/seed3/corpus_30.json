@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0814,
+    -0.0238
+  ],
+  "confidence": 0.75,
+  "named_confounds": [
+    "genre composition shift (juvenile up, historical/domestic down after 1876)",
+    "date_confidence imbalance (more high-confidence dates late)",
+    "small early sample (752 of 6766 works pre-1876)",
+    "author productivity",
+    "one passage per work (rate is binary per work)"
+  ],
+  "evidence_passage_ids": [
+    "p005003",
+    "p003670",
+    "p002524",
+    "p005707",
+    "p004740",
+    "p001911",
+    "p003485",
+    "p003232"
+  ],
+  "rationale": "Estimand: for each genre, mean work-level DISTANCE_TRAVEL passage rate (count/n_passages) late (year>=1876) minus early; then average across 8 genres with equal weight. Effect -0.050; 95% CI from stratified (genre x period) work bootstrap (300 reps) [-0.081, -0.024]. All 8 genres individually decrease (-0.04 to -0.05 typically). Composition checks: genre mix shifts with period (juvenile 21%->34%, historical 22%->10%), but the genre-stratified estimand neutralises this; origin is balanced; n_editions and author productivity are near-identical across periods; date_confidence somewhat more 'high' late. Contrast survives restriction to high-confidence dates (-0.059) and medium (-0.060); weaker in low (-0.024); holds in UK (-0.043), US (-0.087), unknown origin (-0.045). WLS with genre, origin, date_confidence, log editions, author productivity and author-clustered SEs gives -0.052 [-0.078, -0.025]. Caveats: each work has one passage, so rates are noisy 0/1; the early period is thin (752 works, few before 1840); decade means are non-monotonic (1860s low at 0.089, 1870s 0.133), so it looks more like a modest level drop than a smooth trend. Possible alternative explanations: annotation drift across source collections, or genre labels and sampling that differ by period in ways not captured here. Passage IDs only show what the construct looks like; they do not establish the trend."
+}

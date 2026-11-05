@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0803,
+    -0.0226
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "genre composition change over time",
+    "uneven temporal coverage (few early works)",
+    "date uncertainty near cutoff",
+    "single-passage sampling per work",
+    "annotation/classifier drift",
+    "origin mix (many unknown)"
+  ],
+  "evidence_passage_ids": [
+    "p005158",
+    "p002734",
+    "p000263",
+    "p001068",
+    "p003382",
+    "p005486"
+  ],
+  "rationale": "Data: 6766 works, all dated. Each work has exactly one coded passage (n_passages=1), so a work's rate is 0 or 1 for DISTANCE_TRAVEL. I split works into early (<1876) and late (>=1876), took the mean rate within each genre-period cell (every work weighted equally), computed late minus early for each genre, and averaged across the 8 genres with equal weight. Effect = -0.050 passage-rate units. The 95% CI, [-0.080, -0.023], comes from a 2000-replicate bootstrap that resampled works within each genre-period cell. All 8 genres decline individually, by between 0.04 and 0.06. Robustness checks: high-date-confidence works only gave -0.079; dropping the other/collection genres gave -0.050; restricting to 1856-1895 gave -0.055. Caveats: the early period is thin, with 769 works and some cells of only 37-57, so the early estimates are noisy. Decade means are not monotonic: the rate peaks around the 1870s and then drops to about 0.10. That points to a step-like drop after the cutoff more than a smooth trend. Alternative explanations: because each work contributes one passage, sampling variation is large; the coding of what counts as travel could have drifted over time; and the selection of which works survive or were digitized may differ between periods. Within-genre comparisons control for the genre mix shifting toward juvenile fiction, but they cannot remove differences in selection inside a genre. The cited passages show the construct as coded; they do not by themselves establish the trend."
+}

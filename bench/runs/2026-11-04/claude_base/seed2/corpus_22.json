@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0816,
+    -0.0218
+  ],
+  "confidence": 0.7,
+  "named_confounds": [
+    "imbalance between early and late samples (about 750 works before 1876 vs about 6,000 after)",
+    "different origin mix over time; UK-only subset shows a reversal",
+    "uncertain dating (low or medium date confidence for over half the works)",
+    "possible drift in how passages were sampled or annotated",
+    "only one sampled passage per work",
+    "different genre composition within each period"
+  ],
+  "evidence_passage_ids": [
+    "p003106",
+    "p004960",
+    "p006043",
+    "p001839",
+    "p000380",
+    "p006080",
+    "p003830",
+    "p003085"
+  ],
+  "rationale": "Construct: domains__DISTANCE_TRAVEL, rate = count / n_passages. Cutoff: late means year >= 1876. Data coverage: 6,766 works, each with exactly one passage and no missing years. Works are spread over 8 genres. The early period is thin, with 37 to 165 works per genre. Method: in each genre I took the unweighted mean rate across works, early and late, and subtracted early from late. I then averaged that difference across genres with equal weights. For the 95% CI I resampled works with replacement within each genre and period cell, 4,000 times. Result: -0.050 passages per passage, CI [-0.082, -0.022]. All 8 genres go the same way, with drops of 0.04 to 0.06 (for example, domestic_realist 0.091 to 0.038 and juvenile 0.205 to 0.153). Sensitivity checks: high-date-confidence works only, -0.043; excluding the other and collection genres, -0.050; single-edition works only, -0.044; US works only, -0.053. However, UK-only works give +0.014. That suggests part of the effect may come from origin composition or from the large unknown-origin group, and lowers my confidence. By decade, mean rates were roughly 0.11 to 0.18 from the 1820s to the 1870s and a flat 0.09 to 0.11 from the 1880s on. That looks like a level drop around the cutoff rather than a steady trend, but the early decades have few works and are noisy. Other possible explanations: the early sample may differ in how works were selected, survived or were digitized; annotation could be inconsistent across eras; and with one passage per work, results are sensitive to which passage was sampled. The cited passage IDs are works coded as distance or travel. They show what the code captures but cannot by themselves establish the trend. Conclusion: a moderately robust decrease, with a caveat about the UK subset."
+}

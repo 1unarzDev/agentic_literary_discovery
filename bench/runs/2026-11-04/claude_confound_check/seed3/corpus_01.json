@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0823,
+    -0.0211
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "genre composition (late period juvenile-heavy)",
+    "date_confidence / dating uncertainty",
+    "small, sparse early period (pre-1850 decades)",
+    "author productivity/clustering",
+    "origin composition",
+    "one passage per work (sampling noise)"
+  ],
+  "evidence_passage_ids": [
+    "p001679",
+    "p006120",
+    "p000392",
+    "p005558",
+    "p003694",
+    "p001436",
+    "p000842"
+  ],
+  "rationale": "Corpus: 6766 works, each with exactly one coded passage, so the rate is a 0/1 DISTANCE_TRAVEL indicator. The split at 1876 gives 752 early and 6014 late works. I averaged works equally within each genre-by-period cell, took the late-minus-early difference per genre, and averaged the 8 genres equally. Result: -0.050. A stratified bootstrap (1000 resamples within genre x period) gives a 95% CI of [-0.082, -0.021]. All 8 genres decline, by between 0.04 and 0.06. Composition checks: the late period has more juvenile works, but the estimand already weights genres equally. Year is barely correlated with n_editions (r=-0.03) or author productivity (r=0.04), and the date_confidence and origin mixes are similar in both periods. An OLS with genre, origin, date_confidence, n_editions and log author productivity as controls, with SEs clustered by author, gives -0.050 [-0.075, -0.026]. Restricted to high-confidence dates the effect is -0.079, and year is a significant linear predictor within genre (p~1e-4). The effect is negative in every origin stratum and every date_confidence stratum, but weak in the medium stratum (-0.009). Caveats: the early period is small and its earliest decades are very sparse and noisy. Decade means fall from about 0.13-0.16 (1830s-1870s) to about 0.09-0.11 after 1880, so this looks like a step change around the cutoff rather than a steady trend. One passage per work makes estimates noisy, and the passage coding may be biased by period. The cited passages are DISTANCE_TRAVEL-coded examples. They show what the construct looks like but do not by themselves establish the trend."
+}

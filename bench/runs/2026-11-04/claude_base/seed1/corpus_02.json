@@ -1,0 +1,30 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0324,
+    0.0694
+  ],
+  "confidence": 0.88,
+  "named_confounds": [
+    "early-period sparsity (only 752 of 6766 works before 1876; several genre-early cells have 37-77 works)",
+    "genre composition change over time",
+    "author clustering (1669 authors, up to 110 works each)",
+    "imprecise dating (27% low date confidence)",
+    "one sampled passage per work, so work-level rates are 0/1",
+    "annotation/classifier drift across periods' language",
+    "reprint/edition selection"
+  ],
+  "evidence_passage_ids": [
+    "p004615",
+    "p000961",
+    "p002985",
+    "p000696",
+    "p000851",
+    "p005645",
+    "p002500",
+    "p001302"
+  ],
+  "rationale": "Methods: the rate is count__domains__DISTANCE_TRAVEL/n_passages for each work (every work has exactly one passage). Early means year<1876 and late means year>=1876. I averaged works equally within each genre-by-period cell, took late-minus-early for each of the 8 genres, and averaged those 8 differences equally. Estimate: +0.052 passage-rate units (about 0.05 to 0.11 on average). 95% CI [0.032, 0.069] from 1000 bootstrap resamples stratified by genre and period. An author-cluster bootstrap gives a similar CI, [0.034, 0.069]. Robustness: the increase is positive in all 8 genres (+0.045 to +0.060). It holds within the UK, US and unknown origin groups and at every date-confidence level. Dropping low-confidence dates gives 0.055, keeping only single-edition works gives 0.049, and restricting to 1846-1905 gives 0.057. By decade, rates are about 0.05-0.07 from the 1830s to the 1870s, then about 0.11-0.12 from the 1880s on. That looks like a step change near the cutoff followed by a plateau, not a steady trend. Coverage: 6766 works from 1800 to 1920s, but the early period is thin (752 works), which widens the uncertainty; two early cells (domestic_realist, romance) have zero positives. Alternative explanations: changes in what was sampled or digitized after 1876, author-heavy clusters, the annotator tagging later language differently, and changes in genre definitions. The genre-balanced estimand and the author-cluster bootstrap reduce, but do not rule out, these explanations. The cited passages are tagged DISTANCE_TRAVEL in both periods; they illustrate what the construct covers but do not by themselves establish the trend."
+}

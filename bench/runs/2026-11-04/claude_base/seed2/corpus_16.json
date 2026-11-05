@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0258,
+  "ci": [
+    -0.0534,
+    -0.0019
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "genre composition change (late corpus dominated by juvenile/domestic works)",
+    "small early-period samples per genre (46-219 works)",
+    "author clustering / prolific authors",
+    "date uncertainty (about half of works have low/medium date confidence)",
+    "single sampled passage per work (high per-work noise)",
+    "annotation/classifier drift across period",
+    "origin (UK/US/unknown) composition"
+  ],
+  "evidence_passage_ids": [
+    "p000616",
+    "p004194",
+    "p003572",
+    "p003991",
+    "p003992",
+    "p004358"
+  ],
+  "rationale": "Each of the 6,766 works has one passage (n_passages=1), so a work's rate is 0 or 1 for DISTANCE_TRAVEL; 726 works (10.7%) are coded positive. Estimand: within each of the 8 genres, take the mean work rate for year>=1876 minus the mean for year<1876, then average the 8 genres with equal weight. Result: -0.026. A bootstrap that resamples works within genre-by-period cells (1000 reps) gives a 95% CI of [-0.053, -0.002]. The decrease comes mostly from adventure (0.217 to 0.141) and historical (0.181 to 0.084), with smaller drops in collection and juvenile. Domestic_realist and sensation_mystery rise slightly, and other is flat. Robustness checks: the estimate stays negative when the cutoff moves to 1860, 1870, 1880 or 1890 (-0.021 to -0.033), with only high-date-confidence works (-0.044), with works averaged within author (-0.029), and when collection and other are dropped (-0.029). An author-clustered bootstrap is weaker: 95% CI [-0.051, +0.0004], just including zero, with 97% of replicates negative. Decade means are noisy rather than a clean trend (about 0.12-0.15 in the 1830s-1870s, about 0.08-0.13 afterwards). Alternative explanations: the early cells are small; the late corpus is weighted toward particular genres; a few prolific authors could drive the result; dates may be wrong; and the labelling may have drifted over time. So the evidence for a modest decrease is suggestive but only borderline robust. The cited passage IDs are DISTANCE_TRAVEL-coded examples. They illustrate the construct but do not by themselves establish the trend."
+}

@@ -1,0 +1,28 @@
+{
+  "claim": "abstain",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0001,
+    0.0489
+  ],
+  "confidence": 0.45,
+  "named_confounds": [
+    "genre composition shift over time",
+    "very small early-period cells (e.g., romance n=40 with zero hits, collection n=37)",
+    "author clustering / prolific authors",
+    "imprecise dating (54% of works low/medium date confidence; most years decade-coded)",
+    "classifier/annotation drift across periods",
+    "corpus sampling heavily skewed to post-1876 works",
+    "reprint/edition selection"
+  ],
+  "evidence_passage_ids": [
+    "p001211",
+    "p001035",
+    "p004503",
+    "p000274",
+    "p000025",
+    "p001134"
+  ],
+  "rationale": "Methods: 6,766 works, one passage each (n_passages=1), so the work rate is 0/1 for DISTANCE_TRAVEL. Split at year>=1876. I took the late-minus-early difference in mean rate within each of the 8 genres, then averaged the genres equally. Point estimate +0.025 passage-rate units. A bootstrap stratified by genre and period gives a 95% CI of [0.004, 0.046]. An author-clustered bootstrap gives [0.0001, 0.049], which barely excludes zero. Coverage: only 931 works are early versus 5,835 late, and several early genre cells are tiny. Romance (40 early works, 0 hits) and collection (37 early works) supply much of the effect. Adventure and sensation_mystery go down slightly. Robustness: the estimate shrinks to +0.015 for high-date-confidence works only, +0.013 within a 1856-1895 window, and +0.020 without the other/collection genres. It is +0.032 for single-edition works. Decade means rise unevenly (1870s 0.059, 1860s 0.105). Alternative explanations: changes in genre and author mix, sparse early sampling, dating error near the cutoff, and annotation drift could each produce a small difference like this. Passage IDs only show that travel/distance appears as a theme; they cannot establish a trend. The direction leans toward an increase, but its size is small and it is not robust across clustering and sensitivity checks, so I abstain."
+}

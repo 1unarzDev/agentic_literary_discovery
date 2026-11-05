@@ -1,0 +1,30 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0314,
+    0.069
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition change over time",
+    "early-period sparsity (752 early vs 6014 late works)",
+    "uncertain dating (date_confidence low/medium)",
+    "one passage per work sampling noise",
+    "automated domain-label error that may vary by period",
+    "origin/unknown-origin composition",
+    "author clustering"
+  ],
+  "evidence_passage_ids": [
+    "p001376",
+    "p003794",
+    "p005167",
+    "p003155",
+    "p001667",
+    "p003783",
+    "p002597",
+    "p000644"
+  ],
+  "rationale": "Data: 6766 works with one passage each; all have a year. Rate = count__domains__DISTANCE_TRAVEL / n_passages. Cutoff is 1876, with late defined as year >= 1876. Estimand: within each of 8 genres, take the unweighted mean of work rates for late works minus early works, then average the 8 genre differences equally. The result is +0.0517. The 95% CI is [0.031, 0.069], from a 2000-replicate bootstrap that resamples works within each genre x period cell. The late rate is higher than the early rate in all 8 genres, with differences of about +0.045 to +0.060. Two genres (domestic_realist, romance) have zero early occurrences. Robustness checks: high date-confidence only gives 0.049, low only 0.045, medium only 0.055, and excluding low gives 0.053. Single-edition works only give 0.051. By origin: UK 0.039, US 0.032, unknown 0.064. Decade means rise from about 0.03-0.07 before 1880 to about 0.11-0.12 after 1890. Caveats: the early period is thin (35-165 works per genre), so early estimates are noisy. Each work contributes one sampled passage. Labels come from a classifier, and if its errors differ by period they could mimic a trend. I did not cluster by author. Genre stratification controls for shifts in genre mix, but not for changes within a genre such as subgenre or publisher selection. The cited passage IDs are passages labelled with this domain, and they only illustrate it. The trend rests on the aggregate rates."
+}

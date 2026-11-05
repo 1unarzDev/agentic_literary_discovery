@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0803,
+    -0.0213
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "sparse and imbalanced early sample (about 750 early vs 6000 late works)",
+    "date uncertainty (about half of works have low/medium date confidence)",
+    "genre composition and labeling",
+    "origin mix (many works of unknown origin; US effect is smaller)",
+    "annotation/classifier drift across periods",
+    "one passage per work, so each work rate is 0 or 1"
+  ],
+  "evidence_passage_ids": [
+    "p000619",
+    "p000379",
+    "p004045",
+    "p004463",
+    "p001296",
+    "p006674"
+  ],
+  "rationale": "6766 works, each with exactly one passage; the rate is count__domains__DISTANCE_TRAVEL/n_passages. Early means year<1876 and late means year>=1876. All years are present. Within each genre I took the late-minus-early difference in mean work-level rates, then averaged those differences across the 8 genres with equal weight. Estimate: -0.050. 95% CI from a 2000-replicate bootstrap resampling works within each genre-period cell: [-0.080,-0.021]. All 8 genres show a decrease, ranging from -0.04 to -0.06. Sensitivity checks: high-date-confidence works only -0.062, single-edition works -0.049, UK -0.059, US -0.022 (smaller, and no CI computed). Decade means fall from about 0.12-0.20 before 1870 to about 0.09-0.11 after 1880. The decline seems to happen around the 1870s-1880s and then levels off, so this looks like a step change rather than a steady trend. Caveats: early cells are small (37-165 works per genre), dates are uncertain, the coding procedure may have changed over time, and the corpus is a sample whose composition may differ between periods. Cited passages are coded with this domain and only show what the construct looks like; they do not prove the trend."
+}

@@ -1,0 +1,24 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0046,
+    0.0467
+  ],
+  "confidence": 0.3,
+  "named_confounds": [
+    "date_confidence imbalance (early works disproportionately low/medium-confidence dates)",
+    "n_editions associated with assigned year",
+    "genre composition varies with year (historical, domestic_realist skew earlier)",
+    "author productivity associated with year",
+    "small early-period cells per genre (37-165 works)"
+  ],
+  "evidence_passage_ids": [
+    "p006022",
+    "p006337",
+    "p002917",
+    "p001318"
+  ],
+  "rationale": "Data: 6,766 works, with one coded passage per work (n_passages=1 for every work). The outcome is the DISTANCE_TRAVEL domain count divided by n_passages. The cutoff is 1876. Only 752 works are early and 6,014 are late. Estimand: for each genre, I took the mean late rate minus the mean early rate, weighting works equally, then averaged across the 8 genres with equal weight. Result: +0.025, with a 95% stratified bootstrap CI of [0.005, 0.047] from 1,000 resamples within genre-by-period cells. Genre-level differences are mixed: adventure (-0.02) and sensation_mystery (-0.006) go down, while collection, romance and juvenile go up. The early cells for romance and collection are very small (40 and 37 works). Mean rates rise across year bins, from 0.065 for 1800-1850 to about 0.115 after 1900. Artifact checks: in an OLS model, assigned year is strongly associated with date_confidence (low/medium-confidence works are 5-7 years earlier), n_editions (about -7 years per extra edition), genre, and author productivity. Origin is not significantly associated with year. An OLS model adjusting for genre, origin, date_confidence, n_editions and log author productivity, with author-clustered SEs, gives late = +0.024 [0.0002, 0.049], which barely excludes zero. The contrast does not survive restriction to well-dated works. High-confidence works only: +0.015 [-0.025, 0.050]. High plus medium, with the same adjustments minus author productivity (HC1 SEs): +0.020 [-0.006, 0.045]. A continuous year slope among high-confidence works is about 0 [-0.0006, 0.0006 per year]. The pooled effect is strongest in low-confidence-dated works (+0.043), which points to dating or composition artifacts rather than a robust historical change. The cited passage IDs come from high-confidence-dated works and only show that the coded construct appears in both periods. They do not establish a trend. Alternative explanations: early works are dated less reliably and have more editions, so they may be a selected subset; genre mix shifts over time; and the small early samples make the per-genre contrasts noisy. The pooled increase is suggestive, but it is not robust to these checks, so I abstain."
+}

@@ -1,0 +1,69 @@
+{
+  "candidates": [
+    {
+      "construct": "domains__SOCIAL_RANK_CONVENTION",
+      "effect": -0.029224255431872598,
+      "ci": null,
+      "minimum_effect": 0.03,
+      "author_clusters": 1669,
+      "bootstrap_draws": 0,
+      "ready": false
+    },
+    {
+      "construct": "domains__COMMUNICATION_INFORMATION",
+      "effect": 0.002384541246886928,
+      "ci": null,
+      "minimum_effect": 0.03,
+      "author_clusters": 1669,
+      "bootstrap_draws": 0,
+      "ready": false
+    },
+    {
+      "construct": "domains__DISTANCE_TRAVEL",
+      "effect": 0.025293067123554513,
+      "ci": null,
+      "minimum_effect": 0.03,
+      "author_clusters": 1669,
+      "bootstrap_draws": 0,
+      "ready": false
+    },
+    {
+      "construct": "telephone",
+      "effect": 0.002778490323032911,
+      "ci": null,
+      "minimum_effect": 0.03,
+      "author_clusters": 1669,
+      "bootstrap_draws": 0,
+      "ready": false
+    },
+    {
+      "construct": "night",
+      "effect": 0.0044304519980113265,
+      "ci": null,
+      "minimum_effect": 0.03,
+      "author_clusters": 1669,
+      "bootstrap_draws": 0,
+      "ready": false
+    },
+    {
+      "construct": "internal",
+      "effect": 0.0032363052937735915,
+      "ci": null,
+      "minimum_effect": 0.03,
+      "author_clusters": 1669,
+      "bootstrap_draws": 0,
+      "ready": false
+    }
+  ],
+  "selected": {
+    "construct": "domains__DISTANCE_TRAVEL",
+    "effect": 0.025293067123554513,
+    "ci": null,
+    "minimum_effect": 0.03,
+    "author_clusters": 1669,
+    "bootstrap_draws": 0,
+    "ready": false
+  },
+  "interpretation": "Exploratory finite-panel empirical contrast, not established historical causality",
+  "replicates": "Ten correlated blinded replays of one panel; not independent phenomena"
+}

@@ -52,6 +52,8 @@ def load_rows(root, runs):
                 # staging dir and /tmp/bench-agent-venv are expected).
                 outside = re.findall(r'(/home/[^\s\'"]*|agentic_literary|private/|\.\./|~/)',
                                      code.replace(workdir, ''))
+                if not meta.get('isolated'):  # host /tmp is shared between concurrent sessions
+                    outside += re.findall(r'/tmp/(?!bench-agent-venv|claude-1000/)[\w.\-/]+', code.replace(workdir, ''))
                 for name in NUISANCE_COLUMNS:  # would this artifact be "identified" here?
                     r[f'names__{name}'] = bool(answer is not None and r['valid_answer'] and
                                                identifies_confound({'named_confound': name}, answer))
@@ -68,7 +70,7 @@ def load_rows(root, runs):
                                                                      'cache_creation_input_tokens']) if u else None,
                          output_tokens=u.get('output_tokens'), turns=s.get('num_turns'),
                          n_tool_calls=s.get('n_tool_calls'), model=s.get('model'),
-                         outside_refs=';'.join(sorted(set(outside))),
+                         outside_refs=';'.join(sorted(set(outside))), isolated=bool(meta.get('isolated')),
                          # Process-level: did the agent's code touch each nuisance column?
                          **{f'touched__{k}': bool(any(re.search(p, code) for p in v))
                             for k, v in NUISANCE_COLUMNS.items()})
@@ -143,6 +145,8 @@ def summarize(rows):
                    'other_corpora': float(f[f.confound != name][f'names__{name}'].mean())}
             for name in NUISANCE_COLUMNS}
         m['runs_with_outside_path_refs'] = int(f.outside_refs.astype(bool).sum())
+        m['outside_path_refs'] = sorted({x for v in f.outside_refs for x in v.split(';') if x})
+        m['n_isolated_runs'] = int(f.isolated.sum())
         m['named_confounds_per_answer_by_kind'] = f.groupby('kind').n_named_confounds.mean().to_dict()
         m['nuisance_touched_by_kind'] = {k: float(g[[c for c in g if c.startswith('touched__')]].mean(axis=1).mean())
                                          for k, g in f.groupby('kind')}
@@ -170,9 +174,9 @@ def figures(rows, metrics, figdir):
                          'axes.linewidth': .6, 'xtick.color': '#52514e', 'ytick.color': '#52514e',
                          'savefig.dpi': 300})
     figdir = Path(figdir); figdir.mkdir(parents=True, exist_ok=True)
-    style = {'claude_base': ('Agent (base prompt)', '#2a78d6', 'o'),
-             'claude_confound_check': ('Agent (+confound check)', '#eb6834', 's'),
-             'baseline': ('Deterministic estimator', '#1baf7a', 'D')}
+    style = {'claude_base': ('Agent', '#2a78d6', 'o'),
+             'claude_confound_check': ('Agent + confound check', '#eb6834', 's'),
+             'baseline': ('Estimator', '#1baf7a', 'D')}
     conds = [c for c in style if c in metrics]
     labels = {'genre_mix_drift': 'Genre\nmix', 'reprint_date_contamination': 'Reprint\ndates',
               'edition_selection_bias': 'Edition/\ncanon', 'prolific_author_selection': 'Prolific\nauthors',
@@ -196,7 +200,9 @@ def figures(rows, metrics, figdir):
     ax.text(-.45, .115, 'gate ≤ 0.1', color='#52514e', fontsize=6, ha='left', va='bottom')
     ax.axvline(len(order)-.1, color='#d9d8d4', lw=.6)
     ax.set_xticks(list(range(len(order)))+[len(order)+.4])
-    ax.set_xticklabels([labels[k] for k in order]+['All\nnulls'], rotation=0)
+    realized = rows[rows.kind == 'confounded_null'].groupby('confound').observed_effect.apply(
+        lambda x: f'≤{100*x.abs().max():.1f}')
+    ax.set_xticklabels([f'{labels[k]}\n{realized.get(k, "")}' for k in order]+['All\nnulls\n|Δ| pp'], rotation=0)
     ax.tick_params(axis='x', labelsize=6)
     ax.set_ylim(-.03, 1.03); ax.set_ylabel('False shift claims on nulls')
     ax.grid(axis='y', color='#ebeae6', lw=.5); ax.set_axisbelow(True)
@@ -205,19 +211,27 @@ def figures(rows, metrics, figdir):
     fig.tight_layout(pad=.3)
     fig.savefig(figdir/'false_claims_by_confound.pdf'); fig.savefig(figdir/'false_claims_by_confound.png')
     plt.close(fig)
-    # (b) detection vs false claims, sized by cost (two panels avoid a dual axis)
-    fig, axes = plt.subplots(1, 2, figsize=(3.33, 1.75), gridspec_kw={'width_ratios': [1, 1]})
+    # (b) calibration: stated P(shift) vs realized standardized effect; accuracy vs cost
+    fig, axes = plt.subplots(1, 2, figsize=(3.33, 1.85), gridspec_kw={'width_ratios': [1.25, 1]})
     ax = axes[0]
-    for c in conds:
+    rng = np.random.default_rng(1)
+    for j, c in enumerate(conds):
         name, color, marker = style[c]
-        d, fc = metrics[c]['detection_injected'], metrics[c]['false_claim_null']
-        ax.errorbar(fc['mean'], d['mean'], xerr=[[fc['mean']-fc['ci'][0]], [fc['ci'][1]-fc['mean']]],
-                    yerr=[[d['mean']-d['ci'][0]], [d['ci'][1]-d['mean']]], fmt=marker, ms=4.5,
-                    color=color, elinewidth=1, capsize=1.5, mec='white', mew=.5)
-    ax.axvspan(-.05, .1, ymin=0, ymax=1, color='#ebeae6', lw=0, zorder=0)
-    ax.set_xlim(-.05, 1.0); ax.set_ylim(-.05, 1.05)
-    ax.set_xlabel('False claims (nulls)'); ax.set_ylabel('Injected shifts detected')
-    ax.set_title('Sensitivity vs. false claims', loc='left')
+        g = rows[(rows.condition == c) & rows.confidence.notna()]
+        x = 100*g.observed_effect.where(g.kind != 'confounded_null', g.observed_effect).to_numpy()
+        x = x + (j-(len(conds)-1)/2)*.35 + rng.uniform(-.08, .08, len(x))
+        hollow = (g.kind == 'confounded_null').to_numpy()
+        ax.scatter(x[~hollow], g.confidence[~hollow], s=9, marker=marker, color=color, alpha=.75,
+                   linewidths=0, zorder=3)
+        ax.scatter(x[hollow], g.confidence[hollow], s=9, marker=marker, facecolors='white',
+                   edgecolors=color, linewidths=.7, zorder=3)
+    ax.axvspan(-2.7, 2.7, color='#f3f2ef', lw=0, zorder=0)
+    ax.text(0, 1.06, 'nulls (hollow)', ha='center', va='bottom', fontsize=5.5, color='#52514e')
+    ax.text(-5.0, 1.06, 'injected', ha='center', va='bottom', fontsize=5.5, color='#52514e')
+    ax.text(5.1, 1.06, 'injected', ha='center', va='bottom', fontsize=5.5, color='#52514e')
+    ax.set_xlim(-6.2, 6.2); ax.set_ylim(-.04, 1.04)
+    ax.set_xlabel('Realized standardized effect (pp)'); ax.set_ylabel('Stated P(shift)')
+    ax.set_title('Calibration', loc='left', pad=9)
     ax = axes[1]
     for c in conds:
         name, color, marker = style[c]
@@ -227,9 +241,9 @@ def figures(rows, metrics, figdir):
                     xerr=None if not cost else [[x-cost['ci'][0]], [cost['ci'][1]-x]],
                     fmt=marker, ms=4.5, color=color, elinewidth=1, capsize=1.5, mec='white', mew=.5,
                     label=name)
-    ax.set_xlabel('API cost per corpus (USD)'); ax.set_ylabel('Balanced accuracy')
-    ax.set_ylim(.4, 1.02); ax.set_xlim(-.03, None)
-    ax.set_title('Accuracy vs. cost', loc='left')
+    ax.set_xlabel('USD per corpus'); ax.set_ylabel('Balanced accuracy')
+    ax.set_ylim(.4, 1.02); ax.set_xlim(-.02, .2)
+    ax.set_title('Accuracy vs. cost', loc='left', pad=9)
     for a in axes:
         a.grid(color='#ebeae6', lw=.5); a.set_axisbelow(True)
     handles, names = axes[1].get_legend_handles_labels()
@@ -240,10 +254,45 @@ def figures(rows, metrics, figdir):
     plt.close(fig)
 
 
+def table(metrics):
+    """Markdown summary table (mean [95% CI]) for the paper."""
+    def fmt(b, pct=True, digits=2):
+        if not b:
+            return '—'
+        k = 100 if pct else 1
+        d = 0 if pct else digits
+        return f"{k*b['mean']:.{d}f} [{k*b['ci'][0]:.{d}f}, {k*b['ci'][1]:.{d}f}]"
+    names = {'claude_base': 'Agent, base prompt', 'claude_confound_check': 'Agent, +confound check',
+             'baseline': 'Deterministic estimator'}
+    order = [c for c in names if c in metrics] + [c for c in metrics if c not in names]
+    lines = ['| Metric | ' + ' | '.join(names.get(c, c) for c in order) + ' |',
+             '|---|' + '---:|'*len(order)]
+    spec = [('Runs (valid)', lambda m: f"{m['n_runs']} ({m['n_valid']})"),
+            ('Injected shifts detected, %', lambda m: fmt(m['detection_injected'])),
+            ('False shift claims on nulls, %', lambda m: fmt(m['false_claim_null'])),
+            ('Abstention (scored corpora), %', lambda m: fmt(m['abstention_scored'])),
+            ('Balanced accuracy, %', lambda m: fmt(m['balanced_accuracy'])),
+            ('Brier loss', lambda m: fmt(m['brier_scored'], False, 3)),
+            ('Confound "identified" (keyword), %', lambda m: fmt(m['confound_identified_null'])),
+            ('Shift claims on real-date replays, %', lambda m: fmt(m['positive_replay_shift_claim_rate'])),
+            ('Evidence IDs valid, %', lambda m: '—' if m['evidence_validity_rate'] is None else
+                f"{100*m['evidence_validity_rate']:.0f} (n={m['evidence_cited_total']})"),
+            ('USD / corpus', lambda m: fmt(m['cost_usd_per_corpus'], False, 3)),
+            ('Input tokens / corpus (k)', lambda m: '—' if not m['input_tokens_per_corpus'] else
+                f"{m['input_tokens_per_corpus']['mean']/1000:.1f}"),
+            ('Output tokens / corpus (k)', lambda m: '—' if not m['output_tokens_per_corpus'] else
+                f"{m['output_tokens_per_corpus']['mean']/1000:.1f}"),
+            ('API minutes / corpus', lambda m: fmt(m['api_minutes_per_corpus'], False, 2)),
+            ('Wall minutes / corpus', lambda m: fmt(m['minutes_per_corpus'], False, 2))]
+    for label, f in spec:
+        lines.append(f'| {label} | ' + ' | '.join(f(metrics[c]) for c in order) + ' |')
+    return '\n'.join(lines) + '\n'
+
+
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('root'); p.add_argument('runs')
-    p.add_argument('--output'); p.add_argument('--rows'); p.add_argument('--figs')
+    p.add_argument('--output'); p.add_argument('--rows'); p.add_argument('--figs'); p.add_argument('--table')
     a = p.parse_args()
     rows = load_rows(a.root, a.runs)
     metrics = summarize(rows)
@@ -253,6 +302,8 @@ if __name__ == '__main__':
     else:
         print(text)
     if a.rows:
-        rows.drop(columns=[c for c in rows if c.startswith('touched__')] and []).to_csv(a.rows, index=False)
+        rows.to_csv(a.rows, index=False)
+    if a.table:
+        Path(a.table).write_text(table(metrics))
     if a.figs:
         figures(rows, metrics, a.figs)

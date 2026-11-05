@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.0318,
+    0.0206
+  ],
+  "confidence": 0.1,
+  "named_confounds": [
+    "date uncertainty (27% of works have low date confidence)",
+    "unbalanced early/late sample sizes (752 vs 6014 works)",
+    "genre composition change",
+    "author clustering (1669 authors)",
+    "origin metadata mostly unknown",
+    "single passage per work"
+  ],
+  "evidence_passage_ids": [
+    "p005158",
+    "p002575",
+    "p002203",
+    "p004088",
+    "p000529",
+    "p003208"
+  ],
+  "rationale": "Method: each work has one annotated passage, so its rate is count__domains__DISTANCE_TRAVEL / n_passages (0 or 1). Works were split at year 1876. Within each genre I took the late-mean minus early-mean with equal weight per work, then averaged the 8 genres equally. The estimate is -0.0048. The 95% CI, from a stratified bootstrap over genre x period (2000 reps), is [-0.032, 0.021], which includes zero. Results by genre are mixed and small (about -0.003 to +0.014), except 'other' at -0.072, which rests on only 33 early works. Robustness checks: high-date-confidence works only gives -0.009; high+medium gives +0.002; restricting to 1850-1899 gives -0.032, which is noisy. Decade means stay flat between about 0.07 and 0.15 with no monotone trend. The UK, US and unknown origin groups each drop slightly, by under 0.01. Coverage: 6766 works, but only 752 are pre-1876 and the earliest decades are sparse. That makes the early estimates imprecise, and there is also author clustering and date misassignment. The cited passages are high-confidence passages tagged DISTANCE_TRAVEL. They only show what the construct looks like and do not establish a trend. Conclusion: the data do not support a robust historical shift in this construct."
+}

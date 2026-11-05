@@ -139,13 +139,23 @@ uv run --with pandas,numpy,pyarrow python -m bench.generate $R/pilot/labels.parq
     --construct domains__DISTANCE_TRAVEL --allow-unverified-positive
 # Analysis venv for agents, outside the repo: pandas numpy statsmodels pyarrow
 uv run --with pandas,numpy,pyarrow python -m bench.run_agents $R/pilot/generated $R/claude_base --backend claude \
-    --timeout 1200 --seeds 3 --concurrency 6 --resume --temp-root /tmp/bench-agent-runs --extra-path /tmp/bench-agent-venv/bin
+    --timeout 1200 --seeds 3 --concurrency 6 --resume --isolate \
+    --temp-root $PWD/bench/runs/tmp/stage --extra-path $HOME/.cache/bench-agent-venv/bin
 #   ... same with --condition confound_check -> $R/claude_confound_check
 uv run --with pandas,numpy,pyarrow python -m bench.run_agents $R/pilot/generated $R/baseline \
     --command "/tmp/bench-agent-venv/bin/python $PWD/bench/baseline.py"
 uv run --with pandas,numpy,pyarrow,matplotlib python -m bench.analyze $R/pilot/generated $R/conditions \
     --output $R/metrics.json --rows $R/rows.csv --figs bench/figs
 ```
+
+`--isolate` wraps each session in bubblewrap: private `/tmp`, and the repository,
+other staging dirs and `~/.claude/projects` masked. `--resume` reruns only missing,
+`error` or `infra_error` sessions (environment I/O failures, gateway 5xx); invalid
+answers and timeouts are agent outcomes and are kept. In this study 11 early base
+sessions (shared-`/tmp` writes or quota failures) were quarantined by rule
+(`quarantine/`) and rerun isolated, and 8 confound-check sessions that hit gateway
+503s were rerun. Results: `metrics.json`, `metrics_table.md`, `rows.csv`, `bench/figs/`.
+Paper draft: `docs/drafts/aaai27_eval_ai_scientists.md`.
 
 `run.json` files keep the CLI's final result event (model, usage, cost, turns) and a
 truncated list of tool-call inputs for process-level checks; full transcripts are not

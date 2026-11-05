@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0037,
+    0.0454
+  ],
+  "confidence": 0.65,
+  "named_confounds": [
+    "genre composition change (corpus heavily late-skewed, juvenile-dominated)",
+    "small early-period cells (e.g., romance n=40, collection n=37)",
+    "date uncertainty around cutoff (27% low date_confidence)",
+    "origin mix (67% unknown origin)",
+    "annotation/classifier drift across periods",
+    "author clustering (1669 authors for 6766 works)"
+  ],
+  "evidence_passage_ids": [
+    "p004613",
+    "p000328",
+    "p003083",
+    "p000166",
+    "p005073",
+    "p004247"
+  ],
+  "rationale": "Methods: 6766 works, each with exactly 1 annotated passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages (0 or 1). Works were split at year >= 1876 (late) vs earlier. Within each of the 8 genres I took the unweighted mean across works for each period, computed late minus early, and then averaged the genre differences with equal weight. Point estimate: +0.0253 passage-rate units. 95% CI from a 2000-replicate bootstrap that resamples works within each genre x period cell: [0.0037, 0.0454]. Genre-level differences were positive in 6 of 8 genres: romance +0.059, collection +0.075, juvenile +0.042, historical +0.030, domestic_realist +0.018, other +0.007. Adventure (-0.022) and sensation_mystery (-0.006) were slightly negative. Decade means rise from about 0.03-0.08 before 1860 to about 0.09-0.12 from 1880 to 1920. Sensitivity checks, all positive point estimates: high date-confidence works only +0.015; excluding the other and collection genres +0.020; only the four largest genres +0.017; UK only +0.033; US only +0.019; works dated 1856-1896 only +0.015. Bootstrap CIs were not computed for these subsets. Coverage and caveats: early works are scarce (752 vs 6014 late), and a few small early cells (romance 0/40, collection 1/37) pull the estimate upward. Robustness checks shrink the effect to about 0.015, so the evidence for an increase is modest and the lower CI bound is close to zero. The bootstrap does not account for clustering by author, and an author-clustered model did not finish in the time available, so the interval may be too narrow. Alternative explanations: the late corpus has a different mix of works within genres (for example more juvenile travel or adventure-style books); dating error near the cutoff; drift in how the annotator labelled passages; and sampling artefacts because each work contributes only one passage. The cited passage IDs are passages tagged with DISTANCE_TRAVEL from both periods. They only illustrate the construct and do not establish the trend. Conclusion: a small increase that is directionally consistent across checks but has moderate uncertainty."
+}

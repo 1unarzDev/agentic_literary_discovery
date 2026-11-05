@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.033,
+    0.0686
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition shift (juvenile share rises 21%->34%, historical falls 22%->10% after 1876)",
+    "early-period sparsity (only 752 pre-1876 works vs 6014 late)",
+    "low date_confidence works give an imprecise estimate",
+    "author productivity / prolific-author clustering",
+    "passage annotation/coding drift over time"
+  ],
+  "evidence_passage_ids": [
+    "p000961",
+    "p002985",
+    "p000696",
+    "p004277",
+    "p004974",
+    "p006320"
+  ],
+  "rationale": "Data: 6766 works, each with exactly one passage (n_passages=1), all dated; the cutoff is 1876. For each work, rate = count__domains__DISTANCE_TRAVEL / n_passages. Within each genre I averaged rates with equal weight per work, took late (year>=1876) minus early, and then averaged the 8 genre differences with equal weight. Estimate: +0.052 per passage. 95% CI [0.033, 0.069] from a bootstrap of 1000 resamples, stratified by genre and period. Every one of the 8 genres shows an increase (+0.045 to +0.060), so the result is not driven by one genre or by genre mix. That matters because genre mix does change over time: juvenile works go from 21% to 34% of the corpus and historical works from 22% to 10%. Equal-genre weighting neutralises this. Origin (UK/US/unknown), date_confidence, n_editions and author productivity are about equally distributed across the two periods. Robustness checks: (1) a passage-weighted regression of rate on late with genre, origin, date_confidence, log editions and log author productivity, with standard errors clustered by author, gives +0.051 [0.034, 0.068]; (2) high-date-confidence works only give +0.053 [0.024, 0.078], and medium-confidence works +0.065; (3) the effect holds within each origin: UK +0.069, US +0.063, unknown +0.048. Low-confidence works alone give +0.018 with a CI spanning zero, which fits noisy dating weakening the contrast rather than creating it. By decade, rates sit around 0.05-0.07 from the 1830s to the 1870s and jump to about 0.11-0.12 from the 1880s onward, a step change near the cutoff rather than a smooth trend. Caveats: the early period is small (752 works, with some genre cells of only 37-57 works), so early rates are imprecise. Alternative explanations I cannot rule out: drift in how passages were coded over time, how the sample was selected (for example by digitization or archive collection), and unmeasured changes in subgenres. The cited passage IDs are passages coded with the DISTANCE_TRAVEL domain; they show what the construct looks like and do not on their own establish the trend."
+}

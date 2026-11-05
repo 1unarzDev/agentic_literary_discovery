@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0029,
+    0.0451
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence / dating precision (effect weakens and CI includes zero in high-confidence-dated works)",
+    "n_editions differs strongly by period (early works more often reprinted, p<1e-30)",
+    "sparse early period (752 of 6766 works pre-1876; some genre cells have 37-57 works)",
+    "genre composition imbalance across periods",
+    "author clustering"
+  ],
+  "evidence_passage_ids": [
+    "p003265",
+    "p006752",
+    "p001318",
+    "p001154",
+    "p004621",
+    "p006683"
+  ],
+  "rationale": "Data: 6,766 works, each with one passage (n_passages=1), dated 1800-1925, cutoff 1876. Only 752 works fall before 1876, and some genre-by-period cells are small (collection had 37 early works, romance 40). Estimand: for each of the 8 genres, I took the mean late-minus-early difference in per-work DISTANCE_TRAVEL passage rates, then averaged those 8 differences with equal weight. Result: +0.0253, with a 95% CI of [0.0029, 0.0451] from a bootstrap resampling works within each genre-by-period cell. An author-clustered bootstrap gave [0.0002, 0.0473]. A weighted regression with author-clustered errors, adjusting for genre, origin, n_editions, date_confidence and log author productivity, gave +0.028 [0.002, 0.053]. Robustness checks: author productivity and origin mix are similar in both periods. n_editions is strongly tied to period (early works have more editions). Genre shares also differ between periods. The direction is inconsistent across genres: adventure and sensation_mystery decrease while the others increase. When I restricted to high-confidence dates, the estimate fell to +0.015 (+0.016 adjusted), with CI [-0.019, 0.052], which includes zero. High- plus medium-confidence works gave +0.020. By decade, the rate rises gradually from the 1840s and is noisy (the 1870s are low), so this looks more like a weak trend sensitive to sparse early data than a clear break. The full-sample contrast barely excludes zero and does not hold up in well-dated works, so I abstain rather than claim a robust shift. Alternative explanations: early works that survive in multiple editions may be a selected, unrepresentative group; dating errors may push works across the cutoff; the genre mix changes over time; small early cells inflate the variance. The cited passage IDs are passages coded DISTANCE_TRAVEL with confidence of at least 0.9. They show the construct exists in the corpus but say nothing about the trend."
+}

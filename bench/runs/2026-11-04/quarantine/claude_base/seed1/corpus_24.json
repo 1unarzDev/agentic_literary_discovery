@@ -1,0 +1,30 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0021,
+  "ci": [
+    -0.0228,
+    0.0242
+  ],
+  "confidence": 0.15,
+  "named_confounds": [
+    "genre composition imbalance (late period dominates every genre; juvenile and adventure have high base rates)",
+    "small early-period cells (40-254 works per genre before 1876)",
+    "date uncertainty (about 27% low-confidence dates; works near the 1876 cutoff may be misassigned)",
+    "single coded passage per work (sampling noise; one passage may not represent the work)",
+    "automated/annotator coding of domains with variable confidence",
+    "origin metadata mostly unknown (UK/US mix may differ by period)",
+    "reprint/edition selection effects in what survives into the corpus"
+  ],
+  "evidence_passage_ids": [
+    "p003157",
+    "p005471",
+    "p002363",
+    "p002962",
+    "p005210",
+    "p004077",
+    "p004194",
+    "p005925"
+  ],
+  "rationale": "Methods: I used works.parquet (6,766 works, each with one coded passage, so n_passages=1 and every year is present). The rate for each work is count__domains__DISTANCE_TRAVEL / n_passages. A work is late if its year is 1876 or later. Within each of the 8 genres I took the unweighted mean across works, separately for early and late. I then computed the late-minus-early difference per genre and averaged the 8 differences with equal weight. For uncertainty I ran a stratified bootstrap with 4,000 replicates, resampling works within each genre-by-period cell; the CI is the 2.5th to 97.5th percentile. Result: effect = +0.0021 passage-rate units, 95% CI [-0.023, +0.024]. The interval is centred near zero and narrow enough to rule out large changes. Genres disagree on direction. Adventure, juvenile, romance and domestic_realist fall slightly. Sensation_mystery and other rise, but their early cells are small (about 51-54 works) and their early rates are low. Collection and historical are flat. Robustness: restricting to high-confidence dates gives +0.0027; high or medium confidence gives -0.0046; using only 1850-1899 gives +0.0099. None of these departs meaningfully from zero. Decade means are uneven: higher early in the century, with only 12-73 works per decade before the 1850s, a dip in the 1870s-80s, and a recovery to about 0.10-0.12 after 1890. That is not a consistent one-way trend. UK and US subsets show small declines, but most works have unknown origin, so that split cannot be relied on. Alternative explanations for any apparent difference include shifts in genre mix, a few early works per cell, misdated works near the cutoff, noise from coding a single passage per work, and coder inconsistency. Coverage: about 13% of works are pre-1876 (673 works), so early estimates are noisier. The data are adequate to conclude there is no robust shift, and they do not support claiming one. The cited passage IDs are passages coded DISTANCE_TRAVEL, spread across both periods. They only illustrate the construct and do not establish a trend."
+}

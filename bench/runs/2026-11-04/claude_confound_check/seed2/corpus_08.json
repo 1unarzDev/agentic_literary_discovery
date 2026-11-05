@@ -1,0 +1,28 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0032,
+    0.0455
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "date_confidence composition shift (high-confidence dates 34% of early works vs 48% of late works; medium-confidence 37% vs 25%)",
+    "genre composition linked to year (juvenile 21% early vs 34% late; historical 22% vs 10%)",
+    "sparse early period (752 works before 1876 vs 6014 after; romance and collection have only 37-40 early works each)",
+    "n_editions differs by period (mean 1.26 early vs 1.06 late)",
+    "author clustering"
+  ],
+  "evidence_passage_ids": [
+    "p004115",
+    "p000153",
+    "p005406",
+    "p000460",
+    "p005663",
+    "p004228",
+    "p003808",
+    "p001689"
+  ],
+  "rationale": "Data: 6,766 works, each with exactly one coded passage. So the passage rate for a work is 0 or 1, based on whether its passage is tagged DISTANCE_TRAVEL. Overall rate is 0.107. Every work has a year. Cutoff is 1876: 752 early works, 6,014 late. Method: within each genre, I took the mean of the work-level rates in each period and computed late minus early. I then averaged those differences equally across the 8 genres. The 95% CI comes from 1,000 bootstrap resamples drawn within each genre-by-period cell. Main result: +0.0253, CI [0.0032, 0.0455]. 6 of 8 genres go up; adventure and sensation_mystery go slightly down. The romance early rate is 0 out of 40 works and collection is 1 out of 37, so a few small cells drive part of the average. Artifact checks: years are clearly related to genre mix and to date_confidence. Origin mix is stable, and author productivity is similar in both periods (mean 20.6 vs 21.0 works per author). An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with errors clustered by author, gives +0.0255, CI [0.001, 0.050]. That barely excludes zero. A logit using continuous year with the same kinds of controls gives p=0.028. The result does not hold up when restricted to well-dated works: high-confidence dates only gives +0.015, CI [-0.023, 0.050]; high plus medium gives +0.020, CI [-0.009, 0.045]. Low-confidence-dated works give the largest effect (+0.043), which points to a dating artifact. Restricting to single-edition works gives +0.032, CI [0.009, 0.051]. Decade means rise slowly and unevenly, and the early decades rest on very few works. Conclusion: the full-sample contrast is small, sits close to zero, and is not significant among well-dated works. It may come from dating error or from sparse early cells, so I am not claiming a robust shift. The cited passage IDs are travel-tagged passages (early and late, coder confidence of at least 0.9). They show what the construct looks like but cannot establish a trend."
+}

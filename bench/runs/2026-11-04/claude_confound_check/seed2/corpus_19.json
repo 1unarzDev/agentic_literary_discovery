@@ -1,0 +1,24 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0149,
+  "ci": [
+    -0.0405,
+    0.0107
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "date_confidence imbalance (late period much richer in low/medium-confidence dates)",
+    "sparse early period (752 early vs 6014 late works)",
+    "origin composition (mostly unknown origin)",
+    "one passage per work: binary work-level rates"
+  ],
+  "evidence_passage_ids": [
+    "p000884",
+    "p000090",
+    "p001878",
+    "p002577",
+    "p001176"
+  ],
+  "rationale": "Method: I computed a rate for each work as count__domains__DISTANCE_TRAVEL / n_passages. Every work has exactly one passage, so each work's rate is 0 or 1. Within each genre I averaged works equally, took late (year >= 1876) minus early, and then averaged the 8 genres equally. The 95% CI comes from a stratified bootstrap with 2000 resamples of works within each genre-by-period cell. Coverage: 6766 works, none missing a year. Only 752 works are early, and some early genre cells have just 43-82 works. Result: the effect is -0.015 with a 95% CI of [-0.040, 0.011], which includes zero. The direction is not consistent across genres: collection rises, domestic, historical, romance, other and sensation fall, and adventure and juvenile stay flat. Composition checks: period is linked to date_confidence. Low-confidence dates make up 29% of late works but 11% of early works. Origin, n_editions and author productivity are roughly balanced across periods. Restricting by date confidence gives high -0.010, medium -0.039 and low -0.025. Splitting by origin gives effects of mixed sign (US -0.046, unknown -0.013, UK +0.016). A WLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives -0.008 with a CI of [-0.032, 0.016]. Decade means run from about 0.10 to 0.16 with no monotone trend. The cited passages are only examples of travel and distance content; they cannot show a trend. Conclusion: I found no robust historical shift. Small early cells and dating uncertainty limit power, but the estimate is near zero and stable across adjustments."
+}

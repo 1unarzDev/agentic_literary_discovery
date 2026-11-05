@@ -1,0 +1,25 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0183,
+  "ci": [
+    -0.0063,
+    0.0407
+  ],
+  "confidence": 0.3,
+  "named_confounds": [
+    "genre composition shift (domestic_realist over-represented before 1876)",
+    "sparse early-period data (376 of 6766 works before 1876)",
+    "date_confidence heterogeneity (low-confidence dates give a negative estimate)",
+    "author productivity differs between periods",
+    "origin mix (mostly unknown)"
+  ],
+  "evidence_passage_ids": [
+    "p003957",
+    "p004260",
+    "p002517",
+    "p000973",
+    "p001688"
+  ],
+  "rationale": "Data: 6766 works. Each work has exactly 1 passage, so a work's rate is 0 or 1. All years are present, ranging from 1800 to 1925, and only 376 works fall before the 1876 cutoff. Method: for each work, rate = count__domains__DISTANCE_TRAVEL / n_passages. I took the mean of works within each genre and period, computed late minus early for each genre, then averaged the 8 genres with equal weight. The CI comes from a 2000-replicate bootstrap that resamples works within each genre-period cell. Result: +0.018, 95% CI [-0.006, 0.041], so the interval includes zero. Robustness: high-confidence dates give +0.031 [-0.007, 0.065], medium +0.026 [-0.017, 0.063], and low -0.013 [-0.063, 0.035]. By origin, UK gives +0.023 [-0.030, 0.071], US +0.042 [-0.000, 0.081] and unknown +0.012 [-0.019, 0.038]. A passage-weighted WLS adjusted for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives +0.012 [-0.011, 0.034]. Composition checks: genre mix changes sharply across the cutoff. Domestic_realist makes up about 37% of early works but about 15% of late ones, and it has a low rate. This makes pooled decade means rise from about 0.05 to about 0.12, but that rise is mostly a composition artifact. Equal-genre weighting removes most of it. Origin, date_confidence and n_editions are fairly balanced across periods. Mean author productivity is slightly higher in the late period. Genre-level differences are mixed: adventure, collection and domestic_realist go down, while juvenile, other and sensation_mystery go up. Early genre cells are small, with 47 to 280 works each. Conclusion: the point estimate is a small increase, but it is not distinguishable from zero under any specification, and it does not survive restriction to well-dated works at the 95% level. I therefore do not claim a robust shift. The cited passages are tagged DISTANCE_TRAVEL and only show what the construct looks like; they cannot establish a trend."
+}

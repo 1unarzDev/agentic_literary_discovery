@@ -1,0 +1,13 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.004814988240693694,
+  "ci": [
+    -0.032339623835194016,
+    0.021474339837871274
+  ],
+  "confidence": 0.22799999999999998,
+  "named_confounds": [],
+  "evidence_passage_ids": [],
+  "rationale": "Equal-genre, equal-work late-minus-early rate; 1000-draw author-cluster bootstrap."
+}

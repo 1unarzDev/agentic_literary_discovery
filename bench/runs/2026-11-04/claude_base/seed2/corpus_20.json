@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0035,
+    0.0468
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "early-period sparsity: 552 pre-1876 works vs 6214 later, with very small early cells (romance n=40, all zero; collection n=37)",
+    "date uncertainty: 27% of works have low date confidence, and the effect shrinks to 0.015 with high-confidence dates only",
+    "shifting genre and origin mix over time, with origin unknown for 66% of works",
+    "one passage per work, so each work's rate is 0 or 1",
+    "single-label annotation error or annotator drift",
+    "author clustering and repeat authors"
+  ],
+  "evidence_passage_ids": [
+    "p001318",
+    "p006434",
+    "p002917",
+    "p003742",
+    "p002057",
+    "p001590",
+    "p005442",
+    "p000055"
+  ],
+  "rationale": "Methods: 6766 works, each with n_passages=1, so a work's rate is 0 or 1. Cutoff year 1876 (late means year>=1876). Rate = count__domains__DISTANCE_TRAVEL / n_passages. Within each of 8 genres I took the late-minus-early difference of equal-weighted work means, then averaged the 8 genre differences equally. Point estimate: +0.0253 passage-rate units. 95% CI from a 4000-draw bootstrap stratified by genre and period: [0.0035, 0.0468]; about 1.3% of draws were <=0. A cross-check (OLS with genre fixed effects and author-clustered SEs) gave +0.024 [0.0005, 0.048]. Pattern: 6 of 8 genres increase; adventure (-0.022) and sensation_mystery (-0.006) dip slightly. Decade means rise from about 0.03-0.07 (1810s-1840s) to about 0.11-0.12 (1890s-1910s), but the 1870s are low (0.059). Sensitivity: high-date-confidence only +0.015; excluding low-confidence dates +0.020; excluding other/collection +0.020; 1850-1899 only +0.018; UK +0.033; US +0.019. Every variant is positive, but they are smaller than the main estimate and probably not individually significant. Coverage and uncertainty: the early period is thin (552 works), so the CI lower bound sits near zero. Alternative explanations: changes in genre and subgenre makeup within the broad labels, errors in dating, how texts were selected for digitization, and annotation bias. Cited passage IDs are late-period passages tagged DISTANCE_TRAVEL. They show what the construct looks like but do not by themselves establish the trend. Conclusion: a modest, fairly consistent increase. It is statistically supported but not strongly robust, hence moderate confidence."
+}

@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0816,
+    -0.0235
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "genre composition shift (late period has more juvenile works and fewer historical and domestic_realist works)",
+    "unbalanced period sizes (only 752 of 6766 works fall before 1876)",
+    "date_confidence mix (the late period has more high-confidence dates)",
+    "origin (two-thirds of works have unknown origin)",
+    "author productivity",
+    "multi-label annotation of passage domains"
+  ],
+  "evidence_passage_ids": [
+    "p001424",
+    "p006385",
+    "p006108",
+    "p003397",
+    "p002820",
+    "p004627",
+    "p003974",
+    "p003485"
+  ],
+  "rationale": "Data: 6766 works, each with exactly one annotated passage, dated 1800-1925. Cutoff is 1876: 752 works are early and 6014 are late. Rate = count__domains__DISTANCE_TRAVEL / n_passages. Estimand: within each of the 8 genres I took the mean rate of late works minus the mean rate of early works, each work weighted equally, then averaged the 8 genre differences equally. Result: -0.050. The 95% CI comes from a bootstrap of 1000 resamples, resampling works within each genre-by-period cell: [-0.082, -0.024]. The rate is lower in the late period in all 8 genres, with drops between 0.04 and 0.06 (for example juvenile 0.205 to 0.153, domestic_realist 0.091 to 0.038). Artifact checks: genre mix does differ between periods (juvenile goes from 21% to 34% of works, historical from 22% to 10%). The estimand holds genre fixed, so this does not drive the result. Origin share, n_editions and author productivity are almost the same in both periods. The late period has somewhat more high-confidence dates. Restricting by dating quality gives -0.059 for high-confidence dates only, -0.060 for medium and -0.024 for low; the low group is noisier and the smaller value fits dating error blurring the contrast. Stratifying by origin gives UK -0.043, US -0.087 and unknown -0.045. An OLS regression of rate on period, adjusting for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives -0.052 (CI -0.078 to -0.025, p=1e-4). Narrowing the window around the cutoff gives -0.051 for 1856-1895 and -0.051 for 1866-1885. Caveats: the decade-by-decade means are noisy and not monotonic (the 1860s dip, then a partial rebound), so the change looks more like a step-down or gradual decline than a sharp break. The early period is small, and much of the uncertainty comes from it. This is a corpus of sampled passages and may not represent all publishing of the period. The domain labels are multi-label annotations, and a change in how annotators applied them, or in the kind of passage sampled, could imitate a thematic change. Origin is missing for most works. The cited passage IDs are high-confidence, well-dated passages labeled DISTANCE_TRAVEL from early and late works. They show what the construct looks like but do not by themselves establish the trend."
+}

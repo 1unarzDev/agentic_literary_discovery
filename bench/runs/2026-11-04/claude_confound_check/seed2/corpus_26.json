@@ -1,0 +1,29 @@
+{
+  "claim": "abstain",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0042,
+    0.0466
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence composition shift (high-confidence dating 34% early vs 48% late)",
+    "genre composition shift (juvenile 21% early vs 34% late; historical 22% vs 10%)",
+    "n_editions differs by period (1.26 early vs 1.06 late)",
+    "small early sample (752 of 6766 works before 1876)",
+    "loss of significance when restricted to well-dated works",
+    "annotation/coding drift"
+  ],
+  "evidence_passage_ids": [
+    "p006353",
+    "p002976",
+    "p002439",
+    "p005543",
+    "p005752",
+    "p004798",
+    "p004772",
+    "p006147"
+  ],
+  "rationale": "Methods: Each work has exactly one passage, so the rate is count__domains__DISTANCE_TRAVEL divided by n_passages, which is 0 or 1. Works dated 1876 or later count as late. For each genre I took the mean over works of late minus early, then averaged the eight genres with equal weight. I got the 95% CI by bootstrapping works within each genre-by-period cell (2000 resamples). Result: an increase of +0.025 per passage, CI [0.004, 0.047]. Six of eight genres go up; adventure and sensation_mystery go down slightly. An OLS model adjusting for genre, origin, date_confidence, log n_editions and log author productivity, with author-clustered SEs, gave a similar estimate: +0.026, CI [0.001, 0.050]. Data coverage: 6766 works, and only 752 fall before the cutoff. Some early genre cells are small (37 to 77 works), and the romance early mean is 0 out of 40. Year is linked to other metadata. Genre mix changes (more juvenile, fewer historical works after 1876). Date confidence changes (more high-confidence dates late). n_editions is higher early. Origin and author productivity look balanced. Robustness: Among high-confidence-dated works only, the effect drops to +0.015 with CI [-0.028, 0.053], which includes zero. Medium-dated works give +0.022 and low-dated works +0.043, so much of the signal comes from less securely dated works. That points to a possible dating artifact. By origin the effect is +0.033 (UK), +0.019 (US) and +0.028 (unknown). The decade means rise roughly from the 1820s to the 1910s, but the early decades are noisy. Alternative explanations: weak dates could misplace works across the cutoff; the genre and edition mix differs by period; early cells are small and could reflect chance; coding could have drifted. The passage IDs listed are DISTANCE_TRAVEL-coded passages from high-confidence-dated works: the first four are early, the last four are late. They only illustrate the construct and do not show a trend. The pooled increase is borderline. It does not hold up when restricted to well-dated works, which the task requires before claiming a shift, so I abstain."
+}

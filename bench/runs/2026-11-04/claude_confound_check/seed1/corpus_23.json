@@ -1,0 +1,25 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0033,
+    0.0455
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence imbalance across the cutoff (low/medium-confidence dates overrepresented pre-1876)",
+    "small and sparse early sample (752 early vs 6014 late works; one passage per work)",
+    "n_editions differs between periods (early mean 1.26 vs late 1.06)",
+    "genre composition shift (juvenile share grows sharply after 1876)"
+  ],
+  "evidence_passage_ids": [
+    "p006432",
+    "p006477",
+    "p003217",
+    "p002503",
+    "p003605",
+    "p001326"
+  ],
+  "rationale": "Methods: 6766 works, all dated, each with exactly one passage (n_passages=1), so the work rate is 0/1 presence of DISTANCE_TRAVEL. Early means year<1876 and late means year>=1876. The estimand is the equal-genre mean (8 genres) of within-genre equal-work late-minus-early mean rates. The 95% CI comes from a 2000-replicate bootstrap that resamples works within each genre x period cell. Result: +0.0253 [0.0033, 0.0455]. Late exceeds early in 6 of 8 genres; adventure and sensation_mystery go slightly down. Some early cells are tiny, e.g. romance has n=40 with 0 hits and collection has n=37. A passage-weighted regression adjusting for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives late=+0.0253, with a CI of roughly 0.001 to 0.050. Artifact checks: dating quality is unbalanced across the cutoff, with 34% high-confidence dates early vs 48% late. The effect is largest among low-confidence dates (+0.043) and shrinks among well-dated works: high-only gives +0.015 [-0.027, 0.052] and high+medium gives +0.020 [-0.007, 0.045]. Neither CI excludes zero. Results by origin are similar (UK 0.033, US 0.019, unknown 0.028). Decade means rise from about 0.03-0.08 before 1860 to about 0.09-0.12 after 1880, but the early decades are thin, and the 1870s dip to 0.059 straddles the cutoff. Alternative explanations: misdating of low-confidence works could create or inflate the contrast. Genre mix and edition or survival selection could also contribute. With a single coded passage per work, the per-work signal is very noisy. Conclusion: the pooled contrast is small and positive but only marginally significant, and it does not survive restriction to well-dated works. I therefore abstain rather than claim a robust shift. The cited passages are coded DISTANCE_TRAVEL and only illustrate the construct. They do not establish a trend."
+}

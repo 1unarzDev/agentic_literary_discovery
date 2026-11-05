@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0039,
+    0.0458
+  ],
+  "confidence": 0.62,
+  "named_confounds": [
+    "early-period sparsity (752 of 6766 works pre-1876)",
+    "genre composition change (juvenile/adventure dominate late)",
+    "date uncertainty (low/medium confidence dates)",
+    "author clustering / prolific authors",
+    "single-passage-per-work sampling noise",
+    "classifier/annotation drift across periods"
+  ],
+  "evidence_passage_ids": [
+    "p003543",
+    "p001905",
+    "p005129",
+    "p003218",
+    "p000067",
+    "p004759"
+  ],
+  "rationale": "Methods: rate = count__domains__DISTANCE_TRAVEL / n_passages per work (every work has 1 passage). Late = year >= 1876. Within each of 8 genres, equal-weight mean of work rates late minus early; then unweighted mean across genres. Estimate +0.025 passage-rate units; 95% CI [0.004, 0.046] from 1000 bootstrap resamples of works stratified by genre x period. Genre-FE OLS with author-clustered SEs gives a similar +0.024 [0.0005, 0.048]. Six of 8 genres rise (adventure and sensation_mystery fall slightly). Sensitivity: every check stays positive but gets smaller: high-confidence dates only +0.015, one work per author +0.016, dropping 1866-1885 +0.018, 1850-1899 window +0.018. By origin: UK +0.033, US +0.019. Decade means rise roughly from ~0.03-0.07 before 1850 to ~0.11-0.12 after 1890. Coverage: only 752 early works, some early genre cells have about 40 works (collection, romance), and early romance's 0 rate inflates the effect. Each work contributes one passage. Alternative explanations: noisy early estimates from small cells; changes in which works and genres were sampled; date misassignment; prolific authors; and annotation drift rather than real change. The cited passages are coded DISTANCE_TRAVEL and only illustrate the construct. They cannot establish a trend. Conclusion: a modest increase that is borderline robust. The CI excludes zero, but the lower bound is near zero and the robustness checks shrink the effect."
+}

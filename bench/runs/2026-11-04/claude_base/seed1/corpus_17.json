@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.032,
+    0.021
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition change over time",
+    "sparse early-period sample (~750 of 6766 works pre-1876)",
+    "date uncertainty (low/medium-confidence dates for over half of works)",
+    "one passage per work limits within-work precision",
+    "origin mix (many unknown)",
+    "annotation/classifier error in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p000585",
+    "p003048",
+    "p002473",
+    "p002411",
+    "p001988"
+  ],
+  "rationale": "Took the 6766 works (each has one passage) and computed a DISTANCE_TRAVEL passage rate for each one (count / n_passages). Works were split at 1876 (late = year >= 1876). I averaged works with equal weight inside each genre-by-period cell, took late minus early for each of the 8 genres, and averaged those 8 differences with equal weight. Estimate: -0.0048. 95% CI from 2000 bootstrap resamples of works within each genre-period cell: [-0.032, 0.021]. This range includes zero. The genres point different ways: adventure +0.05, juvenile +0.02, collection -0.056, romance -0.026, historical -0.019, and the others close to 0. Results change with the subset. Using only high-confidence dates gives -0.034, high plus medium gives -0.021, and leaving out the other and collection genres gives +0.003. By origin, UK is -0.028, US -0.005 and unknown +0.006. Decade means move around 0.04-0.17 with no trend, and early decades are very noisy because they contain few works. Other explanations for any apparent difference: early cells are small (39-247 works), the genre mix changes over time, dates are uncertain, and domain labels may contain errors. The cited passages are high-confidence examples labelled with the construct. They show what the construct looks like, not a trend. The evidence does not support a robust historical shift."
+}

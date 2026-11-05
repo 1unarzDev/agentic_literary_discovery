@@ -1,0 +1,31 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0318,
+    0.0686
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "early-period sparsity (only 752 of 6766 works before 1876)",
+    "genre composition change over time",
+    "date uncertainty (52% of works have low or medium date confidence)",
+    "single annotated passage per work, so measurement noise",
+    "annotation/classifier drift across eras",
+    "origin mostly unknown",
+    "author clustering",
+    "sampling of which works survive or get digitized"
+  ],
+  "evidence_passage_ids": [
+    "p005768",
+    "p004028",
+    "p005726",
+    "p001517",
+    "p006414",
+    "p004853",
+    "p000214",
+    "p002412"
+  ],
+  "rationale": "Method: per-work rate = count__domains__DISTANCE_TRAVEL / n_passages (n_passages is 1 for every work, so each rate is 0 or 1). Works with year >= 1876 count as late. I averaged works equally within each genre-by-period cell, took the late-minus-early difference for each of the 8 genres, then averaged those 8 differences equally. Result: +0.052. The 95% CI [0.032, 0.069] comes from 2000 bootstrap resamples within each genre-by-period cell. All 8 genres moved upward, by between +0.045 and +0.060. Robustness checks: high-date-confidence works only gave +0.047; known-origin works only, +0.039; dropping juvenile, +0.052; one work per author per period, +0.055. An OLS model with genre, origin and date-confidence controls and author-clustered SEs gave +0.052 (95% CI 0.033 to 0.071). By decade, the rate rises from about 0.04-0.06 before 1870 to about 0.10-0.12 from 1880 on. Coverage: 6766 works, none missing a year, but only 752 are early, and some early cells are small (romance has 40 works, collection 37), so their estimates are imprecise. Two genres show an early rate of exactly 0. Alternative explanations: the annotation scheme or classifier may behave differently on later texts; the set of surviving or digitized works may differ by era; date errors may move works across the cutoff; and with one passage per work, a work's rate is very noisy. The cited passages are late-period examples tagged with the DISTANCE_TRAVEL domain. They show what the construct looks like but do not by themselves prove a trend. The trend claim rests on the aggregate estimate."
+}

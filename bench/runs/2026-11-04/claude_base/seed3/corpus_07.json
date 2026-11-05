@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0805,
+    -0.0226
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "early-period sparsity (752 of 6766 works before 1876)",
+    "genre mix shifting toward juvenile works over time",
+    "date uncertainty (27% of works have low date confidence)",
+    "author clustering (1669 authors)",
+    "non-monotonic decade pattern (1880s dip)",
+    "annotation/classifier drift in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p006199",
+    "p001783",
+    "p000759",
+    "p001996",
+    "p001925",
+    "p003302"
+  ],
+  "rationale": "Method: each work has 1 passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages. Works are split at year >= 1876 (late) vs earlier. Within each genre I took the unweighted mean over works for each period, computed late minus early, and averaged those differences across the 8 genres with equal weight. Result: -0.050. A 95% CI of [-0.081, -0.023] comes from a 2000-replicate bootstrap that resamples works within each genre-period cell. All 8 genres show a decrease, ranging from -0.04 to -0.06. The decrease also holds in every subset I checked: high date confidence -0.040, medium -0.053, low -0.071; high plus medium -0.044; single-edition works -0.045; UK -0.067, US -0.043, unknown origin -0.058; works dated 1856-1895 only -0.065. Coverage: 6766 works, of which only 752 are early, and some early genre cells are small (37-165 works). This makes the early rates noisy. Decade means are not monotonic: roughly 0.13-0.19 in the 1840s-1870s, 0.07 in the 1880s, then 0.10-0.12. The change therefore looks more like a step down after the cutoff than a steady trend, and it is modest in size. Alternative explanations: (1) The early sample is small and may be selected differently. (2) Within-genre composition may have changed, e.g. new kinds of juvenile or adventure works. (3) Dating errors could move works across the cutoff. (4) Domain labels may be assigned inconsistently across periods. (5) Works by the same author are not independent, so the bootstrap CI may be too narrow; I did not run an author-clustered bootstrap. Equal genre weighting limits confounding from genre mix. The cited passage IDs are only examples of passages tagged with this domain, at both ends of the date range. They do not establish the trend on their own."
+}

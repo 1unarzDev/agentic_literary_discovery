@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0149,
+  "ci": [
+    -0.0423,
+    0.0087
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "date_confidence imbalance (early works mostly high-confidence dates, late works more low/medium)",
+    "genre composition",
+    "sparse early period (752 of 6766 works before 1876)",
+    "origin mostly unknown"
+  ],
+  "evidence_passage_ids": [
+    "p002269",
+    "p004612",
+    "p003182",
+    "p000034",
+    "p000884",
+    "p000090",
+    "p001878",
+    "p002577"
+  ],
+  "rationale": "Methods: The cutoff is 1876. Every work has n_passages=1, so a work's rate is its DISTANCE_TRAVEL count divided by n_passages. For each genre I averaged the work rates in the late period and in the early period (each work weighted equally) and took late minus early. I then averaged that difference across the 8 genres with equal weight. Result: -0.0149 passage-rate units. A bootstrap with 1,000 resamples, resampling works within each genre-period cell, gave a 95% CI of [-0.042, 0.009], which includes 0. Within genres the differences are mixed: collection +0.08, adventure and juvenile about 0, and domestic, historical, romance, sensation and other negative by 0.02 to 0.06. Decade means after 1820 are flat at about 0.10 to 0.16. The few works from the 1800s and 1810s are too sparse to use. Artifact checks: Period is strongly linked to date_confidence. 71% of early works have high-confidence dates, against 44% of late works. Genre and origin mix shift only slightly between periods. Mean n_editions and author productivity are similar in both periods. The contrast does not hold up under stratification or adjustment. By date confidence the estimates are high -0.010, medium -0.039 and low -0.025. By origin they are UK +0.016, US -0.046 and unknown -0.013. An OLS model with genre, origin, date_confidence, log n_editions and log author productivity, using author-clustered SEs, gave a late effect of -0.008 (95% CI -0.032 to 0.016, p=0.51). Restricting to high-confidence dates with genre fixed effects gave +0.004 (95% CI -0.025 to 0.033). Alternative explanations: any small difference that remains could come from uneven dating quality, the thin early sample in some genres (43 to 82 early works in several cells), or the unknown origin of most works. The cited passage IDs are passages tagged DISTANCE_TRAVEL from each period. They only show that the construct appears in both periods and cannot establish a trend. Conclusion: the data do not support a robust historical change in DISTANCE_TRAVEL rates at 1876."
+}

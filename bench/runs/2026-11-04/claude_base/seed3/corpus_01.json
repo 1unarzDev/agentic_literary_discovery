@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0803,
+    -0.0226
+  ],
+  "confidence": 0.72,
+  "named_confounds": [
+    "date_confidence / imprecise dating",
+    "early-period sparsity and genre-mix imbalance",
+    "author clustering",
+    "annotation (domain-label) drift",
+    "sampling of one passage per work",
+    "reprints/n_editions"
+  ],
+  "evidence_passage_ids": [
+    "p006153",
+    "p003576",
+    "p003026",
+    "p001679",
+    "p005309",
+    "p003357"
+  ],
+  "rationale": "Method: there are 6,766 works with 1 passage each and all of them have years (1800-1925). The rate is count__domains__DISTANCE_TRAVEL/n_passages. Works are early if year<1876 and late if year>=1876. I took the mean rate over works within each genre x period cell, then the late-minus-early difference per genre, then the unweighted mean across the 8 genres. Estimate: -0.050. The 95% CI [-0.080, -0.023] is a percentile bootstrap (2,000 draws) that resamples works within each genre x period cell. Robustness: all 8 genres point the same way (differences from about -0.04 to -0.06). The direction holds in each origin subset (UK -0.034, US -0.045, unknown -0.057) and among single-edition works (-0.051). Decade means drop from about 0.13-0.16 (1840s-1870s) to about 0.09-0.11 (1880s-1920s). Caveats: the early period is small (752 works, with 37-165 per genre). Results depend on date quality: high-confidence dates give -0.079, medium give -0.009 and low give -0.042. Dating error near the cutoff could weaken or distort the contrast. An author-clustered model did not finish in the time limit, so works by the same author may make the CI too narrow. Alternative explanations: changes in how the annotator labelled domains over time, a different mix of works being sampled or digitized within each genre, and shifts in subgenre content rather than in how travel or distance functions. The cited passage IDs are early and late passages labelled DISTANCE_TRAVEL. They show the construct but do not by themselves establish the trend."
+}

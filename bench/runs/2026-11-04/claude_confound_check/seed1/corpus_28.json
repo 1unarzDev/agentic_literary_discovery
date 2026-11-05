@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0129,
+  "ci": [
+    -0.0402,
+    0.0119
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition shift (juvenile share 12%->35%, domestic_realist 34%->15% across cutoff)",
+    "unbalanced early sample (748 early vs 6014 late works)",
+    "date_confidence heterogeneity (stratum estimates differ in sign)",
+    "origin heterogeneity (US -0.086 vs UK +0.010)",
+    "one passage per work (high per-work sampling noise)"
+  ],
+  "evidence_passage_ids": [
+    "p003226",
+    "p005719",
+    "p000445",
+    "p002862",
+    "p001652",
+    "p005033"
+  ],
+  "rationale": "Data: 6766 works, all dated, one coded passage per work (n_passages=1), so each work's rate is 0 or 1. The rate is count__domains__DISTANCE_TRAVEL / n_passages. Early means year <1876 (748 works) and late means year >=1876 (6014 works). Method: within each genre I took the mean rate over works (equal weight per work) and computed late minus early. I then averaged that difference over the 8 genres with equal weight. The CI comes from 1000 bootstrap resamples within each genre x period cell. Result: effect -0.013, 95% CI [-0.040, 0.012], so the interval includes zero. Genre-level differences go both ways: adventure +0.02, juvenile -0.04, romance -0.07, historical -0.03, sensation +0.01. Artifact checks: genre mix changes sharply across the cutoff. Juvenile works, which have high DISTANCE_TRAVEL rates, rise from 12% to 35% of the corpus, and domestic_realist works, which have low rates, fall from 34% to 15%. Because of this, the pooled decade means rise (about 0.08 in the 1850s to 0.14 in the 1920s), but that rise is mostly a composition effect and disappears within genres. Origin and date_confidence are roughly balanced between periods, and mean n_editions and author productivity barely differ. I also fit an OLS adjusted for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs: late coefficient -0.014, CI [-0.036, 0.009]. Restricting to high-confidence dates gives -0.022. The medium and low date-confidence strata give +0.037 and -0.036, and by origin the US estimate is -0.086 while the UK estimate is +0.010. These signs are inconsistent, so no robust direction is visible. The cited passage IDs are works coded as DISTANCE_TRAVEL with coder confidence >=0.9, from both periods. They only show that the construct is present and cannot establish a trend. Conclusion: no robust historical shift. The apparent raw increase is better explained by the changing genre composition."
+}

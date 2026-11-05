@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.026,
+  "ci": [
+    0.004,
+    0.046
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "early-period sparsity (752 of 6766 works before 1876)",
+    "one passage per work (binary rates)",
+    "genre composition (juvenile/adventure share)",
+    "origin mix and unknown-origin works",
+    "date_confidence / dating error",
+    "n_editions reprint bias",
+    "adventure-genre heterogeneity"
+  ],
+  "evidence_passage_ids": [
+    "p002266",
+    "p003146",
+    "p002750",
+    "p001805",
+    "p001519",
+    "p000183"
+  ],
+  "rationale": "Estimand: for each genre, the late (year>=1876) mean minus the early mean of the work-level DISTANCE_TRAVEL passage rate, averaged equally over 8 genres. Every work has n_passages=1, so each rate is 0 or 1. Point estimate +0.026. A 95% CI from a bootstrap stratified by genre and period (2000 resamples) is [0.004, 0.046]. Composition checks: genre, origin, date_confidence and author productivity have nearly the same distribution before and after the cutoff. Mean n_editions is a little higher in the late period (1.09 vs 1.02). Robustness: high-confidence dates only gives +0.041 [0.013, 0.068]; single-edition works only gives +0.024 [0.003, 0.045]; an OLS adjusted for genre, origin, date_confidence, n_editions and log author productivity, with author-clustered SEs, gives +0.027 [0.004, 0.049]; a continuous year trend is positive (p=0.03). Weaknesses: the high-plus-medium-confidence subset gives +0.019 with a CI that includes 0 [-0.007, 0.045], and the UK and US strata alone are small and their CIs include 0. Adventure goes the opposite way (it declines), while the other seven genres rise. Decade means rise only modestly, from about 0.09 to 0.11, and pre-1850 decades are sparse and noisy. Possible alternative explanations: the early period is small and over-represents some genres, so a few early works can swing the estimate; the classifier may tag travel differently across periods; reprinted or misdated works could blur the cutoff. The cited passage IDs are passages tagged DISTANCE_TRAVEL in well-dated works from both periods. They only illustrate the construct and do not establish the trend. Conclusion: a small increase that survives most checks but not all of them, so confidence is moderate."
+}

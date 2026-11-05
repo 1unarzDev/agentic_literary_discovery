@@ -1,0 +1,24 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0038,
+    0.046
+  ],
+  "confidence": 0.62,
+  "named_confounds": [
+    "date uncertainty (low/medium date_confidence works)",
+    "early-period sparsity and small early genre cells",
+    "genre composition shift toward juvenile in late period",
+    "annotation/classifier noise in domain labels",
+    "one sampled passage per work"
+  ],
+  "evidence_passage_ids": [
+    "p006161",
+    "p006310",
+    "p000317",
+    "p002512"
+  ],
+  "rationale": "There are 6766 works, each with one annotated passage (n_passages=1), and all have years. I computed the DISTANCE_TRAVEL passage rate for each work and split at the 1876 cutoff (early <1876, late >=1876). Within each genre I averaged works equally, took late minus early, then averaged the 8 genres equally. The estimate is +0.0253 passage-rate units. A bootstrap that resamples works within each genre-by-period cell (2000 reps) gives a 95% CI of [0.0038, 0.0460]. The direction is positive in 6 of 8 genres; adventure (-0.022) and sensation_mystery (-0.006) are slightly negative. The decade means also rise roughly from about 0.03-0.08 (1810s-1850s) to about 0.11-0.12 (1890s-1910s). The result holds when any one genre is dropped (estimates 0.018-0.033) and when juvenile is excluded (0.023). It is weaker when restricted to high-date-confidence works (0.016, CI [-0.027, 0.054]) or high plus medium (0.020), and when the window is limited to 1850-1899 (0.018). Main caveats: the early cells are small (37-165 works per genre, and romance has 0 of 40 early hits), so they drive much of the uncertainty. The CI lower bound is close to zero. Dating errors, the shift in genre mix and noise in the labels could also matter. The passage IDs only illustrate late-period travel passages and cannot establish the trend. Overall I judge this a modest, moderately robust increase."
+}

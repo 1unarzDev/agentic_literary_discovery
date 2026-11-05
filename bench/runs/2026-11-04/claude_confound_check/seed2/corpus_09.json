@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.026,
+  "ci": [
+    0.004,
+    0.046
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "date_confidence heterogeneity (medium-confidence stratum shows reversed sign)",
+    "small early-period sample (752 early vs 6014 late works)",
+    "genre-specific reversal (adventure declines)",
+    "origin (UK/US strata individually non-significant)",
+    "n_editions slightly higher in late works"
+  ],
+  "evidence_passage_ids": [
+    "p004955",
+    "p003479",
+    "p001524",
+    "p004896",
+    "p003729",
+    "p004576"
+  ],
+  "rationale": "Methods: Every work has exactly one passage, so each work's rate is 0 or 1 for the DISTANCE_TRAVEL domain. Works are early if dated before 1876 and late if dated 1876 or after. Within each genre I took the late mean rate minus the early mean rate, then averaged these differences across the 8 genres with equal weight. The 95% CI comes from a bootstrap of 2000 resamples, drawn within each genre-period cell. Result: the effect is +0.026 passage-rate units, CI [0.004, 0.046]. The contrast increases in 7 of the 8 genres; adventure decreases (0.20 to 0.14). Artifact checks: the genre mix and the date_confidence mix are about the same in both periods. Author productivity is almost the same (21.1 vs 20.9 works per author). n_editions is slightly higher in late works (1.09 vs 1.02). I also ran a WLS regression adjusting for genre, origin, date_confidence, log editions and log author productivity, with standard errors clustered by author. It gives +0.026, CI [0.003, 0.049]. Restricting to high-date-confidence works gives +0.041, CI [0.011, 0.067]. Low-confidence works give +0.051 (significant). Medium-confidence works give -0.014, CI [-0.062, 0.030], which is not consistent with the other strata. The unknown-origin stratum is positive and significant. The UK and US strata are positive but their CIs include zero, because those samples are smaller. Moving the cutoff between 1850 and 1890 always gives a positive raw difference (+0.013 to +0.029). The decade means show that DISTANCE_TRAVEL rates rise from about 0.07\u20130.10 before 1880 to a steady about 0.11 afterwards. Uncertainty and alternatives: the effect is small, and the early side is thin, especially before 1850, so a few early works carry a lot of weight. The medium-date-confidence reversal and the large share of unknown origin leave some room for dating or composition artifacts. A change in which works were sampled over time, rather than a real change in the literature, could also produce part of the difference. The cited passage IDs are passages coded DISTANCE_TRAVEL from early and late works. They show the construct only and are not evidence of the trend. Conclusion: a modest increase that survives adjustment and the high-confidence restriction. Robustness is only moderate."
+}

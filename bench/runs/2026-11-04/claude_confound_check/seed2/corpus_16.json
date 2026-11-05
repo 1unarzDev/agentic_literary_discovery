@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": -0.0258,
+  "ci": [
+    -0.0513,
+    -0.003
+  ],
+  "confidence": 0.3,
+  "named_confounds": [
+    "author productivity / prolific-author composition (late works come from authors with ~22 corpus works vs ~9.6 early)",
+    "within-author clustering (non-independent works)",
+    "genre-specific concentration (decline driven mainly by adventure and historical)",
+    "dating uncertainty (about 27% low-confidence dates)",
+    "sparse early period (~11% of works before 1876)"
+  ],
+  "evidence_passage_ids": [
+    "p004533",
+    "p001998",
+    "p002697",
+    "p004934",
+    "p004443",
+    "p001371"
+  ],
+  "rationale": "Data: 6,766 works with one coded passage each (n_passages=1), so the work-level rate is binary. Cutoff is 1876: 751 early works and 6,015 late works. Estimand: for each of 8 genres, the late-minus-early difference in mean DISTANCE_TRAVEL rate, averaged with equal weight per genre. Point estimate -0.026. A percentile 95% CI from a 1,000-replicate bootstrap stratified by genre and period is [-0.051, -0.003], which only just excludes zero. The direction is mixed across genres: adventure -0.08 and historical -0.10, while domestic_realist and sensation_mystery rise slightly and the other genres are near zero. Artifact checks: the share of late works is similar across genres (0.86-0.91), and origin, n_editions and date_confidence are only weakly associated with period. Author productivity differs strongly between periods. An OLS model adjusting for genre, origin, date_confidence, log n_editions and log author productivity, with SEs clustered by author, gives -0.025 with CI [-0.050, 0.001], p=0.055, so the CI no longer excludes zero. Restricting to high-confidence dates gives -0.044 (HC1 CI -0.079 to -0.005), but that model is not clustered by author and covers less than half the corpus. Decade means move without a trend (0.08-0.15) and show no clear break at 1876. The contrast is therefore borderline, depends on a few genres, and loses significance under author clustering and productivity adjustment, so the evidence does not support a robust historical shift. Possible alternative explanations: a few prolific late authors whose works are dominated by non-travel plots; changing genre sub-mixes inside adventure and historical; and noise from the small early sample. The cited passages are examples coded as distance/travel. They illustrate the construct only and are not evidence of a trend."
+}

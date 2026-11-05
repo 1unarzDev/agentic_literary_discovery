@@ -1,0 +1,25 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.032,
+    0.021
+  ],
+  "confidence": 0.1,
+  "named_confounds": [
+    "genre composition (late period dominated by juvenile/adventure)",
+    "early-period sparsity (376 early vs 6390 late works)",
+    "date_confidence / dating error",
+    "origin mix (mostly unknown origin)",
+    "author productivity clustering"
+  ],
+  "evidence_passage_ids": [
+    "p003048",
+    "p002473",
+    "p002411",
+    "p000326",
+    "p006760"
+  ],
+  "rationale": "There are 6,766 works with one passage each. The rate is count__domains__DISTANCE_TRAVEL / n_passages, and works dated 1876 or later count as late. Following the estimand, I averaged works equally within each genre-by-period cell, took the late-minus-early difference in each genre, and averaged those differences equally across the 8 genres. The result is -0.0048 passage-rate units. A stratified bootstrap within genre-period cells (1,000 resamples) gives a 95% CI of [-0.032, 0.021]. Results by genre point in different directions: adventure rises by about 0.05, while collection and romance fall by about 0.03 to 0.06. Decade means show no trend, staying around 0.09 to 0.11 after 1860. Artifact checks: the shares of date_confidence and origin are nearly the same in both periods, mean n_editions is 1.02 early vs 1.09 late, and author productivity is similar. The early period is sparse, with only 376 works. Restricting to well-dated works gives -0.034 [-0.079, 0.007]. An OLS adjusted for genre, origin, date_confidence, log editions and author productivity, with standard errors clustered by author, gives +0.004 [-0.019, 0.026]. Origin-specific estimates all have CIs that include 0. None of these specifications shows a robust change. Limitations: the construct labels are model-assigned passage tags, the early cells are small, and one passage per work gives low power. The cited passage IDs illustrate the construct only and do not establish a trend."
+}

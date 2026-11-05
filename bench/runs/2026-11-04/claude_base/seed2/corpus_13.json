@@ -1,0 +1,24 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.0318,
+    0.0206
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition shift (late period dominated by juvenile/adventure)",
+    "date uncertainty (52% of works medium/low date confidence)",
+    "small early-period cells (e.g. other n=33, romance n=39)",
+    "origin mix (67% unknown origin)",
+    "single sampled passage per work"
+  ],
+  "evidence_passage_ids": [
+    "p001509",
+    "p002172",
+    "p000730",
+    "p001325"
+  ],
+  "rationale": "Methods: 6766 works with one coded passage each, all dated. Each work's rate is count__domains__DISTANCE_TRAVEL / n_passages. Works are split at 1876 (late means year >= 1876). Within each of 8 genres I took the unweighted mean of work rates for each period, then averaged the late-minus-early differences with equal genre weights. Effect = -0.0048. The 95% CI from a 2000-replicate bootstrap, resampling works within each genre-by-period cell, is [-0.032, 0.021] and includes zero. Coverage: only 1035 works fall before the cutoff, and some early genre cells are thin (other 33, romance 39). Robustness: per-genre differences are small (all within about \u00b10.015) except 'other' (-0.07, n=33 early). Leaving out other and collection gives +0.003. Results split by date-confidence level (high -0.009, medium +0.014, low -0.025) and by origin (UK -0.033, US +0.021) point in different directions. Decade means are flat at about 0.09-0.13 with no trend. Alternative explanations for any apparent difference: changes in genre composition over time, noisy single-passage sampling, misdating, and differences in coding confidence. The cited passages are late-period passages coded for distance/travel. They show what the construct looks like, not a trend. Conclusion: no robust historical shift."
+}

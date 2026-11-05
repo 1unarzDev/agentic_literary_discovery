@@ -1,0 +1,25 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0038,
+    0.0447
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence imbalance / dating artifact",
+    "sparse early cells (few pre-1876 works per genre)",
+    "n_editions imbalance (reprinted works concentrated early)",
+    "genre composition shift toward juvenile/adventure late"
+  ],
+  "evidence_passage_ids": [
+    "p004403",
+    "p005888",
+    "p000379",
+    "p005470",
+    "p002509",
+    "p000214"
+  ],
+  "rationale": "Data: 6,766 works, each with exactly one coded passage (n_passages=1), so a work's rate is 0 or 1. No year is missing. The cutoff is 1876. Only 752 works fall before it, against 6,014 from 1876 on, and early genre cells are small (37\u2013165 works). Method: for each genre I took the mean work rate in each period, subtracted early from late, and averaged the eight differences with equal weight. The 95% CI comes from a 1,000-replicate bootstrap that resamples within each genre\u00d7period cell. Headline result: +0.025 passage-rate units (CI 0.004 to 0.045), an increase. Six of eight genres go up; adventure and sensation_mystery go down slightly. A clustered OLS adjusting for genre, origin, date_confidence, log author productivity and n_editions gives a similar coefficient (0.024, p=0.048), but that is only borderline. Artifact checks: date_confidence is linked to period, since low- and medium-confidence works are more common before 1876. The contrast also grows as dating quality falls: high-confidence works only +0.015 (CI -0.027 to 0.054), high plus medium +0.020 (CI -0.006 to 0.046), low-confidence works +0.043. So the effect does not survive restriction to well-dated works, and it may partly come from how dates were assigned. Mean n_editions is higher in the early period (1.26 vs 1.06), meaning reprinted works make up more of the early sample. Restricting to single-edition works keeps the effect (+0.032, CI 0.009 to 0.054). Author productivity and origin are balanced across periods. By decade the rate rises loosely from the 1830s to the 1910s, but early decades are noisy. The cited passages are coded for the construct and only show how it appears in the text; they cannot show a trend. Conclusion: there is a small positive contrast, but it is borderline, rests on thin early cells and disappears among well-dated works. A dating or composition artifact cannot be ruled out, so I abstain. The effect and CI above are the full-sample estimates."
+}

@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    -0.0009,
+    0.0482
+  ],
+  "confidence": 0.45,
+  "named_confounds": [
+    "author clustering (prolific authors contribute up to 110 works)",
+    "date uncertainty (52% of works have medium/low date confidence)",
+    "sparse early cells (37-165 pre-1876 works per genre vs hundreds to thousands late)",
+    "genre composition and heterogeneous genre effects",
+    "origin mix (66% unknown origin)",
+    "single sampled passage per work / annotation noise"
+  ],
+  "evidence_passage_ids": [
+    "p001448",
+    "p005638",
+    "p000351",
+    "p002315",
+    "p005466",
+    "p006172"
+  ],
+  "rationale": "Method: 6,766 works, each with one passage (n_passages=1). The work rate is count__domains__DISTANCE_TRAVEL / n_passages. Works dated 1876 or later count as late. For each genre I took the mean of the work rates in each period (equal work weights), computed late minus early, and averaged the 8 genre differences (equal genre weights). Point estimate: +0.0253 passage-rate units. A work-level bootstrap stratified by genre and period (2,000 reps) gives a 95% CI of [0.0033, 0.0458]. Works by the same author are not independent, so I also ran an author-cluster bootstrap (500 reps). It gives [-0.0009, 0.0482], which includes zero, and I report that interval. Genre differences are mixed: six are positive (collection +0.075, romance +0.059, juvenile +0.042, historical +0.030, domestic +0.018, other +0.007) and two are negative (adventure -0.022, sensation -0.006). Sensitivity: the estimate shrinks to +0.015 using only high-confidence dates, is +0.043 using only low-confidence dates, and is +0.018 when works from 1866-1885 are excluded. By origin it is UK +0.033, US +0.019 and unknown +0.028. Decade means do not rise steadily: 0.10 in the 1860s, 0.06 in the 1870s, then about 0.09-0.12 from the 1880s on. Coverage is heavily skewed toward late works (about 750 early vs 6,014 late, median year 1905), so the early estimates are imprecise. Alternative explanations: a few prolific authors driving the result, measurement error in dates that blurs the cutoff, changes in which works were sampled or in genre mix within each period, and annotation noise. The direction is consistently positive but small, it weakens on the most reliable dates, and the CI includes zero once author clustering is accounted for, so the evidence does not support a robust shift; I abstain. The cited passage IDs are confidence>=0.9 passages tagged DISTANCE_TRAVEL from the earliest and latest years. They illustrate the construct and do not establish a trend."
+}

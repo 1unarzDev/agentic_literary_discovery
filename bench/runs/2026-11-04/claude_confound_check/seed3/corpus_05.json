@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0035,
+    0.0464
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "date_confidence composition differs by period (high-confidence dates 34% early vs 48% late; medium 37% vs 25%)",
+    "dating uncertainty: effect concentrated in low-confidence-dated works",
+    "n_editions composition (early works more often multi-edition)",
+    "sparse early period (752 of 6766 works; some genre-early cells n=37-57)",
+    "genre imbalance across periods"
+  ],
+  "evidence_passage_ids": [
+    "p003517",
+    "p005416",
+    "p002623",
+    "p003469",
+    "p006035",
+    "p001180"
+  ],
+  "rationale": "Each of the 6766 works has exactly 1 passage, so a work's rate is 0 or 1 (DISTANCE_TRAVEL present or not). Estimand: within each of the 8 genres, the mean rate of late works (year>=1876) minus the mean rate of early works, then averaged across genres with equal weight. Full-sample effect is +0.025, with a 95% stratified bootstrap CI of [0.003, 0.046] (2000 reps). OLS with genre, origin, date_confidence, log n_editions and log author productivity, clustered by author, gives a similar result: +0.026 [0.001, 0.050]. Five of 8 genres go up; adventure and sensation_mystery go down slightly. Robustness checks: the share of each date-confidence level differs between periods. Restricting to high-confidence dates gives +0.015 [-0.028, 0.051]. High plus medium gives +0.020 [-0.009, 0.044]. Low-confidence works alone give +0.043, so much of the contrast comes from poorly dated works. Origin strata all point the same way (UK 0.033, US 0.019, unknown 0.028). Restricting to single-edition works gives +0.032 [0.011, 0.052]. Decade means rise loosely but are noisy before 1880, and early cells are small. The full-sample CI barely excludes zero, and the result does not hold up among well-dated works. The likely alternatives are dating error and changes in corpus composition rather than real historical change. The data do not support claiming a robust shift, so I abstain. The cited passages only illustrate the construct; they do not show a trend."
+}

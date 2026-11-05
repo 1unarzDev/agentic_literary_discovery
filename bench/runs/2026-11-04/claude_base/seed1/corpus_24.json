@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0021,
+  "ci": [
+    -0.0221,
+    0.0251
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition change over time",
+    "uneven temporal coverage (few early works)",
+    "date uncertainty near cutoff",
+    "origin metadata (UK/US vs unknown) heterogeneity",
+    "annotation/classifier noise in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p005471",
+    "p002363",
+    "p002962",
+    "p005210",
+    "p002416",
+    "p001790"
+  ],
+  "rationale": "Data: 6,766 works, each with 1 passage, all dated. Split at year 1876: 752 early and 6,014 late works across 8 genres. Rate = count__domains__DISTANCE_TRAVEL / n_passages. Estimand: take the mean rate across works within each genre-period cell, compute late minus early per genre, and average the 8 genre differences with equal weight. Result: +0.0021. A stratified bootstrap (2,000 resamples of works within each genre x period cell) gives a 95% CI of [-0.022, 0.025], which includes zero. Genre differences point in different directions. Adventure, domestic realist, juvenile and romance fall slightly; other and sensation/mystery rise; collection and historical barely change. The early cells are small (40-254 works). Robustness checks: high date-confidence works only give +0.003. Excluding works within 10 years of the cutoff gives -0.005. By origin, UK gives -0.017, US -0.024 and unknown +0.026, so the sign depends on the subset. Decade means fall from the very sparse early 1800s to a low in the 1870s-80s, then rise again, with no clear break at 1876. Possible alternative explanations for any apparent difference: genre mix and sample size change across periods, labeling noise, and dating errors near the cutoff. The cited passages are labeled as DISTANCE_TRAVEL and only illustrate the construct; they are not evidence of a trend. Conclusion: no robust historical shift."
+}

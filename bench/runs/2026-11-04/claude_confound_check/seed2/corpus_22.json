@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0809,
+    -0.0228
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "genre composition (juvenile share rises late, historical/domestic falls)",
+    "date_confidence / dating imprecision",
+    "sparse early sample (~940 pre-1876 works vs ~6000 late)",
+    "author clustering / prolific authors",
+    "classifier labeling drift"
+  ],
+  "evidence_passage_ids": [
+    "p004369",
+    "p002521",
+    "p001290",
+    "p006233",
+    "p006141",
+    "p002674"
+  ],
+  "rationale": "Corpus has 6766 works with one passage each (6766 passages), all dated 1800-1925; cutoff 1876. Outcome is count__domains__DISTANCE_TRAVEL / n_passages. Estimand: the late-minus-early difference in mean work rate within each of 8 genres, averaged with equal genre weights, giving -0.050. 95% CI from 1000 bootstrap resamples stratified by genre x period: [-0.081, -0.023]. The decrease shows up in all 8 genres, with differences from -0.04 to -0.06. Artifact checks: period is associated with genre mix (juvenile share 21% early vs 34% late; historical 22% vs 10%). Origin, date_confidence, n_editions and author productivity are balanced across periods. An OLS model adjusting for genre, origin, date_confidence, log n_editions and log author productivity, with author-clustered SEs, gives late = -0.051 (95% CI -0.076 to -0.026). The decrease holds within each date_confidence stratum (high -0.043, medium -0.086, low -0.025), when restricted to well-dated works (-0.043), and within the US and unknown-origin strata. The UK-only estimate is about +0.01, which is noisy and a point of heterogeneity. Decade means peak around the 1830s-1870s (0.11-0.18) and settle near 0.09-0.11 after 1880. That looks more like a step down than a steady trend, and the early decades are thin. Remaining caveats: the early sample is small; passage labels are model annotations whose behavior could drift with prose style; and corpus selection may differ by period. The cited passage IDs are high-confidence DISTANCE_TRAVEL passages from well-dated works at both ends of the period. They show what the construct looks like but do not by themselves establish the trend."
+}

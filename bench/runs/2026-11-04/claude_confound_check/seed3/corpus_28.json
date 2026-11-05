@@ -1,0 +1,25 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0129,
+  "ci": [
+    -0.0402,
+    0.0118
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition (juvenile/adventure overrepresented late)",
+    "sparse early cells (35-259 works per genre pre-1876)",
+    "date_confidence heterogeneity",
+    "origin heterogeneity (US subset diverges)"
+  ],
+  "evidence_passage_ids": [
+    "p001652",
+    "p005033",
+    "p005766",
+    "p003226",
+    "p005719",
+    "p000445"
+  ],
+  "rationale": "Data: 6766 works, one passage each (n_passages=1), all dated 1800-1925; cutoff 1876 gives 752 early and 6014 late works. Estimand: per-genre mean of work-level DISTANCE_TRAVEL rates, late minus early, averaged equally over 8 genres = -0.013; 95% stratified bootstrap CI (genre x period, 400 reps) [-0.040, 0.012], which includes zero. Pooled decade means do rise (about 0.06 to 0.13), but that comes from composition: high-rate genres such as juvenile and adventure make up most of the late period. Genre-specific differences point both ways (adventure +0.02, juvenile -0.04, romance -0.07). Checks: origin, date_confidence, n_editions and author productivity are roughly balanced across the cutoff. A WLS regression adjusting for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives late = -0.014, CI [-0.036, 0.009], p=0.23. A linear year trend within genre has p=0.65. Results are unstable across strata: high-confidence dates -0.022, medium +0.037, low -0.036; US -0.086, UK +0.010, unknown origin 0.000. Each work has only one binary passage, so per-work rates are very noisy. The cited passage IDs are passages tagged with the construct and only illustrate it; they are not evidence of a trend. Conclusion: no robust historical shift."
+}

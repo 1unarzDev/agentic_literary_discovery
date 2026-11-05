@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0324,
+    0.0698
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "single passage per work (sparse sampling)",
+    "few early works (752 before 1876 vs 6014 after)",
+    "dating uncertainty (low/medium date_confidence)",
+    "genre composition change over time",
+    "origin mix (UK/US/unknown)",
+    "reprint/edition selection",
+    "annotation or labeling drift"
+  ],
+  "evidence_passage_ids": [
+    "p003099",
+    "p003612",
+    "p004182",
+    "p005264",
+    "p002939",
+    "p001271"
+  ],
+  "rationale": "Methods: I used works.parquet, with 6,766 works, one passage each, and no missing years. Works dated 1876 or later count as late. Each work's rate is count__domains__DISTANCE_TRAVEL divided by n_passages. I averaged those rates over works within each genre and period, took the late-minus-early difference for each genre, and averaged the 8 genre differences with equal weight. Result: the effect is +0.0517 passages per passage. The 95% interval, [0.032, 0.070], comes from a percentile bootstrap (4,000 resamples) that resampled works within each genre-period cell. All 8 genres go up, by roughly 0.04 to 0.06 each. In domestic_realist and romance the early rate is 0. Robustness checks: high-date-confidence works only gives 0.047. A 1847-1905 window gives 0.049. Single-edition works only gives 0.050. The rise also shows up separately in UK, US and unknown-origin works. By decade, the rate goes from about 0.04-0.06 before 1870 to 0.08 in the 1870s and about 0.10-0.12 from the 1880s on. Uncertainty and caveats: each work contributes only one passage, so work-level rates are 0 or 1 and noisy. The early period is thin (752 works, with some genre cells of only about 37-57 works). Many dates have low or medium confidence, which could move works across the cutoff. However, the result holds among high-confidence dates. Alternative explanations: the early and late samples may have been selected differently (for example, which works survived or were reprinted), changes within genres such as more travel or adventure subtypes later on, or annotation drift in how passages were assigned the travel domain. Comparing within genres rules out the genre-mix explanation but not the others. The cited passage IDs are passages tagged DISTANCE_TRAVEL, early and late. They only show what the tag looks like and do not establish the trend themselves."
+}

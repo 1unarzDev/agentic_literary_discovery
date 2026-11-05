@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0082,
+  "ci": [
+    -0.0175,
+    0.0299
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "date_confidence imbalance (early works 72% high-confidence vs 43% late)",
+    "early-period sparsity (376 of 6766 works before 1876)",
+    "one passage per work (binary per-work rates)",
+    "origin heterogeneity (UK vs US opposite signs)",
+    "author productivity slightly higher in late period"
+  ],
+  "evidence_passage_ids": [
+    "p005438",
+    "p005402",
+    "p005763",
+    "p005958",
+    "p006005",
+    "p000654"
+  ],
+  "rationale": "Construct: domains__DISTANCE_TRAVEL; rate = count / n_passages, cutoff 1876. Each work has exactly one passage, so every work-level rate is 0 or 1. Estimand: the mean within each genre of late minus early, averaged over 8 genres with equal weight and equal weight per work. Result: +0.0082. A 95% CI from a genre-stratified bootstrap (2000 reps) is [-0.0175, 0.0299], which includes zero. Genre-level differences are mixed in sign: adventure, juvenile and sensation are lower late; historical, romance and collection are higher late. Checks: (1) Restricting to high date-confidence works gives +0.023, which is still small and noisy. (2) By origin the effect is UK -0.017, US +0.032, unknown +0.007, so the sign is inconsistent. (3) An OLS adjusted for genre, origin, date_confidence, log n_editions and log author productivity, with SEs clustered by author, gives late = +0.0054, 95% CI [-0.019, 0.030]. (4) Decade means are flat at about 0.10-0.12 from the 1820s to the 1910s and dip to 0.089 in the 1920s; the decades before 1820 are tiny. Composition: date_confidence is strongly tied to period (early 72% high vs late 43%). Genre and origin shares are similar across the two periods, and n_editions and author productivity differ only slightly. The early period is thin (376 works). Passage IDs cited are examples coded DISTANCE_TRAVEL, given only to show what the code captures; they cannot establish a trend. Conclusion: no robust historical shift."
+}

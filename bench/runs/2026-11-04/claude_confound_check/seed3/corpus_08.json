@@ -1,0 +1,25 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0035,
+    0.0467
+  ],
+  "confidence": 0.3,
+  "named_confounds": [
+    "date_confidence composition differs by period (high-confidence share 34% early vs 48% late)",
+    "n_editions differs by period (mean 1.26 early vs 1.06 late)",
+    "small, sparse early sample (about 376 works, 58 positives; some genre cells have 0 positives)",
+    "genre mix",
+    "author clustering / productivity"
+  ],
+  "evidence_passage_ids": [
+    "p002723",
+    "p003698",
+    "p005437",
+    "p003950",
+    "p005239"
+  ],
+  "rationale": "Methods: 6,766 dated works, each with exactly one passage. Each work's rate is count__domains__DISTANCE_TRAVEL divided by n_passages, which here is just 0 or 1. Works are early if year < 1876 and late if year >= 1876. Within each genre I took the late-minus-early difference in mean work rates, then averaged across the 8 genres with equal weight. The 95% CI comes from a bootstrap (1,000 resamples) of works within each genre-period cell. Raw result: +0.025 (CI 0.0035 to 0.047). Six of eight genres go up; adventure and sensation_mystery go down slightly. Artifact checks: the pre-1876 sample is small and concentrated in the 1850s-70s. Origin mix and author productivity look balanced between periods. Date confidence and n_editions are not balanced. Restricting to high-confidence dates gives +0.015 (CI -0.027 to 0.054), which includes zero. The effect is largest among low-confidence dates (+0.043), which suggests dating error may be inflating the raw contrast. A logit model adjusting for genre, origin, date_confidence, log n_editions and log author productivity, with SEs clustered by author, gives late coef 0.32, p = 0.066, so it is not significant. Excluding works with more than one edition (+0.032, CI 0.009 to 0.052) or the juvenile genre (+0.023, CI 0.0004 to 0.047) leaves the effect positive, but the second CI only just clears zero. Decade means rise unevenly (0.06 to 0.12, with a dip in the 1870s right before the cutoff). Alternative explanations: undated revisions or reprints, imprecise dates near the cutoff, genre-specific shifts in what got sampled, and annotation noise in the domain label. Conclusion: a small positive raw increase shows up, but it does not survive restriction to well-dated works or full covariate adjustment, so the data do not support claiming a robust shift. The effect and CI above are the unadjusted descriptive estimate. The cited passages are late, high-confidence-dated works coded with the travel/distance domain. They show what the construct looks like, not a trend."
+}

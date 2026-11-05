@@ -1,0 +1,24 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    -0.0014,
+    0.0481
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "genre composition imbalance (late period dominated by juvenile works, which have a high DISTANCE_TRAVEL rate)",
+    "date_confidence: the effect shrinks among well-dated works",
+    "n_editions differs between periods and is associated with the outcome",
+    "author clustering / author productivity",
+    "sparse early sample (752 early vs 6014 late works)"
+  ],
+  "evidence_passage_ids": [
+    "p000119",
+    "p002913",
+    "p003237",
+    "p001303"
+  ],
+  "rationale": "Methods: I compared works dated year<1876 (early) with works dated >=1876 (late). The outcome was count__domains__DISTANCE_TRAVEL / n_passages. Every work has n_passages=1, so each work's rate is 0 or 1. I averaged rates with equal weight per work inside each genre-by-period cell, took the late-minus-early difference within each genre, and averaged those differences with equal weight across the 8 genres. The point estimate is +0.0253. A bootstrap that resamples works within each genre-period cell gives a 95% CI of [0.0037, 0.0454]. But works by the same author are not independent, and a bootstrap that resamples whole authors gives [-0.0014, 0.0481], which includes zero. I report that author-clustered interval. Robustness checks: (1) Composition. The periods differ in genre mix: juvenile is 2051/6014 late works vs 161/752 early, and juvenile and adventure have the highest rates. Equal genre weighting removes this mix difference, but the genre-level differences are mixed in sign: adventure goes 0.169 to 0.147 and sensation_mystery 0.070 to 0.064, while romance rises from 0/40 and collection from 1/37, both from tiny early cells. (2) Dating. High date_confidence works make up 34% of early vs 48% of late works. Restricted to high-confidence dates the effect is +0.015 with a 95% CI of [-0.024, 0.051]. The low-confidence subset shows the largest effect (+0.043), which suggests dating noise contributes. (3) Adjustment. A Poisson GLM with genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives late coef 0.28 (95% CI -0.03 to 0.58, p=0.073). n_editions is lower in the late period (1.06 vs 1.26) and is positively associated with the outcome. Origin strata all give positive but small estimates (0.019 to 0.033). Author productivity is similar in both periods. (4) Decade means rise roughly from the 1820s to the 1910s, but the early decades are small and noisy. Interpretation: there is a weak positive tendency, but it does not hold up under author clustering, restriction to well-dated works or covariate adjustment. The data therefore do not support claiming a robust historical shift. The cited passage IDs are late, well-dated passages tagged DISTANCE_TRAVEL. They show what the construct captures but cannot establish a trend."
+}

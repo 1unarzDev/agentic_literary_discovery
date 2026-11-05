@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0799,
+    -0.0211
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "early-period sparsity and imbalance (752 early vs 6014 late works; some genres have only 37-57 early works)",
+    "date uncertainty (about 27% of works have low date confidence)",
+    "genre composition and genre labels changing over time",
+    "annotation/classifier drift across period language",
+    "one passage sampled per work, so the measure is noisy at the work level",
+    "origin mostly unknown (67%), so national mix cannot be controlled"
+  ],
+  "evidence_passage_ids": [
+    "p002143",
+    "p005648",
+    "p003608",
+    "p001325",
+    "p000379",
+    "p004045",
+    "p004463",
+    "p001846"
+  ],
+  "rationale": "Method: each of the 6766 works has exactly one annotated passage. The work rate is count__domains__DISTANCE_TRAVEL / n_passages. I split works into early (year<1876) and late (year>=1876), took the mean rate per genre and period with equal weight per work, computed late minus early for each genre, and averaged the 8 genres with equal weight. Result: -0.050. The 95% CI from a stratified bootstrap (works resampled within genre and period, 2000 reps) is [-0.080, -0.021]. All 8 genres go down, by between -0.04 and -0.06. The passage-level domain tags matched the work counts exactly, and tagged passages have high annotation confidence (mean 0.97). Robustness checks: high-date-confidence works only gave -0.062 [-0.111, -0.023]; dropping low-confidence dates gave -0.053 [-0.088, -0.020]; leaving out the other and collection genres gave -0.050 [-0.081, -0.022]; a narrower 1850-1899 window gave -0.040 [-0.079, -0.007]. By decade, rates are about 0.12-0.20 before the 1870s and about 0.095-0.11 from the 1880s on. Caveats: the early period is thin (752 works, and some genres have under 60), so the estimate rests heavily on few early works. The CI does not cover date errors, genre labels that may mean different things over time, possible tagger drift, or unknown origin mix. The cited passage IDs only illustrate the construct and do not by themselves show the trend. Even so, the decrease holds in every genre and in every sensitivity check, which supports a moderately robust decline."
+}

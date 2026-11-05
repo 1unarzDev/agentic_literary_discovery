@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0323,
+    0.0697
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition (juvenile share rises late, historical/domestic share falls)",
+    "sparse early sample (~376 pre-1876 works)",
+    "dating uncertainty (low/medium date_confidence)",
+    "origin mix (mostly unknown)",
+    "passage-level annotation noise"
+  ],
+  "evidence_passage_ids": [
+    "p002136",
+    "p005579",
+    "p001985",
+    "p003170",
+    "p003213",
+    "p005736",
+    "p005796",
+    "p003826",
+    "p003911"
+  ],
+  "rationale": "Data: 6,766 works, one passage per work. Outcome is count__domains__DISTANCE_TRAVEL / n_passages, cutoff 1876 (late = year >= 1876). Estimand: take the mean rate across works within each genre-by-period cell, compute the late-minus-early difference for each genre, then average the 8 genres with equal weight. Result: +0.0517 passage-rate units. The 95% CI from a 2000-replicate bootstrap, resampling works within each genre-by-period cell, is [0.032, 0.070]. All 8 genres show an increase of about 0.04 to 0.06. Artifact checks: genre composition does change (juvenile 21%->34% of works, historical 22%->10%), but the estimand already stratifies by genre. Origin, date_confidence, n_editions and author productivity barely differ between the periods. The effect holds within each date-confidence stratum (high-confidence dates only: +0.047; medium +0.048; low +0.073) and within each origin (UK +0.035, US +0.044, unknown +0.059). An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives +0.052 [0.034, 0.071]. Decade means rise gradually from about 0.04-0.06 before 1870 to about 0.12 after 1880. That looks like a real trend rather than a jump created by the cutoff. Caveats: the early sample is small (about 376 works) and sparse before 1850. Labels are model-assigned annotations of single passages. The cited passage IDs are high-confidence, well-dated examples labelled with this domain; they only illustrate the construct and do not establish the trend on their own."
+}

@@ -1,0 +1,24 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0026,
+    0.0437
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "genre composition shift (juvenile share rises from 21% to 34%, historical share falls from 22% to 10% after 1876)",
+    "date_confidence imbalance (high-confidence dating 34% early vs 48% late)",
+    "n_editions higher in early works (reprint/survival selection)",
+    "small early sample (752 of 6766 works; some genre-early cells n<60)",
+    "single passage per work (high sampling noise)"
+  ],
+  "evidence_passage_ids": [
+    "p006319",
+    "p002670",
+    "p000580",
+    "p004912"
+  ],
+  "rationale": "Method: each work has 1 passage, so the work rate = count__domains__DISTANCE_TRAVEL / n_passages. Works are split at 1876 (late = year >= 1876). For each genre I took the mean work rate per period, then averaged the late-minus-early differences across the 8 genres with equal weight. The 95% CI comes from a bootstrap that resamples works within each genre-by-period cell. Point estimate: +0.025 (CI 0.003 to 0.044). Rates rise in 6 of 8 genres; adventure and sensation_mystery decline. Coverage: 6766 works, but only 752 are early, and the early cells are small (37 to 165 works). Artifact checks: period is associated with genre mix (juvenile goes up, historical goes down), with date_confidence and with n_editions (early works have more editions). It is not associated with origin or author productivity. Robustness: the effect is similar within each origin (0.019 to 0.033). Restricted to high-confidence dates it drops to +0.015 with CI -0.025 to 0.052, which includes zero. An author-clustered binomial GLM adjusted for genre, origin, date_confidence, log editions and log author productivity gives p=0.066. The matching OLS gives CI 0.001 to 0.050, just above zero. Decade means increase in a noisy, non-monotonic way. Alternative explanations: changes in genre and subgenre mix, selection of reprinted or surviving early works, dating error in low- and medium-confidence works, and noise from a single annotated passage per work. The positive estimate is suggestive, but it is fragile under restriction to well-dated works and under adjustment, so I abstain. The cited passages are late, well-dated works coded for this domain. They illustrate the construct only and do not establish a trend."
+}

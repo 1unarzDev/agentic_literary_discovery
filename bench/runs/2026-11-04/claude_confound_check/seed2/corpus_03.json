@@ -1,0 +1,25 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0032,
+    0.0466
+  ],
+  "confidence": 0.33,
+  "named_confounds": [
+    "date_confidence imbalance: early works are much more often low- or medium-dated, and the effect is largest among low-confidence dates",
+    "small, sparse early sample (752 early vs 6014 late works), with only 10-24 well-dated early works in several genres",
+    "n_editions differs by period (early mean 1.26 vs late 1.06), which suggests different survival or reprint selection",
+    "genre composition shifts toward late juvenile works (handled by equal-genre weighting but still affects precision)",
+    "one passage per work, so work rates are 0/1 and very noisy"
+  ],
+  "evidence_passage_ids": [
+    "p003083",
+    "p006341",
+    "p005216",
+    "p001819",
+    "p003691"
+  ],
+  "rationale": "Methods: rate = count__domains__DISTANCE_TRAVEL / n_passages per work. n_passages is always 1, so each work's rate is 0 or 1. A work is late if its year is 1876 or later. I averaged works equally within each genre and then averaged the 8 genres equally. The 95% CI comes from a bootstrap of 2000 resamples, resampling works within each genre and period. Full sample: late minus early = +0.025, CI [0.003, 0.047]. Per-genre differences are mixed: adventure (-0.022) and sensation_mystery (-0.006) go down, while the others go up. A weighted least squares model adjusting for genre, origin, date_confidence, log(n_editions) and log(author productivity), with author-clustered standard errors, gives +0.025, but its CI is roughly [0.0, 0.05] and touches zero. Artifact checks: dating quality is strongly linked to period. Before 1876 about 34% of works are high-confidence dates; afterwards about 48% are. Splitting by date confidence, the effect is +0.043 for low-confidence dates, +0.022 for medium and only +0.015 for high. Restricting to well-dated (high) works gives +0.016 with CI [-0.027, 0.054], so the contrast does not hold up there. Effects are similar across origins (UK 0.033, US 0.019, unknown 0.028). Early works also have more editions, which points to different selection into the corpus. Decade means move unevenly: early decades have few works, and the 1870s, which straddle the cutoff, are low. Alternative explanations: a weak, positive full-sample estimate could come from misdated or low-confidence early works, from small and noisy early cells in each genre, or from survival and reprint selection rather than a real historical change. The cited passage IDs are from well-dated late works and only show that the construct appears in the corpus; they cannot establish a trend. Because the result is borderline and does not survive restriction to well-dated works, I abstain."
+}

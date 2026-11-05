@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.034,
+    0.022
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "early-period sparsity (only 752 pre-1876 works vs 6014 late; very few before 1840)",
+    "genre composition and small early cells (e.g. 'other' n=33 early drives the negative estimate)",
+    "date uncertainty (27% low-confidence dates)",
+    "origin mix (UK vs US estimates have opposite signs)",
+    "author clustering",
+    "classifier/annotation noise in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p004809",
+    "p005158",
+    "p002575",
+    "p002203",
+    "p004088",
+    "p002670"
+  ],
+  "rationale": "Every work has exactly one passage, so a work's rate is 0 or 1 depending on whether its passage carries the DISTANCE_TRAVEL domain label. Within each of the 8 genres I took the mean rate of late works (year >= 1876) minus the mean rate of early works, weighting works equally, then averaged the 8 genre differences with equal weight. The estimate is -0.0048 against a base rate of about 0.107. The 95% CI of [-0.034, 0.022] comes from a 1000-draw bootstrap that resamples authors. The genre differences are all small (between -0.003 and +0.014) except 'other', which is -0.072 but has only 33 early works. Dropping 'other' turns the estimate to +0.005. Subsets also disagree on sign: by date confidence the estimates are -0.009 (high), +0.014 (medium) and -0.025 (low), and by origin they are -0.033 (UK) and +0.021 (US). Decade means stay roughly flat at about 0.08-0.15, and the noisiest values are in the sparse early decades. Early coverage is thin, so the comparison has limited power. The data do not support a robust change. The cited passages are only examples of the travel/distance domain and do not show a trend."
+}

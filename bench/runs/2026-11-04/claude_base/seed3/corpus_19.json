@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0149,
+  "ci": [
+    -0.0405,
+    0.0107
+  ],
+  "confidence": 0.15,
+  "named_confounds": [
+    "genre composition change (juvenile/adventure dominate late period)",
+    "sparse early sample (752 early vs 6014 late works)",
+    "date uncertainty (52% medium/low date confidence)",
+    "origin heterogeneity (UK vs US opposite signs)",
+    "one passage per work limits within-work precision",
+    "classifier/annotation error in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p003039",
+    "p000884",
+    "p000090",
+    "p001878",
+    "p002577",
+    "p000352"
+  ],
+  "rationale": "Estimand: per-work rate = count__domains__DISTANCE_TRAVEL / n_passages (every work has 1 passage); I averaged work rates within genre x period (early <1876, late >=1876) with equal work weights, took late-minus-early per genre, then averaged the 8 genres equally. Effect = -0.0149 passage-rate units. A stratified bootstrap (2000 reps, resampling works within genre x period) gives a 95% CI of [-0.040, 0.011], which includes zero. Robustness: the sign is negative within high, medium and low date-confidence subsets (-0.010, -0.039, -0.025) and in a 1856-1896 window (-0.017), but it flips by origin (UK +0.016, US -0.046), and genre effects vary (collection +0.08, romance and other about -0.05 to -0.06). The decade means stay flat at about 0.10-0.11 after 1850, and the early decades are small and noisy. Data coverage: 6766 works, early cells hold 43-251 works per genre. Alternative explanations for any apparent dip: small early samples, uneven genre and origin mix, dating error close to the cutoff, and labeling noise. The cited passage IDs are high-confidence DISTANCE_TRAVEL passages that illustrate the construct only; they are not trend evidence. Conclusion: the data do not support a robust historical shift."
+}

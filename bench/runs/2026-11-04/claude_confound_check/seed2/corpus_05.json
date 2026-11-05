@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0039,
+    0.044
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence imbalance between periods",
+    "genre composition (juvenile/adventure heavy late)",
+    "n_editions differs by period",
+    "author clustering",
+    "sparse early period (752 vs 6014 works)"
+  ],
+  "evidence_passage_ids": [
+    "p002249",
+    "p003211",
+    "p002204",
+    "p003969",
+    "p001633",
+    "p005388"
+  ],
+  "rationale": "Methods: The measure is count__domains__DISTANCE_TRAVEL divided by n_passages. Every work has exactly one passage (6766 works, all dated). Works were split at 1876: 752 early and 6014 late. For each genre I took the mean work rate in each period and the late-minus-early difference, then averaged the 8 genres with equal weight. The CI comes from a 500-replicate bootstrap that resamples works within each genre-period cell. Result: the effect is +0.025 passage-rate units, 95% CI [0.004, 0.044]. Artifact checks: the years are tied to other metadata. Works dated with high confidence make up 34% of the early period and 48% of the late period. Mean n_editions is 1.26 early and 1.06 late. Genre mix also changes a lot, with juvenile works heavily concentrated in the late period. Author productivity is about the same in both periods. Restricting to high-confidence dates gives an effect of +0.015, CI [-0.027, 0.051], which includes zero. Low-confidence works give the largest effect (+0.043), which is what you would expect if dating noise or a dating artifact were inflating the contrast. I also fit a Poisson GLM with genre, origin, date_confidence and log editions as covariates and author-clustered standard errors. The late coefficient is 0.28 (p=0.07, CI includes zero). Decade means rise loosely but are noisy, and the early decades are sparse. Interpretation: there is a positive raw contrast, but it does not survive restriction to well-dated works or adjustment that accounts for clustering. It may reflect differences in dating quality, genre composition or the small early sample rather than a real historical change. The cited passages are only examples of the travel/distance domain and cannot establish a trend. For these reasons I abstain."
+}

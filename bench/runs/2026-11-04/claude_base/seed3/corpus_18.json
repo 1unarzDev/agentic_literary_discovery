@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.033,
+    0.07
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "imbalanced early sample (only 752 of 6766 works before 1876)",
+    "date uncertainty (27% of works have low date confidence)",
+    "genre composition change over time",
+    "prolific authors (up to 110 works per author)",
+    "passage annotation/classification drift",
+    "single passage per work",
+    "UK/US/unknown origin mix"
+  ],
+  "evidence_passage_ids": [
+    "p004610",
+    "p002399",
+    "p000067",
+    "p002310",
+    "p000451",
+    "p000216"
+  ],
+  "rationale": "Method: each work contributes exactly one passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages (0 or 1). I took the mean rate for works within each genre-by-period cell (cutoff 1876, late = year >= 1876), computed late minus early within each of the 8 genres, and averaged the 8 differences with equal weight. Estimate: +0.052 passages per passage. The rate went up in every genre, with differences between +0.045 and +0.060. 95% CI from a 2000-replicate bootstrap stratified by genre and period: [0.033, 0.069]. An OLS model with genre x period interactions and author-clustered SEs gave the same contrast, 0.052 with CI [0.033, 0.071], p<0.001. Robustness: high-confidence dates only gave 0.044; dropping low-confidence dates gave 0.054; dropping the other and collection genres gave 0.053; a 1850-1899 window gave 0.051; UK-only gave 0.029 and US-only 0.068, both positive. By decade, the rate was about 0.05 in the 1850s-1870s and rose to 0.10-0.13 from the 1880s on, so the change lines up with the cutoff and is not driven by a single decade. Coverage: 6766 works and passages from 1800 to 1925. The early period is thin (752 works, and some genre cells have only 37-57 works, two of them with zero early hits), so per-genre early rates are imprecise. Alternative explanations: annotators or the classifier may have tagged later texts differently; the passages sampled from later works may differ in what they contain; misdated works could move cases across the cutoff; prolific late authors could dominate (author clustering only widened the SE slightly); and the mix of works within genres may have changed. The cited passage IDs are late-period passages tagged DISTANCE_TRAVEL. They illustrate what the construct looks like but do not establish the trend on their own. Overall the increase is consistent across genres and sensitivity checks, but it is modest and rests on a small early sample."
+}

@@ -1,0 +1,25 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0318,
+    0.0704
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition shift (juvenile share rises late, historical share falls)",
+    "uneven date confidence / dating error",
+    "sparse early sample (752 of 6766 works before 1876)",
+    "author productivity",
+    "one passage per work (binary rates)"
+  ],
+  "evidence_passage_ids": [
+    "p003181",
+    "p005274",
+    "p002309",
+    "p002738",
+    "p005660"
+  ],
+  "rationale": "Estimand: for each genre, the mean work-level DISTANCE_TRAVEL passage rate (count/n_passages; every work has exactly 1 passage) for works dated >=1876 minus works dated <1876; then the unweighted mean across 8 genres. Result +0.052 (late-minus-early). 95% CI [0.032, 0.070] from a 1000-replicate stratified bootstrap (resampling works within genre x period cells). The increase holds in all 8 genres (+0.05 to +0.06 in each). Artifact checks: genre mix differs by period (juvenile 21%->34%, historical 22%->10%), but the equal-genre estimand removes this. Origin, date_confidence, n_editions and author productivity are close to balanced across periods. Restricting by date confidence: high +0.054, medium +0.058, low +0.039. An OLS with period, genre, origin, date_confidence, n_editions and log author productivity, using author-clustered SEs, gives +0.051 (CI 0.034-0.068). Decade means are about 0.04-0.06 before 1880 and about 0.11-0.12 from 1880 on, so the rise looks like a step change, not something driven by the cutoff. Caveats: the pre-1876 sample is small (752 works, very few before 1840), each work has only one coded passage, and the domain labels come from automated coding. The cited passage IDs are coded DISTANCE_TRAVEL in well-dated works. They show what the construct looks like but do not establish the trend on their own. Alternative explanations: changes in corpus selection or digitization, rather than in the literature itself, could produce a similar pattern. This is partly reduced by the within-genre consistency and the balanced metadata."
+}

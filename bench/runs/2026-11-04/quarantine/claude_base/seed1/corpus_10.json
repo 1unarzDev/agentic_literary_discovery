@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0038,
+    0.0447
+  ],
+  "confidence": 0.62,
+  "named_confounds": [
+    "genre composition shift toward late period",
+    "date uncertainty (low/medium date_confidence)",
+    "small early-period cells (e.g. romance n=40, collection n=37)",
+    "one passage per work limits within-work precision",
+    "origin mix (many unknown)",
+    "annotation/classifier noise in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p005987",
+    "p001289",
+    "p006553",
+    "p002918",
+    "p002244",
+    "p006717"
+  ],
+  "rationale": "6766 works, each with 1 passage; rate = count__domains__DISTANCE_TRAVEL / n_passages. Early = year<1876 (752 works), late >=1876 (6014). For each genre I averaged the work rates in each period with equal weight per work, took late minus early, and then averaged across the 8 genres with equal weight. Estimate +0.025 passage-rate units. 95% CI from a 1000-replicate bootstrap stratified by genre x period: [0.004, 0.045]. 6 of 8 genres go up; adventure and sensation_mystery go down slightly. By decade the rate climbs from about 0.05-0.08 before 1860 to about 0.11-0.12 after 1890. Robustness is mixed. The effect is positive within every origin (UK 0.033, US 0.019, unknown 0.028) and every date-confidence level. But the high-date-confidence works alone give 0.015, with a bootstrap CI of [-0.026, 0.050] that includes zero. A narrow 1856-1895 window gives only 0.013. Early cells are small, and some early genre means rest on very few hits (romance early = 0/40). So I call a modest increase, but its robustness is uncertain. Alternative explanations: changes in which genres and kinds of books were sampled over time, dating error, labeling drift in the annotation, and noise from sampling a single passage per work. The cited passage IDs are late-period passages tagged DISTANCE_TRAVEL. They show what the construct looks like but cannot establish the trend."
+}

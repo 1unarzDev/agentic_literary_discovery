@@ -1,0 +1,30 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0814,
+    -0.0222
+  ],
+  "confidence": 0.75,
+  "named_confounds": [
+    "genre composition shift (late period dominated by juvenile/domestic works)",
+    "small early sample (752 of 6766 works before 1876)",
+    "date uncertainty (53% of works medium/low date confidence)",
+    "origin heterogeneity (UK works rise while US/unknown fall)",
+    "author clustering (prolific authors up to 110 works)",
+    "annotation/classifier drift in domain labels",
+    "one passage per work so work rates are binary"
+  ],
+  "evidence_passage_ids": [
+    "p006051",
+    "p004188",
+    "p002331",
+    "p005845",
+    "p006142",
+    "p003497",
+    "p004088",
+    "p003960"
+  ],
+  "rationale": "Methods: every work has exactly one passage (n_passages=1), so each work's rate is count__domains__DISTANCE_TRAVEL/1. I split works at year 1876 (late = 1876 or later). Within each of the 8 genres I took the unweighted mean across works for the early and late periods, subtracted early from late, and averaged the 8 genre differences with equal weight. Result: -0.050 passage-rate units. The 95% CI comes from a bootstrap that resamples works within each genre-by-period cell (2000 reps): [-0.081, -0.022]. An author-cluster bootstrap gives [-0.079, -0.022], and OLS with genre and origin fixed effects and author-clustered SEs gives -0.051 [-0.076, -0.026]. Consistency: the late rate is lower than the early rate in all 8 genres, with differences between about -0.04 and -0.06. Splitting by date confidence, the effect stays negative in every tier (high -0.043, medium -0.086, low -0.025). In a 1856-1895 window around the cutoff it is -0.068. With a linear year term added, the step at the cutoff remains (-0.053, p=0.005) and the year slope is about zero. Decade means are roughly 0.14-0.16 in the 1860s-70s and about 0.09-0.11 from the 1880s on. Coverage: 6766 works and passages from 1800 to 1925, but only 752 works are early, so the early cells are thin (37-165 works per genre). Caveats and alternative explanations: UK-origin works go the other way (0.081 to 0.095), so the decline is driven by US and unknown-origin works and may reflect who is in the sample rather than a change in the period. Many dates are uncertain, the domain labels may be applied inconsistently across eras, and 'distance/travel' could look less common late only because other domains become more common. The cited passage IDs are early and late passages tagged DISTANCE_TRAVEL. They show what the construct covers but cannot establish the trend on their own. Overall the decrease is statistically clear and consistent across genres, with moderate doubts about robustness."
+}

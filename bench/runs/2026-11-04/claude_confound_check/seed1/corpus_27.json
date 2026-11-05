@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0028,
+    0.046
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "date_confidence imbalance (late period skews to high-confidence, early to medium)",
+    "genre composition shift (juvenile up, historical/domestic down)",
+    "sparse early cells (752 early vs 6014 late works; romance/collection early rates rest on few works)",
+    "dating error in low-confidence works"
+  ],
+  "evidence_passage_ids": [
+    "p002444",
+    "p000945",
+    "p006281",
+    "p004151",
+    "p004288",
+    "p004853",
+    "p005898",
+    "p002549"
+  ],
+  "rationale": "Each of the 6766 works has one passage, so a work's rate is 0 or 1. Estimand: for each of 8 genres, take the mean late (>=1876) rate minus the mean early rate with works weighted equally, then average across genres with equal weight. The result is +0.025 passages per passage. A stratified bootstrap within genre x period cells (1000 reps) gives a 95% CI of [0.003, 0.046]. The signal is fragile. (1) The genre sign is mixed: adventure and sensation_mystery go down, and the biggest gains come from very small early cells (romance has 0 hits among roughly 40 early works; collection has few early works). (2) Years are tied to other metadata. Late works are much more often high date_confidence (48% vs 34%), and the genre mix changes a lot (juvenile 21% to 34%, historical 22% to 10%). Late works also have slightly fewer editions. Origin and author productivity are balanced. (3) An OLS adjusted for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives 0.026, CI [0.001, 0.050], p=0.04, which is barely significant. Restricting to high-confidence dates shrinks the effect to 0.015, CI [-0.021, 0.051]. Within date-confidence strata the effect is largest in low-confidence works (0.043), which points to a dating artifact. The decade means rise loosely from the 1810s to the 1910s but are noisy and not monotonic (the 1870s dip). Because the contrast does not survive restriction to well-dated works and depends on sparse early cells, the evidence is not strong enough to call a robust historical shift. The cited passages are high-confidence DISTANCE_TRAVEL passages that show the construct; they cannot establish a trend."
+}

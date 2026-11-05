@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0039,
+    0.0459
+  ],
+  "confidence": 0.45,
+  "named_confounds": [
+    "author clustering",
+    "date uncertainty",
+    "sparse early-period sample",
+    "genre composition",
+    "origin (UK/US/unknown) composition",
+    "annotation/classifier noise"
+  ],
+  "evidence_passage_ids": [
+    "p001906",
+    "p006092",
+    "p004231",
+    "p001311",
+    "p006353"
+  ],
+  "rationale": "Data: 6,766 works with one coded passage each. Rate = count__domains__DISTANCE_TRAVEL / n_passages. Cutoff 1876. I averaged works equally within each genre-by-period cell, took the late-minus-early difference for each of the 8 genres, and averaged those differences equally. Point estimate: +0.025. A bootstrap that resamples works within genre-by-period cells (1,000 reps) gives a 95% CI of [0.004, 0.046]. Coverage is very lopsided: only 752 works are early versus 6,014 late, and the early cells are small (37-165 works per genre; romance has 40 early works and zero hits). Six of the 8 genres rise (collection +0.075, romance +0.059, juvenile +0.042, historical +0.030, domestic_realist +0.018, other +0.007) and two fall (adventure -0.022, sensation_mystery -0.006). Robustness checks: (1) An author-cluster bootstrap widens the CI to [-0.001, 0.047], which includes zero. (2) An OLS with genre, origin and date-confidence controls and author-clustered standard errors gives 0.022 [-0.002, 0.045]. (3) Using only high-date-confidence works shrinks the effect to 0.015, while low-confidence works give 0.043, so imprecise dates may be inflating the effect. (4) A narrow 1856-1895 window gives 0.013. (5) The by-decade means rise fairly steadily from the 1810s to the 1910s, and a linear year trend is weakly positive (p=0.016), so this looks more like gradual drift or a compositional effect than a break at 1876. Alternative explanations: a few prolific authors dominating the late period; dating errors; changes in which kinds of works were collected over time; mixing of origins; noise in the passage coding. The cited passage IDs are just examples of passages coded for this domain, from both periods. They do not show a trend. The estimate is positive, but it is small and not robust to author clustering or restriction to well-dated works, so I abstain from claiming a robust shift."
+}

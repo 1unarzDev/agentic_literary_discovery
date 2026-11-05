@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0038,
+    0.0452
+  ],
+  "confidence": 0.3,
+  "named_confounds": [
+    "date_confidence composition (early works disproportionately medium/low dated; late works mostly high)",
+    "dating error in low-confidence works driving the contrast",
+    "n_editions differs by period (early 1.26 vs late 1.06)",
+    "heavy early/late imbalance in sample size (752 early vs 6014 late works) and genre mix (juvenile dominates late)",
+    "small early cells (e.g. romance n=40, collection n=37)"
+  ],
+  "evidence_passage_ids": [
+    "p004403",
+    "p005888",
+    "p000379",
+    "p005470",
+    "p000800",
+    "p005853"
+  ],
+  "rationale": "Estimand: rate = count__domains__DISTANCE_TRAVEL / n_passages per work (every work has n_passages = 1). Late means year >= 1876. I averaged works equally within each genre-by-period cell, took the late-minus-early difference in each of the 8 genres, and averaged those differences with equal weight. The CI comes from a stratified bootstrap of works within each genre-by-period cell (2000 resamples). Full sample: effect +0.025, 95% CI [0.004, 0.045]. The sign varies by genre: adventure and sensation_mystery go down, while romance, collection and juvenile go up. Artifact checks: year is associated with date_confidence (34% of early works are high-confidence vs 48% of late works) and with n_editions; genre mix also differs a lot by period. A cluster-robust OLS by author that adjusts for genre, origin, date_confidence, log n_editions and log author productivity gives +0.026 [0.001, 0.050], which only just excludes zero. Restricted to high-confidence-dated works (n=3152), the equal-weight effect is +0.015 [-0.026, 0.052], the adjusted OLS gives +0.017 [-0.019, 0.053], and the continuous within-genre year slope is about 0 (p=0.98). By date confidence, the contrast is largest and significant only in low-confidence works (+0.043). That suggests dating error or composition rather than a real historical change. The decade means rise from about 0.03-0.08 before 1860 to about 0.11 after 1890, but the early decades are thin. Because the result does not hold up when restricted to well-dated works, the evidence does not support a robust shift. I abstain and put the probability of a real shift at about 0.3. The cited passage IDs are late, high-confidence works coded as DISTANCE_TRAVEL. They show that the construct appears in the data but cannot establish a trend."
+}

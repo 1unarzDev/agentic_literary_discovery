@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0019,
+    0.0451
+  ],
+  "confidence": 0.45,
+  "named_confounds": [
+    "small and thin pre-1876 sample (712 of 6766 works; 37-165 per genre)",
+    "author clustering / repeated authors",
+    "date uncertainty (27% of works have low date confidence)",
+    "genre composition shifting over time",
+    "single coded passage per work (binary rates, annotation noise)",
+    "unknown origin for 67% of works"
+  ],
+  "evidence_passage_ids": [
+    "p001035",
+    "p004503",
+    "p000274",
+    "p000025",
+    "p001211",
+    "p006043"
+  ],
+  "rationale": "Method: each work has exactly one passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages, which is 0 or 1. I averaged works within each genre-by-period cell (early = year < 1876, late = year >= 1876), took the late-minus-early difference in each of the 8 genres, and averaged the 8 differences with equal weight. Point estimate: +0.025 passage-rate units. A bootstrap that resamples works within each genre-period cell gives a 95% CI of [0.002, 0.045], which barely excludes zero. A bootstrap that resamples authors (500 draws) gives roughly [-0.0002, 0.049], which includes zero. Genre results are mixed: adventure (-0.022) and sensation_mystery (-0.006) go down, while collection (+0.075), romance (+0.059, from 0 of 40 early works) and juvenile (+0.042) go up. Robustness checks: high-date-confidence works only give +0.015, low-confidence works give +0.043, and the 1856-1896 window gives +0.015. All subsets point the same way, but the size shrinks on the best-dated data. By decade the rate is noisy before 1876 (about 0.03-0.10, and 0.059 in the 1870s) and about 0.09-0.12 afterwards. Coverage: only 712 early works against 6054 late ones, and the early cells are small, so each early mean is imprecise. Other explanations: changes in which works and authors survive into the corpus, changes in genre and subgenre mix within the broad labels, annotation noise on single passages, and misdated works near the cutoff. The cited passage IDs are passages coded DISTANCE_TRAVEL, from both periods; they show what the code captures but cannot show a trend. Conclusion: the evidence points to a modest increase, but it is not robust. The CI is borderline, it includes zero once authors are clustered, the effect shrinks on high-confidence dates, and genres disagree in sign. So I abstain, giving the probability of a real shift as about 0.45."
+}

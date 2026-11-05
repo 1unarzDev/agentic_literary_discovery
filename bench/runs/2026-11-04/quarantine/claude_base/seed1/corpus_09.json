@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.026,
+  "ci": [
+    0.005,
+    0.048
+  ],
+  "confidence": 0.65,
+  "named_confounds": [
+    "genre composition imbalance (early period ~11% of works)",
+    "date uncertainty (low-confidence dates)",
+    "author clustering / prolific authors",
+    "national origin mix (US effect near zero)",
+    "annotation/classifier drift in domain labels",
+    "single passage per work sampling noise"
+  ],
+  "evidence_passage_ids": [
+    "p004955",
+    "p003479",
+    "p006088",
+    "p001524",
+    "p004896",
+    "p003729"
+  ],
+  "rationale": "Method: every work has exactly one passage (n_passages=1), so the work rate is a 0/1 DISTANCE_TRAVEL indicator. Early means year<1876, late means year>=1876. I took the mean rate within each genre x period, so works count equally inside a genre. Then I averaged the late-minus-early differences across the 8 genres with equal weight. Estimate: +0.026 passage-rate. 95% CI [0.005, 0.048], from 1000 bootstrap resamples of authors (clustered by author). Seven of 8 genres go up. Adventure goes down (0.20 to 0.14). Coverage: 6766 works dated 1800-1925, but only 752 are early, and some early genre cells are small (romance 35, other 51, collection 52), so the early baseline is noisy. By decade the rate is roughly 0.05-0.10 before 1880 and a stable ~0.11 afterwards, which fits a modest rise. Sensitivity checks: high-confidence dates only gives +0.041. High plus medium gives +0.019. UK +0.021, US +0.006, unknown origin +0.032. A narrow 1856-1896 window gives +0.022. All are positive but they vary a lot, and the US subset shows almost nothing. Other possible explanations: the period samples differ in which authors and genres they contain, the early cells are small, dating errors near the cutoff, and labeling drift. The cited passage IDs are labeled DISTANCE_TRAVEL from both periods. They only show what the construct looks like and do not establish the trend. Conclusion: a small, positive shift with moderate robustness."
+}

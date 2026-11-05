@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0327,
+    0.0695
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "corpus composition imbalance (few early works: about 750 pre-1876 vs about 6000 after)",
+    "dating uncertainty (date_confidence low/medium for over half of works)",
+    "annotation/classifier drift across period language",
+    "genre mix and sub-genre heterogeneity within broad labels",
+    "author clustering",
+    "one sampled passage per work"
+  ],
+  "evidence_passage_ids": [
+    "p000345",
+    "p001135",
+    "p005449",
+    "p001068",
+    "p000871",
+    "p003793"
+  ],
+  "rationale": "Data: 6766 works, one annotated passage each (n_passages=1), 8 genres, years 1800s-1920s, cutoff 1876 (late = year >= 1876). Rate = count__domains__DISTANCE_TRAVEL / n_passages. Estimand: within each genre, mean over works of the late rate minus mean over works of the early rate, then an unweighted average across the 8 genres. Result: +0.052. A 95% CI from a bootstrap of works stratified by genre and period (2000 reps) is [0.033, 0.069]. An author-clustered bootstrap gives [0.032, 0.071]. All 8 genres move the same way, with per-genre increases of +0.04 to +0.06. Robustness: the estimate is 0.054 using only high-date-confidence works and 0.053 with the other/collection genres left out. By origin it is UK 0.054, US 0.076, unknown 0.044. Decade means go up from about 0.04-0.06 in the 1850s-1870s to about 0.11-0.12 from the 1880s onward. Caveats: the early cells are small (37-165 works per genre, and romance and domestic_realist have zero early hits), so the early rates are noisy. Each work contributes only one passage. The domain labels come from an annotation process that may treat older and newer prose differently. Other possible explanations are uneven sampling of which works survive or get digitised, and topic shifts inside each broad genre. The cited passage IDs are only examples of late passages tagged with this domain; they do not prove a trend on their own."
+}

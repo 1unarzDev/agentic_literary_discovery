@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0033,
+    0.0458
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "dating uncertainty (low/medium date_confidence)",
+    "sparse early-period cells (<=165 works per genre before 1876)",
+    "genre composition and genre labeling",
+    "unknown origin for most works",
+    "one passage sampled per work (sampling noise)",
+    "annotation/classifier error in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p000196",
+    "p001875",
+    "p006547",
+    "p006484",
+    "p006537",
+    "p006684",
+    "p006172",
+    "p001162"
+  ],
+  "rationale": "Method: 6766 works, each with exactly one passage; rate = count__domains__DISTANCE_TRAVEL / n_passages. Works split at year>=1876 (late) vs earlier. Per-genre mean over works (equal work weights) for each period, late-minus-early per genre, then unweighted mean across 8 genres. Estimate +0.025 passage-rate units; 95% CI [0.003, 0.046] from 2000 bootstrap resamples of works within genre x period cells. 6 of 8 genres are positive (romance +0.059, collection +0.075, juvenile +0.042, historical +0.030, domestic_realist +0.018, other +0.007); adventure (-0.022) and sensation_mystery (-0.006) are negative. Decade means go up overall, from about 0.03-0.08 before 1860 to about 0.11-0.12 from the 1890s, but not steadily (1860s 0.105, 1870s 0.059). Coverage: only 932 early works vs 5834 late ones; several early cells are small (romance n=40 with zero hits, collection n=37), so per-genre differences are noisy. Robustness: point estimates stay positive across subsets (high date confidence only +0.015, CI [-0.025, 0.053]; excluding low-confidence dates +0.020, CI [-0.006, 0.046]; excluding other/collection +0.020; 1850-1899 window +0.018; UK +0.033, US +0.019, unknown origin +0.028). However, the CI includes zero once uncertain dates are dropped, so the evidence for a modest increase is real but only borderline robust. Alternative explanations: misdated works moving across the cutoff, changes in which genres and subgenres were sampled over time, small early samples, and drift in the labeling of the travel domain. The cited passages are travel-tagged examples from both periods. They show what the construct covers but cannot by themselves establish a trend."
+}

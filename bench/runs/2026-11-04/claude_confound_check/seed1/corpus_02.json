@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0328,
+    0.0692
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "early-period sparsity (only 752 of 6766 works dated before 1876)",
+    "heterogeneous date confidence (effect smaller among low-confidence dates)",
+    "genre composition differs between periods",
+    "one passage per work, so rates are binary per work",
+    "annotation or label drift over time"
+  ],
+  "evidence_passage_ids": [
+    "p000696",
+    "p005478",
+    "p001654",
+    "p004936",
+    "p005809",
+    "p000649"
+  ],
+  "rationale": "Methods: Each work has exactly one passage (n_passages=1), so a work's rate is its DISTANCE_TRAVEL count divided by 1. Early means year < 1876 and late means year >= 1876. Within each genre, I gave every work equal weight and took the late mean minus the early mean. I then averaged those differences across the 8 genres with equal weight. The result is 0.0517 passages per passage. The 95% CI, [0.033, 0.069], comes from a bootstrap with 2000 replicates that resamples works within each genre-by-period cell. Coverage: 6766 works, none missing a year. Only 752 are early, and some early genre cells are small (collection n=37, romance n=40). Artifact checks: The share of works in each date-confidence and origin category is about the same in both periods. Mean n_editions is 1.07 early vs 1.08 late. Mean author productivity is 19 vs 21 works per author. Genre mix differs between periods, but the estimand already stratifies by genre, and all 8 genres show an increase of about 0.04 to 0.06. The effect holds in each subset: high date confidence 0.053, medium 0.065, UK 0.069, US 0.063, unknown origin 0.048. It is weaker for low-confidence dates (0.018). I also ran a weighted regression controlling for genre, origin, date confidence, log editions and log author productivity, with standard errors clustered by author. It gives 0.051 (CI 0.034 to 0.068). By decade, rates are about 0.03 to 0.07 before 1880 and about 0.11 to 0.12 from 1880 onward. Alternatives: the annotation scheme may have labelled passages differently over time, and passage sampling may not represent each work. Because each work has only one passage, per-work estimates are noisy. The cited passage IDs are high-confidence DISTANCE_TRAVEL passages from well-dated late works. They show what the construct looks like but cannot establish the trend by themselves. Conclusion: a robust increase after 1876."
+}

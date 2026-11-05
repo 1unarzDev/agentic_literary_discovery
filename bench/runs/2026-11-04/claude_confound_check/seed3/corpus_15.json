@@ -1,0 +1,25 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0797,
+    -0.0211
+  ],
+  "confidence": 0.78,
+  "named_confounds": [
+    "genre composition change (juvenile share rises, historical share falls after 1876)",
+    "date_confidence / dating imprecision",
+    "small and thin early-period sample (pre-1876 decades)",
+    "origin mix (large unknown-origin share)",
+    "author productivity / prolific-author clustering"
+  ],
+  "evidence_passage_ids": [
+    "p006032",
+    "p002827",
+    "p003541",
+    "p006674",
+    "p005505"
+  ],
+  "rationale": "Data: 6,766 works, 1 coded passage each, all dated (1800s-1920s). Cutoff 1876. Rate = count__domains__DISTANCE_TRAVEL / n_passages. Estimand: mean within each genre of the late-minus-early difference in work-mean rates, averaged with equal weight over 8 genres = -0.050. 95% CI from 1,000 stratified bootstrap resamples within genre x period cells: [-0.080, -0.021]. All 8 genres decline (between -0.04 and -0.06 each), so the result is not driven by the genre mix even though composition changes (juvenile 21%->34%, historical 22%->10%). Checks for artifacts: date_confidence and origin shares are nearly the same in both periods; n_editions and author productivity differ only a little. The decline holds within high (-0.062), medium (-0.038) and low (-0.035) date confidence, and within UK (-0.059), US (-0.022) and unknown origin (-0.054). An OLS model with genre, origin, date confidence, log editions and log author productivity, with SEs clustered by author, gives -0.051 [-0.077, -0.025], p<0.001. Decade means fall gradually from about 0.15-0.20 before 1870 to about 0.10 after 1880. Limitations: a linear year trend among only the well-dated works is weaker (p~0.055). The early period is small (~650 works), with very few works before 1840. Each work contributes one passage, so per-work rates are noisy. Origin is unknown for most works. The coding of the domain label could drift over time. Alternative explanations: changes in which works were digitized or sampled, or in the subgenres included within each genre label, could produce a similar decline. The cited passage IDs are passages coded with this domain and only illustrate the construct; they do not establish the trend."
+}

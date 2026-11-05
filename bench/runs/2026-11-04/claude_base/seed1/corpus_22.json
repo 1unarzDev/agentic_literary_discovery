@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0816,
+    -0.0209
+  ],
+  "confidence": 0.72,
+  "named_confounds": [
+    "genre composition change (early period small, late dominated by juvenile)",
+    "sparse early sample (~760 early vs ~6000 late works)",
+    "date uncertainty (27% low-confidence dates)",
+    "origin heterogeneity (UK subset shows no decline)",
+    "annotation/classifier drift in domain labels",
+    "one sampled passage per work"
+  ],
+  "evidence_passage_ids": [
+    "p006051",
+    "p003497",
+    "p004088",
+    "p003960",
+    "p000034",
+    "p005466",
+    "p005795",
+    "p000480"
+  ],
+  "rationale": "Rate = count__domains__DISTANCE_TRAVEL / n_passages per work (each work has 1 passage). Late = year>=1876. Estimand: mean within each genre-period cell (equal work weights), late-minus-early difference per genre, averaged equally over 8 genres. Effect -0.050; 95% CI from 4000 stratified bootstrap resamples of works within genre x period cells [-0.082,-0.021]. All 8 genres show a decline (-0.045 to -0.060). Robustness: high/medium/low date confidence -0.043/-0.086/-0.025; single-edition works -0.044; author-aggregated -0.050; window 1850-1899 -0.068; 1866-1885 -0.075; US -0.052, unknown origin -0.060, but UK +0.014, which is a caveat. Decade means are about 0.14-0.16 in the 1860s-70s and about 0.09-0.11 from the 1880s on, so this looks like a level drop around the cutoff, not just noise at the ends. Coverage limits: the early period is thin (about 760 works before 1876), each work contributes one passage, and labels come from an automated annotation that may drift. Alternative explanations: changes in which works were sampled or digitized, genre or subgenre mix inside the coarse genre labels, labeling drift, and dating error. The cited passages are early or late works tagged DISTANCE_TRAVEL. They show what the label covers but do not establish the trend by themselves."
+}

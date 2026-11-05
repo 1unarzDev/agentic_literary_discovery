@@ -1,0 +1,17 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": null,
+  "ci": null,
+  "confidence": 0.5,
+  "named_confounds": [
+    "genre composition shift over time (juvenile-heavy late corpus)",
+    "date uncertainty (many low/medium date_confidence works)",
+    "sparse early sample (few pre-1876 works)",
+    "one passage per work sampling noise",
+    "origin mix (large unknown share)",
+    "annotation/classifier drift"
+  ],
+  "evidence_passage_ids": [],
+  "rationale": "Inspected task.json (construct domains__DISTANCE_TRAVEL, cutoff 1876, estimand equal-genre mean of equal-work late-minus-early passage rates) and the schema: 6766 works, each with n_passages=1, 8 genres, decades 1800-1920 heavily skewed late (only ~880 works before 1880). The planned method was per-work rate = count/n_passages, split at year>=1876, mean late minus early within each genre, averaged equally across genres, with a genre-by-period stratified bootstrap 95% CI and sensitivity checks (high date confidence only, a window around the cutoff, excluding juvenile, known origin only). That computation never finished: the execution environment failed with disk-quota errors, so no effect, CI, or passage-level evidence was ever observed. I am not inventing numbers, so I abstain. Confidence 0.5 reflects no information about whether a robust shift exists. Even with results, alternative explanations would include genre-mix change, thin and noisy early cells, dating error near the cutoff, and annotation drift."
+}

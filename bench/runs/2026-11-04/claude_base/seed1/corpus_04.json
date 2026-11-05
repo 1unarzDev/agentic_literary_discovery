@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0318,
+    0.0686
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "early-period sparsity (only 752 of 6766 works before 1876)",
+    "genre composition change over time",
+    "date uncertainty (27% low-confidence dates)",
+    "single coded passage per work (classifier/annotation drift)",
+    "origin mix (mostly unknown)"
+  ],
+  "evidence_passage_ids": [
+    "p003863",
+    "p002136",
+    "p001831",
+    "p001487",
+    "p000323",
+    "p000349"
+  ],
+  "rationale": "Rate = count__domains__DISTANCE_TRAVEL / n_passages per work (every work has 1 passage). Early = year<1876, late = year>=1876. Within each of the 8 genres, works are equally weighted; the estimate is the unweighted mean across genres of late-minus-early mean rates: +0.052. The 95% CI comes from 2000 bootstrap resamples of works within genre x period cells: [0.032, 0.069]. All 8 genres go up (by +0.045 to +0.060). The direction holds when split by date confidence (high 0.047, medium 0.048, low 0.073), when low-confidence dates are dropped (0.045), within a narrow 1866-1885 window (0.062), and by origin (UK 0.035, US 0.044, unknown 0.059). Caveats: the early cells are small (37-165 works), and two genres have zero early hits, so their early rates are imprecise. With only one passage per work, the counts are binary and coarse. A change in annotation or coding over time, or which works survived and were sampled, could mimic a real shift. The cited passage IDs are just coded examples of the travel domain; they do not prove the trend on their own."
+}

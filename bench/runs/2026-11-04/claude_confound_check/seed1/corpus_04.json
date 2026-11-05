@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0317,
+    0.0685
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition (juvenile share rises late, historical/domestic share falls)",
+    "date_confidence / dating uncertainty",
+    "year heaping on decade-round years",
+    "sparse early sample (752 early vs 6014 late works)",
+    "origin mix",
+    "author productivity",
+    "single passage per work (rate is binary per work)"
+  ],
+  "evidence_passage_ids": [
+    "p006414",
+    "p004724",
+    "p000253",
+    "p002096"
+  ],
+  "rationale": "Data: 6766 works, each with exactly one coded passage (n_passages=1), so the per-work rate is binary. All works have a year. Cutoff 1876: 752 early works and 6014 late. Estimand: within each of 8 genres, take the late-minus-early mean of count__domains__DISTANCE_TRAVEL/n_passages with every work weighted equally, then average across genres with equal weight. Result: +0.0517. A 95% CI of [0.032, 0.069] comes from a percentile bootstrap (1000 resamples) that resamples works within each genre-by-period cell. The late rate is higher in all 8 genres, with increases of 0.04 to 0.06. Checks: (1) Composition. Genre mix changes with year: the juvenile share goes from 21% to 34%, and the historical share goes from 22% to 10%. Weighting genres equally neutralises this. Origin, date_confidence, n_editions and author productivity are roughly balanced between the two periods. (2) Adjustment. An OLS model of the rate on a late indicator plus genre, origin, date_confidence, n_editions and log author productivity, with SEs clustered by author, gives a late coefficient of 0.052 (CI 0.033 to 0.071). (3) Restricting to high date_confidence works gives 0.047 (bootstrap CI 0.016 to 0.076). The increase also appears within the low and medium date_confidence strata and within the UK, US and unknown origin strata. (4) Narrower windows around the cutoff give 0.062 for 1866-1885 and 0.056 for 1856-1895. Decade means rise gradually, from about 0.04-0.06 before 1870 to about 0.10-0.12 from the 1880s on. The change is not driven by a discontinuity at one point. Years heap on decade-round values, but this has little effect on a 1876 cutoff. Caveats: the early period is small and the earliest decades are very sparse. Each work contributes only one passage, so passage-level coding noise is large. The domain labels may come from an automated classifier whose behaviour could drift with the language of different periods. The corpus may not be a representative sample of what was published. The cited passage IDs are late, well-dated works coded for distance and travel. They illustrate the construct but do not by themselves show a trend."
+}

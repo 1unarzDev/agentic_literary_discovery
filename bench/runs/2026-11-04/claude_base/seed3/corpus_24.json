@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0021,
+  "ci": [
+    -0.0228,
+    0.0242
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition change (early period small, late dominated by juvenile/domestic)",
+    "sparse early-period cells (40-254 works per genre before 1876)",
+    "date uncertainty (52% medium/low date confidence)",
+    "origin mix (UK vs US vs unknown give opposite-sign estimates)",
+    "prolific-author clustering",
+    "one passage per work so work rate is binary and noisy",
+    "annotation/classifier confidence variation"
+  ],
+  "evidence_passage_ids": [
+    "p005471",
+    "p002363",
+    "p002962",
+    "p005210"
+  ],
+  "rationale": "Data: 6,766 works, each with exactly one annotated passage (n_passages=1), dated 1800-1925. Only 752 works fall before the 1876 cutoff and 6,014 at or after it. For each work, rate = count__domains__DISTANCE_TRAVEL / n_passages. Within each of the 8 genres I took the mean over works (equal weight per work), computed late minus early, and then averaged the 8 genre differences with equal weight. Result: +0.0021 passage-rate units. A 95% percentile bootstrap (4,000 resamples of works within genre-by-period cells) gives [-0.023, +0.024], so the CI comfortably includes zero. The genres disagree on direction: adventure, juvenile, romance and domestic realist go down by 0.01-0.02; 'other' and sensation/mystery go up by about 0.05; collection and historical barely move. Robustness checks: high-date-confidence works only gives +0.003, excluding low-confidence dates gives -0.005, restricting to 1850-1900 gives +0.008, and splitting by origin gives UK -0.018, US -0.024, unknown +0.026. The sign is unstable and every estimate is small. The decade means fall from high values in the very small early decades (for example 1800s n=12) to about 0.10-0.12 after 1890, but this is driven by small samples and changes in genre mix, and genre-balancing removes it. An author-clustered bootstrap (500 resamples; prolific authors have up to 110 works) gives a similar interval of [-0.020, +0.025]. The cited passage IDs are passages tagged DISTANCE_TRAVEL. They only show what the construct looks like and say nothing about a trend. Conclusion: the data do not support a robust historical shift in DISTANCE_TRAVEL passage rates at 1876."
+}

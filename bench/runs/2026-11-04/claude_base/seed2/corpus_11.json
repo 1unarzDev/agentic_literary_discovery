@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0327,
+    0.0695
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "early-period sparsity and imbalance (752 early vs 6014 late works)",
+    "dating uncertainty (27% low date_confidence)",
+    "genre composition change over time",
+    "author clustering (1669 authors, non-independent works)",
+    "annotation/classifier drift across period language",
+    "unknown origin for 67% of works"
+  ],
+  "evidence_passage_ids": [
+    "p001135",
+    "p005449",
+    "p001068",
+    "p004086",
+    "p002973",
+    "p004001",
+    "p003640",
+    "p000809"
+  ],
+  "rationale": "Methods: every work has 1 passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages. Works were split at the 1876 cutoff (late = year >= 1876). Within each of the 8 genres I took the unweighted mean rate across works in each period, computed late minus early, and averaged the 8 genre differences with equal weight. Result: +0.052 passage-rate units. The 95% CI of [0.033, 0.069] comes from a 2000-draw bootstrap that resampled works within each genre-by-period cell. All 8 genres go up, by about 0.04 to 0.06 each. Two genres (domestic_realist and romance) have an early rate of 0, based on 164 and 40 works. Robustness checks: the effect is similar within each date_confidence level (high 0.054, medium 0.058, low 0.039) and within each origin (UK 0.054, US 0.076, unknown 0.044). A narrower window of 1856-1895 gives 0.055. Decade means rise from about 0.04-0.06 in the 1850s-1870s to about 0.11-0.12 from the 1880s on. Caveats: the early period is thin (752 works, some genre cells with only 37-57 works) and pre-1850 decades are noisy. The bootstrap does not account for works clustered by author, so the CI may be somewhat too narrow. The change could partly come from drift in the annotation process or from changes in how the corpus was sampled, not from real change in the literature. Genre is held fixed by the equal-genre weighting, but changes in subgenre mix inside a genre are not. The cited passages are late-period passages labelled DISTANCE_TRAVEL, one per genre. They show what the construct looks like but do not by themselves show a trend."
+}

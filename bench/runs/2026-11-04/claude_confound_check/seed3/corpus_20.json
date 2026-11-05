@@ -1,0 +1,25 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0029,
+    0.0451
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence imbalance (low-confidence dating overrepresented late; effect concentrated in low-confidence works)",
+    "n_editions differs by period (early works more reprinted)",
+    "genre composition (late period dominated by juvenile)",
+    "small early-period cells (e.g. romance n=40, collection n=37)"
+  ],
+  "evidence_passage_ids": [
+    "p003246",
+    "p000055",
+    "p005442",
+    "p001590",
+    "p002917",
+    "p001318"
+  ],
+  "rationale": "Methods: The cutoff is 1876. All 6,766 works have a year, and each work has exactly one passage, so a work's rate is either 0 or 1. I averaged rates over works within each genre and period, took late minus early for each of the 8 genres, and then averaged across genres with equal weight. The 95% CI comes from a stratified bootstrap within genre and period (2,000 resamples). Result: the effect is +0.025 passage-rate units, 95% CI [0.003, 0.045]. A weighted least squares model adjusting for genre, origin, date_confidence, log editions and author productivity, with errors clustered by author, gives +0.025, CI [0.001, 0.050]. Raw decade means rise from roughly 0.03-0.08 before 1850 to roughly 0.11-0.12 after 1890, but the early decades are sparse and noisy. Composition and dating checks: the year is linked to other metadata. Early works have more editions (mean 1.26 vs 1.06). Low-confidence dates are more common late (36% vs 29%) and high-confidence dates less common late (64% vs 34% of works overall being high early vs late shares differ). Genre mix also shifts: 752 early works against 6,014 late, and juvenile makes up 34% of the late period. Restricted to high-confidence dates, the effect shrinks to +0.015 with CI [-0.029, 0.051], which includes zero. The adjusted model on high-confidence works gives +0.017, CI [-0.019, 0.053]. By date-confidence level the effect is 0.015 (high), 0.022 (medium) and 0.043 (low), so the contrast grows as dating gets less reliable, which points to a possible dating artifact. Restricting to single-edition works keeps the effect positive (0.032, CI [0.010, 0.052]). The effect is similar across origins (0.019-0.033). Genre results are mixed: adventure and sensation_mystery decrease, while romance and collection increase from very small early samples. Conclusion: the pooled point estimate is positive and its CI barely excludes zero, but it does not hold up when limited to well-dated works. It also depends on small early cells. The evidence therefore does not support a robust historical shift, and I abstain. Alternative explanations: uncertain dating could pull travel-heavy works into the late period; the corpus has changed over time in genre mix and reprint selection; and a passage-level classifier might behave differently on later texts. The cited passage IDs are late, high-confidence passages labelled DISTANCE_TRAVEL. They show what the construct looks like but cannot by themselves establish a trend."
+}

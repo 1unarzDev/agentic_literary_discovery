@@ -1,0 +1,25 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0021,
+  "ci": [
+    -0.0225,
+    0.0251
+  ],
+  "confidence": 0.08,
+  "named_confounds": [
+    "origin composition shift (unknown-origin share rises from 40% to 70% after 1876)",
+    "early-period sparsity (752 of 6766 works before 1876)",
+    "date_confidence imbalance",
+    "genre composition"
+  ],
+  "evidence_passage_ids": [
+    "p002987",
+    "p004467",
+    "p004359",
+    "p006014",
+    "p006627",
+    "p000318"
+  ],
+  "rationale": "Estimand: for each genre, mean DISTANCE_TRAVEL passage rate in late works (year>=1876) minus early works, each work weighted equally; then averaged with equal weight across the 8 genres. Every work has exactly one passage, so work rates are 0 or 1. Overall effect is +0.0021 with a 95% bootstrap CI (resampling within genre x period cells) of [-0.023, 0.025]. Robustness checks: restricting to high-date-confidence works gives +0.0027 [-0.039, 0.036]. An OLS on late, adjusted for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives -0.012 [-0.035, 0.012]. Stratifying by origin gives inconsistent signs (UK -0.017, US -0.024, unknown +0.026). Year is associated with origin: unknown-origin works go from 40% to 70%. Year is only weakly related to date_confidence, n_editions and productivity. Decade means show no monotonic trend (about 0.08-0.15, plus noisy early decades with few works). Coverage: 6766 works, but only 752 are pre-1876, which makes early estimates imprecise. The cited passage IDs are DISTANCE_TRAVEL-tagged passages from well-dated early and late works; they show that the construct occurs in both periods and say nothing about a trend. Conclusion: there is no robust historical shift. The estimate is near zero, the CI includes zero, and the sign flips under adjustment and stratification."
+}

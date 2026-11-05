@@ -1,0 +1,24 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.0323,
+    0.0218
+  ],
+  "confidence": 0.08,
+  "named_confounds": [
+    "origin composition shift (late works far more often 'unknown' origin, fewer UK/US)",
+    "date_confidence imbalance (fewer low-confidence dates late)",
+    "genre mix differences across periods",
+    "sparse early sample (about 750 pre-1876 works vs about 6000 late)",
+    "one passage per work, so work-level rates are binary and noisy"
+  ],
+  "evidence_passage_ids": [
+    "p005158",
+    "p002575",
+    "p002203",
+    "p004088"
+  ],
+  "rationale": "There are 6766 works, each with exactly one passage (n_passages=1), and all have a year. Rate = count__domains__DISTANCE_TRAVEL / n_passages. Late means year >= 1876. I took the mean rate for each genre and period, weighting works equally, then averaged the late-minus-early differences across 8 genres with equal weight. Result: -0.0048. The 95% CI, from a bootstrap that resampled works within genre x period cells (500 reps), is [-0.032, 0.022]. The per-genre differences are small and mixed in sign. The largest is 'other' at -0.07, which rests on few early works. Composition checks: assigned period is strongly linked to origin (unknown origin is 41% of early works vs 70% of late) and somewhat to date_confidence and genre mix. It is not linked to n_editions or author productivity. Robustness checks: restricted to high-confidence dates, -0.009. Medium-confidence: +0.014. Low-confidence: -0.025. By origin: UK -0.033, US +0.021, unknown -0.012. A WLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with errors clustered by author, gives -0.005 (CI -0.026 to 0.016). A linear per-decade trend with genre controls is about 0.001 per decade. Decade means range from 0.07 to 0.15 with no monotone pattern. None of these checks gives a consistent, nonzero change. The cited passages show the construct is present (labelled DISTANCE_TRAVEL with label confidence >= 0.9), but they cannot establish a trend. Conclusion: no robust shift is detectable. The early sample is small, so a modest true change of up to about 3 points cannot be ruled out."
+}

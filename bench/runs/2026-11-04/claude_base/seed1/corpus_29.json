@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0183,
+  "ci": [
+    -0.0063,
+    0.0407
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "genre composition shift (late period dominated by juvenile works)",
+    "sparse early-period sample (approx. 750 of 6766 works before 1876)",
+    "one passage per work, so rates are binary and noisy",
+    "date uncertainty (about half the works have low or medium date confidence)",
+    "annotation/classifier drift across periods"
+  ],
+  "evidence_passage_ids": [
+    "p003957",
+    "p004260",
+    "p002517",
+    "p000973",
+    "p001688",
+    "p002355"
+  ],
+  "rationale": "Methods: 6766 works, each with one passage. The rate for each work is the DISTANCE_TRAVEL count divided by n_passages. I split works at year 1876 (late = year >= 1876), averaged works equally within each genre-by-period cell, took the late-minus-early difference for each genre, then averaged the 8 genres equally. Point estimate: +0.018 passage-rate units. A stratified bootstrap (2000 resamples within each genre-period cell) gives a 95% CI of [-0.006, 0.041], which includes zero. Genre results are mixed: juvenile, other and sensation_mystery rise; adventure, collection and domestic_realist fall slightly. Robustness checks: leaving out any one genre gives estimates from +0.010 to +0.023. Using only high-date-confidence works gives +0.031. Using only 1851-1899 gives +0.012. Raw decade means rise from about 0.05 to about 0.12, but that pooled trend mixes in the shift toward juvenile and adventure works. Every early cell is small (47-280 works), so precision is limited. Alternative explanations: changes in genre mix and sampling, dating errors near the cutoff, and annotation drift. The cited passages are labelled DISTANCE_TRAVEL and only illustrate the construct; they do not show a trend. The direction leans toward an increase, but the CI includes zero, so I abstain."
+}

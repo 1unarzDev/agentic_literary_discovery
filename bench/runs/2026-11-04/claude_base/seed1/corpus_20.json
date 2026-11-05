@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0035,
+    0.0468
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "one sampled passage per work (each work's rate is 0 or 1)",
+    "early period has few works, especially collection, romance and adventure",
+    "genre mix shifts toward juvenile fiction after the cutoff",
+    "uncertain dates (about 54% of works have low or medium date confidence)",
+    "repeated authors (up to 110 works per author) not clustered in the CI",
+    "passage domain labels come from automatic annotation"
+  ],
+  "evidence_passage_ids": [
+    "p004007",
+    "p002575",
+    "p004628",
+    "p005544",
+    "p005629",
+    "p003881",
+    "p003915",
+    "p002739"
+  ],
+  "rationale": "Method: works dated 1876 or later count as late; earlier works count as early. All 6,766 works have a year, and each has exactly one passage, so a work's rate for DISTANCE_TRAVEL is 0 or 1. Within each of the 8 genres I took the mean rate for early works and for late works, giving each work equal weight. I then averaged the late-minus-early differences with each genre weighted equally. The estimate is +0.025 passage-rate units. For the 95% CI I resampled works with replacement inside each genre-period cell 5,000 times (percentile interval): [0.0035, 0.047]. 98.8% of resamples were above zero. Coverage: the early period has only 752 works, and some early cells are small (collection 37, romance 40, other 51, sensation 57). The late period has 6,014 works. By genre, the change goes up in 6 of 8 genres (romance 0 to 0.059, collection 0.027 to 0.10, juvenile 0.118 to 0.160, historical 0.073 to 0.102, domestic 0.030 to 0.048, other 0.078 to 0.085). It goes down slightly in adventure (0.169 to 0.147) and sensation (0.070 to 0.064). Decade means rise roughly from about 0.03 to 0.07 in the 1820s\u20131840s to about 0.11 to 0.12 in the 1890s\u20131910s. The 1800s decade is noisy (12 works). Sensitivity checks: high date-confidence works only give +0.015; works after 1850 only give +0.020; works with known origin give +0.025; single-edition works give +0.032. All are positive, but the effect is small and shrinks when only well-dated works are used. Other explanations: the late period's larger and differently composed sample, especially in small early cells like romance and collection; dating error near the cutoff; a few prolific authors; and drift in the annotation model. Author clustering was not modelled, so the CI is probably too narrow. The cited passage IDs are a random sample of passages labelled with this domain. They only show that the label occurs and do not establish the trend. Overall there is moderate evidence of a modest increase, but how robust it is remains uncertain."
+}

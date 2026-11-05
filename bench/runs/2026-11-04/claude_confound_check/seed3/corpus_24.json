@@ -1,0 +1,24 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0021,
+  "ci": [
+    -0.0208,
+    0.0242
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "origin composition shift (unknown origin 40% early vs 70% late)",
+    "date_confidence heterogeneity",
+    "sparse early sample (752 early vs 6014 late works)",
+    "genre-specific opposite trends"
+  ],
+  "evidence_passage_ids": [
+    "p005471",
+    "p002363",
+    "p002962",
+    "p005210",
+    "p002416"
+  ],
+  "rationale": "Corpus has 6766 works, one passage each, all dated. I computed the per-work DISTANCE_TRAVEL rate (count/n_passages), took the mean within genre for early (<1876) and late (>=1876) works, differenced those means, and averaged the differences across the 8 genres with equal weight. Estimate +0.0021 passage-rate units. A 95% CI from 1000 bootstrap resamples of works within genre-by-period cells is [-0.021, 0.024], so the interval includes zero. Genre results disagree: adventure, juvenile, romance and domestic_realist decline, while other and sensation_mystery rise. Composition checks: origin is strongly tied to period (unknown origin 40% early vs 70% late). Mean n_editions and author productivity are about the same in both periods. Within strata the sign flips: well-dated (high confidence) +0.003, medium -0.014, low +0.019, UK -0.017, US -0.024, unknown origin +0.026. An OLS adjusted for genre, origin, date_confidence, log editions and author productivity, with author-clustered SEs, gives -0.012 [-0.035, 0.012]. By decade the rate declines from early decades to the 1870s and then partly recovers, with no clean break at 1876. The early-period sample is small. No robust historical shift is supported. The cited passage IDs only illustrate the construct and are not evidence of a trend."
+}

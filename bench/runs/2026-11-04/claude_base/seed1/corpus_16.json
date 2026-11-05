@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": -0.0258,
+  "ci": [
+    -0.0514,
+    -0.0016
+  ],
+  "confidence": 0.45,
+  "named_confounds": [
+    "genre composition shift (late period dominated by juvenile/domestic works)",
+    "small early-period sample (752 of 6766 works pre-1876)",
+    "date uncertainty (52% of works low/medium date confidence)",
+    "origin imbalance (67% unknown origin; UK subset shows opposite sign)",
+    "single passage per work (sampling noise, passage selection)",
+    "annotation/classifier error in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p000616",
+    "p004194",
+    "p003572",
+    "p003991",
+    "p003992",
+    "p004358"
+  ],
+  "rationale": "Method: the rate is count__domains__DISTANCE_TRAVEL / n_passages per work, where every work has exactly 1 passage. I took the mean rate for each genre in the early period (<1876) and the late period (>=1876), computed late minus early within each genre, and averaged the 8 genres with equal weight. Estimate: -0.026. A 95% CI from 2000 bootstrap resamples within each genre-by-period cell is [-0.051, -0.002], which only just excludes zero. Coverage: 6766 works dated 1800-1925, but only 752 fall before the cutoff, and early cells hold 46-219 works per genre. Robustness: the sign stays negative when any one genre is dropped (-0.016 to -0.032) and with cutoffs at 1860/1870/1880/1890 (-0.021 to -0.033). However, an OLS model with HC1 robust errors, controlling for genre, origin, date confidence and editions, gives -0.024 (SE 0.0125, about 1.9 SE, so not significant at 5%). Genres disagree: most of the drop comes from adventure (-0.076) and historical (-0.097), while domestic_realist and sensation_mystery rise slightly and other is about zero. The UK-origin subset goes the other way (+0.008). Decade means move non-monotonically (0.12-0.15 in the 1830s-1880s, a dip to 0.083 in the 1890s, then 0.10-0.11), so a single dip may be driving the contrast rather than a steady change. Alternative explanations: noise from sampling one passage per work, genre-specific changes rather than a corpus-wide shift, unreliable dates, an uneven mix of origins, and domain-labelling error. Cited passages are high-confidence DISTANCE_TRAVEL examples that show the construct; they cannot establish a trend. The modest negative estimate sits at the edge of significance, is not significant under the model with controls, and varies by genre and origin. That does not meet the bar for a robust historical change, so I abstain; P(robust shift) is about 0.45."
+}

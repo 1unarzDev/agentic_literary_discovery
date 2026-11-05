@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0814,
+    -0.0224
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition (late period more juvenile/adventure)",
+    "origin mix (large unknown share)",
+    "date_confidence / dating error",
+    "author productivity",
+    "n_editions / reprint selection",
+    "small early sample (752 pre-1876 works)"
+  ],
+  "evidence_passage_ids": [
+    "p003220",
+    "p004514",
+    "p005381",
+    "p005268",
+    "p005611",
+    "p000758"
+  ],
+  "rationale": "There are 6,766 works with one passage each. The rate is count__domains__DISTANCE_TRAVEL divided by n_passages. Early means year before 1876 (752 works) and late means 1876 or later (6,014 works). For the estimand, I took the late-minus-early difference in mean work rate within each genre, then averaged the genres equally. The result is -0.050. A 95% bootstrap CI, resampling works within each genre-by-period cell, is [-0.081, -0.022]. All 8 genres go the same way, with drops of 4 to 6 points (for example, adventure 0.19 to 0.14 and juvenile 0.20 to 0.15). The decade means also fall broadly, from about 0.15-0.20 before 1860 to about 0.10 after 1880.\n\nArtifact checks: the share of high, medium and low date_confidence is almost the same in both periods (about 46% high in each). The origin mix and mean n_editions are also similar, and author productivity is only slightly higher in the late period. I ran an OLS of the rate on the late indicator, adjusting for genre, origin, date_confidence, log n_editions and log author productivity, with errors clustered by author. It gives -0.051 [-0.077, -0.025]. Restricting to high date-confidence works gives -0.062 [-0.108, -0.016]. The drop appears in every origin stratum, though it is weaker for US works (-0.022).\n\nCaveats: the early cells are small, and the per-passage domain labels may be noisy. The labelling or sampling of passages may also have changed over time. The cited passage IDs are only examples of the travel domain at both ends of the date range; they do not establish the trend. Because the decline holds across genres, adjustments and the well-dated subset, the corpus supports a modest decrease."
+}

@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0035,
+    0.0464
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "date uncertainty (low/medium date_confidence)",
+    "sparse early cells (all genres have under 170 works before 1876; romance 40, collection 37)",
+    "genre composition and juvenile dominance late",
+    "origin imbalance (unknown origin for most works)",
+    "one sampled passage per work (coarse work-level rates)",
+    "annotation/classifier drift"
+  ],
+  "evidence_passage_ids": [
+    "p004813",
+    "p002249",
+    "p003211",
+    "p002204",
+    "p003969"
+  ],
+  "rationale": "There are 6766 works and every one has a year. Each work has exactly one passage (n_passages=1), so a work's rate is 0 or 1 for the DISTANCE_TRAVEL domain. Early means year<1876 and late means year>=1876. For each genre I took the mean rate across works in each period (equal weight per work), took late minus early, and averaged that difference over the 8 genres with equal weight. The estimate is +0.0253 passages per passage. The 95% CI, from a percentile bootstrap that resamples works within each genre-by-period cell (2000 reps), is [0.0035, 0.0464]. Six of the 8 genres go up (romance from 0/40, collection, domestic_realist, historical, juvenile, other). Adventure and sensation_mystery go down slightly. Dropping any one genre leaves the estimate positive (0.018 to 0.032). It is also positive within each origin group (UK 0.033, US 0.019, unknown 0.028). Decade means rise roughly from about 0.03-0.07 in the 1810s-1840s to about 0.11-0.12 after 1890, though early decades have few works. Caveats: the effect is small and the CI's lower bound is close to zero. Among high date-confidence works only, the estimate is 0.015 with CI [-0.028, 0.051], so it is not robust there. Early cells are small, and some genre contrasts (for example romance starting at 0 of 40) rest on few works. Other possible explanations: the kind of works sampled after 1876 may differ (for example more juvenile and collection volumes), dates may be wrong, and passage sampling or annotation may have changed over time rather than the literature itself. The cited passages are only examples of the construct and do not by themselves show a trend. Overall the evidence for a modest increase is moderate, not strong."
+}

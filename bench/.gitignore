@@ -8,3 +8,4 @@ answers/
 .pytest-tmp/
 scores.json
 pilot/
+runs/tmp/

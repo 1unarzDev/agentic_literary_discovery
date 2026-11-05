@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0834,
+    -0.0219
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "early-period sparsity (only 752 of 6766 works are before 1876)",
+    "genre composition change over time",
+    "author clustering (prolific authors)",
+    "dating uncertainty (low/medium date_confidence)",
+    "annotation/classifier drift across period language",
+    "non-monotone decade trend (1920s rebound)",
+    "one sampled passage per work"
+  ],
+  "evidence_passage_ids": [
+    "p002697",
+    "p001924",
+    "p005615",
+    "p000284",
+    "p005019",
+    "p004456"
+  ],
+  "rationale": "Method: rate = count__domains__DISTANCE_TRAVEL / n_passages per work (each work has exactly 1 passage, so rates are 0/1). Works were split at cutoff 1876 (late = year >= 1876). For each genre I took the mean rate among late works minus the mean among early works, with each work weighted equally, then averaged across the 8 genres with equal weight. Estimate: -0.050. A 95% CI from a bootstrap stratified by genre and period (2000 reps) is [-0.083, -0.022]. A bootstrap that resamples whole authors (400 reps) gives a similar interval, [-0.081, -0.023]. All 8 genres individually show a decrease, ranging from -0.04 to -0.06. Robustness: the estimate holds when restricted to high date-confidence works (-0.059), when the 'other' genre is excluded (-0.049), within a 1850-1899 window (-0.042), and within each origin group (UK -0.043, US -0.087, unknown -0.045). Coverage: 6766 works dated 1800-1925, but only 752 are early, and some early genre cells are small (collection n=37, romance n=40). Caveats: by decade, the rate peaks in the 1830s-1850s, drops in the 1860s, and rises somewhat in the 1920s, so the change looks more like a gradual or step decline than a clean break at 1876. Alternative explanations: the annotator may tag older diction differently; the corpus may sample different kinds of works over time; prolific authors may have outsized influence (partly addressed by the author bootstrap); one sampled passage per work makes estimates noisy. The cited passage IDs are only examples of the tagged construct; they do not establish the trend."
+}

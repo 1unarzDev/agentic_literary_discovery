@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0327,
+    0.0695
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "early-period sparsity (only ~750 pre-1876 works vs ~6000 late)",
+    "genre composition change over time",
+    "date uncertainty (low/medium date_confidence)",
+    "single passage per work (one-passage sampling noise)",
+    "author clustering",
+    "annotation/classifier drift across period language"
+  ],
+  "evidence_passage_ids": [
+    "p001135",
+    "p005449",
+    "p001068",
+    "p000871",
+    "p004094"
+  ],
+  "rationale": "Rate = count__domains__DISTANCE_TRAVEL / n_passages per work (every work has 1 passage; 6766 works, no missing years). Late = year>=1876. Within each of 8 genres, mean work rate late minus early; then unweighted mean over genres = +0.052 passage-rate units. 95% CI from 2000 stratified bootstrap resamples of works within genre x period: [0.033, 0.069]. All 8 genres show increases (+0.045 to +0.060). Sensitivity: high-date-confidence works only +0.054; cutoff 1866 +0.046, 1886 +0.040; 1856-1895 window +0.055; decade means rise from ~0.04-0.06 (1850s-1870s) to ~0.11-0.12 (1880s+). Caveats: the early period is thin (some genre cells have 37-77 works, two genres have zero early hits), so per-genre estimates are noisy; resampling by work ignores author clustering, so the CI may be somewhat too narrow; dates can be imprecise; and annotation labels may behave differently across eras. The cited passages are only examples of the construct and do not establish the trend on their own. Even so, the increase holds across every genre and every specification I tried, so I conclude there was a modest increase."
+}

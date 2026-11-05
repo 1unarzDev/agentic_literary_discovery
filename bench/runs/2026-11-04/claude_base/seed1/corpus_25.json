@@ -1,0 +1,25 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0082,
+  "ci": [
+    -0.0163,
+    0.0303
+  ],
+  "confidence": 0.15,
+  "named_confounds": [
+    "genre composition shift over time",
+    "early-period sparsity (only 752 of 6766 works before 1876)",
+    "date uncertainty (about 27% low-confidence dates)",
+    "origin imbalance (UK vs US effects go in opposite directions)",
+    "one sampled passage per work, so work-level rates are 0/1",
+    "annotation/classifier noise in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p004807",
+    "p006502",
+    "p001093",
+    "p002356"
+  ],
+  "rationale": "Method: each work has 1 passage, so the work rate is count__domains__DISTANCE_TRAVEL divided by n_passages. Works dated 1876 or later count as late. Within each genre I averaged works with equal weight, took late minus early, then averaged the 8 genres with equal weight. Result: effect = +0.0082. A 95% percentile bootstrap (4000 resamples of works within each genre-by-period cell) gives [-0.016, 0.030], which includes zero. Genre-level differences go both ways: adventure, juvenile and sensation go down; historical, romance and collection go up. Sensitivity checks: high-confidence dates only gives +0.023; UK -0.017; US +0.032; unknown origin +0.007; restricting to 1851-1899 gives +0.014. The rate by decade stays flat at about 0.10-0.12 from the 1830s to the 1910s. Coverage: 6766 works, all dated, but early cells are small (38-264 works per genre). Alternative explanations for any apparent difference include changes in genre and origin mix, dating error, sampling noise from single passages, and label noise. The cited passages show the DISTANCE_TRAVEL label in use. They illustrate the construct and do not show a trend. Conclusion: the data do not support a robust historical shift."
+}

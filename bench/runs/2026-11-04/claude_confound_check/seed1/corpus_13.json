@@ -1,0 +1,25 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.0318,
+    0.0206
+  ],
+  "confidence": 0.1,
+  "named_confounds": [
+    "genre composition (late period dominated by juvenile/domestic works; the share of early works varies by genre)",
+    "origin imbalance (most late works have unknown origin)",
+    "date_confidence heterogeneity",
+    "single-passage-per-work sampling noise"
+  ],
+  "evidence_passage_ids": [
+    "p005158",
+    "p002575",
+    "p002203",
+    "p004088",
+    "p000529",
+    "p003208"
+  ],
+  "rationale": "Data: 6,766 works, all dated, with one passage each (n_passages=1), so each work's rate is 0 or 1. Cutoff year is 1876. There are 752 early works and 6,014 late ones, and every genre has works on both sides of the cutoff (33 to 251 early works per genre). Estimand: for each genre, the mean work-level DISTANCE_TRAVEL rate in the late period minus the early period, then an unweighted mean across the 8 genres. Result: -0.0048 passage-rate units. A 95% CI from a 2,000-draw bootstrap that resamples works within genre and period is [-0.032, 0.021]. Per-genre differences are small (for example juvenile 0.159 to 0.157, adventure 0.138 to 0.151). The only large change is in 'other' (0.15 to 0.08), which rests on just 33 early works. Decade means move without a trend between 0.07 and 0.15. Artifact checks: n_editions and author productivity are the same in both periods. Origin and date_confidence are unevenly spread (the late period has mostly unknown origin). The contrast stays null within each stratum: high date confidence -0.009 [-0.051, 0.029], low -0.025, medium +0.014, UK -0.033, US +0.021, unknown -0.012, and every CI includes zero. A Poisson GLM with author-clustered SEs, adjusted for genre, origin, date_confidence, log editions and log author productivity, gives a late coefficient of -0.043 (95% CI -0.24 to 0.15, p=0.67). Genre is a strong predictor of the rate, so genre composition could create apparent trends in unweighted comparisons. The design with equal weights by genre removes this. The cited passage IDs are high-confidence passages coded DISTANCE_TRAVEL and only show what the construct looks like; they cannot establish a trend. Conclusion: no robust historical shift. The data are consistent with no change, and a change of a few percentage points either way cannot be ruled out."
+}

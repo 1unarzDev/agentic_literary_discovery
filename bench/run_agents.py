@@ -3,6 +3,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
+import re
 from pathlib import Path
 import shlex
 import shutil
@@ -122,7 +123,7 @@ def child_env(token_budget, extra_path=None):
 
 
 def run_one(corpus, command, timeout=300, token_budget=8000, temp_root=None,
-            condition='base', extra_path=None):
+            condition='base', extra_path=None, isolate=False):
     started = time.monotonic()
     prompt = Path(__file__).with_name('agent_task.md').read_text()
     prompt = prompt.replace('8,000-token', f'{token_budget:,}-token') + CONDITIONS[condition]
@@ -134,10 +135,25 @@ def run_one(corpus, command, timeout=300, token_budget=8000, temp_root=None,
             shutil.copy2(Path(corpus)/name, Path(tmp)/name)
         Path(tmp, 'TASK.md').write_text(prompt)
         args = [part.replace('{prompt}', prompt).replace('{token_budget}', str(token_budget)) for part in command]
-        proc = subprocess.Popen(args, cwd=tmp, env=child_env(token_budget, extra_path),
+        env = child_env(token_budget, extra_path)
+        if isolate:
+            # Private /tmp per session (no shared scratch paths, no host tmpfs quota);
+            # mask the repository (keys), other sessions' staging dirs and CLI transcripts.
+            repo = Path(__file__).resolve().parents[1]
+            mask = [str(repo), str(Path(temp_root).resolve()), str(Path.home()/'.claude'/'projects')]
+            args = ['bwrap', '--dev-bind', '/', '/', '--tmpfs', '/tmp'] + \
+                   [x for m in mask if Path(m).exists() for x in ('--tmpfs', m)] + \
+                   ['--bind', tmp, tmp, '--chdir', tmp, '--die-with-parent', '--'] + args
+            env['TMPDIR'] = env['CLAUDE_CODE_TMPDIR'] = '/tmp'
+        else:
+            # Child CLI scratch space (tool outputs) lives beside the staging dirs.
+            scratch = Path(temp_root)/'.cli-tmp'
+            scratch.mkdir(exist_ok=True)
+            env['TMPDIR'] = env['CLAUDE_CODE_TMPDIR'] = str(scratch)
+        proc = subprocess.Popen(args, cwd=tmp, env=env,
                                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, start_new_session=True)
-        base = {'condition': condition, 'token_budget': token_budget,
+        base = {'condition': condition, 'token_budget': token_budget, 'isolated': isolate,
                 'token_budget_enforcement': 'prompt_only', 'workdir': tmp}
         try:
             stdout, stderr = proc.communicate(timeout=timeout)
@@ -172,7 +188,8 @@ def run_one(corpus, command, timeout=300, token_budget=8000, temp_root=None,
             meta.update(status='invalid', error=str(exc))
             answer = None
         # Environment failures (not agent behaviour) are discarded so --resume reruns them.
-        if any(marker in stdout for marker in INFRA_MARKERS):
+        if any(marker in stdout for marker in INFRA_MARKERS) or (
+                proc.returncode and re.search(r'API Error: 5\d\d', str(final) + stdout[-4000:])):
             meta.update(status='infra_error', discarded_answer=answer,
                         error='environment I/O failure seen in session')
             answer = None
@@ -181,7 +198,7 @@ def run_one(corpus, command, timeout=300, token_budget=8000, temp_root=None,
 
 def run(root, output, command, timeout=300, token_budget=8000, temp_root=None,
         condition='base', seeds=(None,), concurrency=1, corpora=None, extra_path=None,
-        resume=False):
+        resume=False, isolate=False):
     root, output = Path(root), Path(output)
     ids = [item['corpus_id'] for item in json.loads((root/'manifest.json').read_text())]
     if corpora:
@@ -202,7 +219,7 @@ def run(root, output, command, timeout=300, token_budget=8000, temp_root=None,
         cid, out = job
         try:
             answer, meta = run_one(root/cid, command, timeout, token_budget, temp_root,
-                                   condition, extra_path)
+                                   condition, extra_path, isolate)
         except Exception as exc:  # e.g. staging I/O errors; keep the other jobs running
             answer, meta = None, {'condition': condition, 'status': 'error', 'error': repr(exc),
                                   'elapsed': 0.0}
@@ -233,10 +250,12 @@ if __name__ == '__main__':
     p.add_argument('--temp-root', help='Staging root; keep it outside the repository')
     p.add_argument('--extra-path', help='Directory prepended to PATH (e.g. analysis venv bin)')
     p.add_argument('--resume', action='store_true', help='Skip corpora that already have a valid answer')
+    p.add_argument('--isolate', action='store_true',
+                   help='bubblewrap: private /tmp; mask repo, other staging dirs and ~/.claude/projects')
     a = p.parse_args()
     if a.timeout <= 0 or a.token_budget <= 0 or a.concurrency <= 0:
         p.error('timeout, token budget and concurrency must be positive')
     run(a.root, a.output, shlex.split(a.command) if a.command else COMMANDS[a.backend],
         a.timeout, a.token_budget, a.temp_root, a.condition,
         tuple(range(1, a.seeds+1)) if a.seeds else (None,), a.concurrency, a.corpora, a.extra_path,
-        a.resume)
+        a.resume, a.isolate)

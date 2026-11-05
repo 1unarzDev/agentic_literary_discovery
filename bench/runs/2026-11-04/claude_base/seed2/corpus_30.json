@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0834,
+    -0.0219
+  ],
+  "confidence": 0.7,
+  "named_confounds": [
+    "genre composition imbalance (early period sparse, ~750 vs ~6000 works)",
+    "author clustering (top authors contribute 70-110 works)",
+    "date uncertainty (27% low-confidence dates)",
+    "origin mix (67% unknown)",
+    "annotation/classifier drift across period language",
+    "one passage per work: sampling noise per work",
+    "non-monotonic decade trajectory"
+  ],
+  "evidence_passage_ids": [
+    "p005019",
+    "p004456",
+    "p004740",
+    "p004242",
+    "p003784",
+    "p003120"
+  ],
+  "rationale": "Method: there are 6766 works, each with exactly one passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages, which is 0 or 1. I split works at cutoff 1876 (late = year>=1876), averaged works with equal weight inside each genre x period cell, took late minus early for each of the 8 genres, and averaged those 8 differences with equal weight. Estimate: -0.050. The 95% CI from a bootstrap stratified by genre x period (2000 reps) is [-0.083, -0.022]. A bootstrap that resamples whole authors gives a similar CI, [-0.080, -0.023]. All 8 genres go down, by between -0.04 and -0.06 each. Sensitivity checks: high-confidence dates only gives -0.059, high plus medium gives -0.059, and a 1856-1895 window gives -0.051. By origin: UK -0.043, US -0.087, unknown -0.045. Capping each author at 3 works shrinks the effect to -0.034, so prolific authors make the decline look somewhat larger. Coverage: only about 11% of works come before 1876, and those early cells are small (37-165 works per genre), which widens the uncertainty. Caveats: the decade means do not fall steadily. They are about 0.16 in the 1830s-1850s, dip in the 1860s, and sit at roughly 0.10-0.12 after 1890, so the change may be a step or a drift around mid-century rather than a sharp break at 1876. Other possible explanations: annotation drift as language changes over time, which works ended up in the corpus in each period, changing sub-genre mix within the broad genre labels, and uncertain dates. The cited passage IDs are works coded for the construct. They only show what the label means and do not by themselves establish the trend."
+}

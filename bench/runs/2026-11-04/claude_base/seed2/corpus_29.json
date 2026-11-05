@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0183,
+  "ci": [
+    -0.007,
+    0.0413
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "genre composition shift (early period dominated by domestic_realist, late by juvenile/adventure)",
+    "sparse early-period cells (47-99 works per genre before 1876)",
+    "date uncertainty (27% low-confidence dates)",
+    "author clustering (prolific authors up to 110 works)",
+    "passage sampling: one passage per work",
+    "annotation/classifier noise in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p000250",
+    "p004260",
+    "p002517",
+    "p000973",
+    "p003957",
+    "p002355"
+  ],
+  "rationale": "Methods: 6,766 works, each with exactly one annotated passage (n_passages=1), so a work's rate is 0 or 1 for DISTANCE_TRAVEL. Following task.json, I split works at cutoff 1876 (late = year >= 1876). Within each genre I took the unweighted mean across works, computed late minus early, and averaged that difference equally over the 8 genres. Point estimate: +0.018 passage-rate. A 95% CI from a 2,000-replicate bootstrap stratified by genre and period is [-0.007, 0.041], so it includes zero. Robustness: the estimate is +0.031 with high-confidence dates only (CI [-0.005, 0.064], still including zero), +0.029 excluding low-confidence dates, +0.007 when restricted to 1850-1904, and +0.014 excluding juvenile. The sign is not consistent across genres: juvenile, other and sensation rise, while domestic_realist, collection and adventure fall slightly. Raw decade means rise from about 0.05 (1830s-1860s) to about 0.12 (1910s-1920s), but much of that comes from the late corpus containing more travel-heavy genres, which equal genre weighting removes. Coverage: only about 750 works are pre-1876, and the early cells per genre are small, which makes the early estimates noisy. Alternative explanations for any apparent rise: changes in genre mix, dating error near the cutoff, prolific authors dominating some cells, and drift in how the domain labels were assigned. The cited passage IDs illustrate the construct and do not show a trend. Conclusion: the data suggest a possible small increase, but it is not robust enough to claim a historical shift, so I abstain."
+}

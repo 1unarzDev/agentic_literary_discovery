@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0328,
+    0.0692
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition (late period juvenile-heavy)",
+    "date_confidence / dating error",
+    "author productivity",
+    "origin imbalance",
+    "small early sample per genre",
+    "passage annotation error"
+  ],
+  "evidence_passage_ids": [
+    "p000961",
+    "p002985",
+    "p000696",
+    "p004277",
+    "p004974",
+    "p006320"
+  ],
+  "rationale": "Data: 6766 works, each with exactly 1 passage (n_passages=1), all dated; cutoff 1876 gives 752 early vs 6014 late works, so the early side is small (37-165 works per genre). Estimand: rate = DISTANCE_TRAVEL count / n_passages. Took the mean per genre x period with each work weighted equally, then the equal-weight average of the late-minus-early differences across the 8 genres: +0.052. 95% CI [0.033, 0.069] from a 2000-rep bootstrap stratified by genre and period. The increase appears in all 8 genres (+0.045 to +0.06). Artifact checks: origin, n_editions and date_confidence mixes are almost the same in both periods. Author productivity is a little higher late (21 vs 19). Genre mix is very unbalanced (late period is juvenile-heavy), but the equal-genre estimand handles this. The effect holds within origin strata (UK +0.069, US +0.063, unknown +0.048) and when restricted to high date_confidence works (+0.053, CI [0.022, 0.078]). It is smaller among low-confidence dates (+0.018), which fits attenuation from dating noise. Author-clustered WLS adjusting for genre, origin, log editions, date_confidence and log author productivity gives +0.051 (CI 0.034-0.068). Decade means rise from about 0.05-0.07 in the 1830s-1870s to about 0.11-0.12 from the 1880s on, which looks like a step near the cutoff rather than an artifact of a single decade. Alternatives: there are few early works per genre; the passage classifier may drift with period language; the sample of which passage was taken from each work could differ by period; and the late period may hold more travel-themed works for selection reasons. Each work contributes only one passage, so work-level noise is high. The cited passage IDs are late-period passages labelled DISTANCE_TRAVEL. They show the construct but do not establish the trend."
+}

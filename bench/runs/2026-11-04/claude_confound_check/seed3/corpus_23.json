@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0024,
+    0.0451
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence imbalance across the cutoff (high-confidence dating 34% of early works vs 48% of late)",
+    "sparse early cells (10-165 works per genre before 1876)",
+    "n_editions differs by period (mean 1.26 early vs 1.06 late)",
+    "dating artifact: effect largest among low-confidence dates",
+    "genre-specific heterogeneity (adventure, historical and sensation genres flat or declining)"
+  ],
+  "evidence_passage_ids": [
+    "p002503",
+    "p006705",
+    "p006662",
+    "p004073",
+    "p004809",
+    "p004674"
+  ],
+  "rationale": "Data: 6,766 works, each with exactly one coded passage, so a work's rate is 0 or 1 for DISTANCE_TRAVEL. All works have a year. Cutoff is 1876: 752 works fall before it and 6,014 after. Estimand: within each genre, take the mean rate of late works minus the mean rate of early works (equal weight per work), then average across the 8 genres with equal weight. Uncertainty comes from a bootstrap that resamples works within each genre-by-period cell (400 replicates). Full sample: effect +0.025, 95% CI [0.002, 0.045], which only barely excludes zero. A WLS regression with genre and period weights that adjusts for genre, origin, date_confidence, log n_editions and log author productivity, with standard errors clustered by author, gives +0.028, CI [0.002, 0.054]. Composition checks: origin and author productivity are balanced across the cutoff. date_confidence is not: high-confidence dates make up 34% of early works and 48% of late ones. n_editions is also higher for early works. Robustness: when I keep only well-dated (high-confidence) works, the effect shrinks to +0.015 with CI [-0.028, 0.048]. Dropping low-confidence works gives +0.020, CI [-0.005, 0.044]. The largest effect is among low-confidence dates (+0.043), which points to a possible dating artifact. Genre results are mixed. Adventure, historical and sensation/mystery are flat or decline. The increases are concentrated in romance (0 of 40 early works coded positive), collection and domestic realist, where early cells are small. Decade means are noisy (for example 1860s 0.105, 1870s 0.059, 1890s 0.114). Alternative explanations: the late-dated or low-confidence works may have been sampled or dated differently; the small early sample makes the baseline unstable; and differences in editions or reprints may affect which early works were included. The cited passages are well-dated late works coded DISTANCE_TRAVEL. They show what the construct captures but cannot establish a trend. Because the contrast does not survive restriction to well-dated works, I abstain."
+}

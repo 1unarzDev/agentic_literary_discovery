@@ -1,0 +1,25 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0328,
+    0.0692
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition change",
+    "date uncertainty (low date_confidence works)",
+    "origin/metadata coverage differences",
+    "sparse early-period sample",
+    "author clustering",
+    "annotation/classifier drift across eras"
+  ],
+  "evidence_passage_ids": [
+    "p000961",
+    "p002985",
+    "p000696",
+    "p004277"
+  ],
+  "rationale": "Methods: every one of the 6766 works has exactly 1 passage, so a work's rate is count__domains__DISTANCE_TRAVEL divided by n_passages. I split works at year 1876 (late = year >= 1876). For each of the 8 genres I took the unweighted mean rate across works in each period, subtracted early from late, and then averaged those 8 differences with equal weight. Result: effect = +0.0517. 95% CI [0.033, 0.069] from 2000 bootstrap resamples of works within each genre-by-period cell. An author-cluster bootstrap gave [0.034, 0.069]. Robustness checks: the difference is positive in all 8 genres (range 0.045 to 0.059). Dropping works dated 1866-1885 gives 0.054. A WLS model controlling for genre, origin, date confidence and log editions, with author-clustered SEs, gives 0.051 [0.034, 0.068]. Decade means sit around 0.05-0.07 from the 1830s to the 1870s and around 0.11-0.12 from the 1880s on. The shift is positive in every origin group (UK 0.069, US 0.063, unknown 0.048) and every date-confidence group, though weaker for low-confidence dates (0.018). Coverage caveats: the early period is small (752 works against 6014 late), and the 1800s-1820s have very few works, so early estimates are noisy. Alternative explanations: the corpus may sample early and late works in different ways, uncertain dates can misplace works around the cutoff, the passage-level domain labelling may behave differently on older texts, and genres may have changed internally. The cited passage IDs are late-period passages labelled DISTANCE_TRAVEL. They only illustrate the construct and do not establish the trend by themselves."
+}

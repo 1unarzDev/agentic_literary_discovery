@@ -1,0 +1,29 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": -0.0258,
+  "ci": [
+    -0.0519,
+    -0.0023
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "genre composition shift (early period has few works per genre)",
+    "date uncertainty (27% low date_confidence)",
+    "origin imbalance (66% unknown origin)",
+    "sparse early sample (558 of 6766 works pre-1876)",
+    "single passage per work (high per-work noise)",
+    "annotation/classifier error in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p000616",
+    "p004194",
+    "p003572",
+    "p003991",
+    "p001671",
+    "p005316",
+    "p003796",
+    "p005731"
+  ],
+  "rationale": "Method: rate = count__domains__DISTANCE_TRAVEL / n_passages per work (each of the 6766 works has exactly 1 passage). Works with year >= 1876 count as late. For each of the 8 genres I took the unweighted mean across works for early and for late, took the difference, then averaged the 8 genre differences with equal weight. Point estimate: -0.026. The 95% CI from a 2000-replicate bootstrap, resampling works within each genre x period cell, is [-0.052, -0.002], which only just excludes zero. The decline comes mostly from adventure (0.217 to 0.141) and historical (0.181 to 0.084). Domestic_realist and sensation_mystery rise slightly, and the other genres change little. Sensitivity: high date-confidence only gives -0.044, medium -0.023, and low +0.012, so the sign flips. Dropping 1866-1885 gives -0.035. A narrow 1856-1895 window gives -0.012. UK works give +0.008, while US (-0.027) and unknown origin (-0.030) are negative. Single-edition works give -0.025. Decade means do not move steadily (0.12-0.15 in the 1830s-1880s, 0.08 in the 1890s, 0.10-0.11 after 1900), which looks more like noise or composition than a clean break at 1876. Coverage: only 558 works are early, and some early genre cells have about 46-65 works with one passage each. That makes estimates in those cells noisy and lets small-sample swings in two genres drive the result. Other explanations: a change in which adventure and historical works were sampled for the early period, errors in dating, and errors in the domain labels. The cited passages are labelled DISTANCE_TRAVEL in both periods and illustrate the construct, but they cannot establish a trend. There is a borderline decrease, but it is not robust across subsets, so I abstain."
+}

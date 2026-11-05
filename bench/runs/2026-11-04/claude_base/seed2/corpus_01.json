@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0805,
+    -0.0217
+  ],
+  "confidence": 0.75,
+  "named_confounds": [
+    "genre composition change (late period dominated by juvenile works)",
+    "sparse early-period sample (about 750 early vs 6000 late works, 1 passage each)",
+    "date uncertainty (effect weak in medium-confidence dates)",
+    "author clustering (up to 110 works per author; bootstrap ignores it)",
+    "annotation/classifier drift across periods",
+    "origin mix (most works have unknown origin)"
+  ],
+  "evidence_passage_ids": [
+    "p005558",
+    "p001393",
+    "p006120",
+    "p000392",
+    "p003694"
+  ],
+  "rationale": "Method: rate = count__domains__DISTANCE_TRAVEL / n_passages per work (every work has exactly 1 passage, 6766 works). Works split at year>=1876. Within each genre I took the equal-weight mean of work rates for each period, computed late minus early, and then averaged across the 8 genres with equal weight. Estimate is -0.050; a stratified bootstrap (genre x period cells, 2000 reps) gives a 95% CI of [-0.080, -0.022]. All 8 genres decline (by -0.04 to -0.06). Robustness checks: the decline holds in UK, US and unknown origin subsets (-0.034 to -0.057), in single-edition works (-0.051), when the 1866-1885 years are dropped (-0.052), and in high-confidence dates (-0.079). It is weaker for medium-confidence dates (-0.009) and is -0.042 for low-confidence dates. Decade means are noisy before 1840 because of small samples. They run about 0.13-0.16 from 1840 to 1870 and about 0.09-0.11 from 1880 to 1920, which fits a step-like drop. Caveats: there are few early works per genre (37-165), the CI does not account for author clustering, the medium-date result is weak, and annotation drift or changes in how passages were sampled could produce this pattern. The cited passage IDs are tagged examples of the construct in early and late works. They illustrate it but do not show the trend."
+}

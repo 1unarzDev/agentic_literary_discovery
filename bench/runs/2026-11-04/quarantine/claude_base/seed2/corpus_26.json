@@ -1,0 +1,29 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    -0.0036,
+    0.0496
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "author clustering (prolific authors)",
+    "date uncertainty (low/medium date_confidence)",
+    "imbalanced early sample (few pre-1876 works per genre)",
+    "genre composition and category boundaries (collection/other)",
+    "single sampled passage per work",
+    "annotation/classifier drift across periods"
+  ],
+  "evidence_passage_ids": [
+    "p003739",
+    "p006027",
+    "p006353",
+    "p005547",
+    "p004499",
+    "p004798",
+    "p005278",
+    "p000649"
+  ],
+  "rationale": "Data: 6,766 works, each with exactly one annotated passage (n_passages=1). No years are missing. The cutoff is 1876, and the late period starts at year>=1876. The early period is thin: only 37 to 165 works per genre, against 353 to 2,051 late. Estimand: in each of the 8 genres I took the mean per-work rate of count__domains__DISTANCE_TRAVEL/n_passages, with every work weighted equally. I then subtracted the early mean from the late mean and averaged those differences across genres with equal weight. Result: +0.0253 passage-rate units. Six genres show an increase (collection +0.075, romance +0.059, juvenile +0.042, historical +0.030, domestic_realist +0.018, other +0.007) and two show a decrease (adventure -0.022, sensation_mystery -0.006). A bootstrap that resamples works within genre-period cells gives a 95% CI of [0.003, 0.046], which only just excludes zero. The reported CI resamples authors instead, because works by the same author are not independent. That interval, [-0.004, 0.050], includes zero. Using only works with high date confidence, the estimate drops to +0.015 with CI [-0.027, 0.052]. The effect is positive for every cutoff I tried (1866: 0.015, 1871: 0.024, 1881: 0.026, 1886: 0.026). Decade means are noisy before 1880 (for example 0.105 in the 1860s and 0.059 in the 1870s) and stay around 0.11 to 0.12 after 1890. So the trend leans upward, but it is small and not robust to author clustering or to dating quality. Alternative explanations: sparse and possibly misdated early works, prolific authors dominating some cells, differences in what the genre labels contain over time, sampling only one passage per work, and annotation behaviour that may differ between older and newer texts. The cited passage IDs are DISTANCE_TRAVEL-coded passages from both periods. They show what the construct looks like but cannot establish a trend on their own. Given these results I abstain. I put the probability of a real, robust increase at about 0.4."
+}

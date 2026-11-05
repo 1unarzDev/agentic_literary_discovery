@@ -1,0 +1,25 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0183,
+  "ci": [
+    -0.0063,
+    0.0407
+  ],
+  "confidence": 0.3,
+  "named_confounds": [
+    "genre composition shift (juvenile/adventure overrepresented late, domestic_realist early)",
+    "date_confidence heterogeneity (low-confidence dates show negative contrast)",
+    "small early-period cells per genre (47-280 works)",
+    "author productivity higher among late works",
+    "single-passage works (n_passages=1, binary rates)"
+  ],
+  "evidence_passage_ids": [
+    "p000250",
+    "p003957",
+    "p004260",
+    "p002517",
+    "p000973"
+  ],
+  "rationale": "6766 works, each with exactly one passage, so the work rate is 0/1. Cutoff is 1876. Early works: 752; late works: 6014. I took the mean rate per genre and period, computed late minus early within each of the 8 genres, and averaged the 8 differences with equal weight. The estimate is +0.018, with a 95% bootstrap CI (2000 resamples within genre-period cells) of [-0.006, 0.041]. The CI includes zero. Genre results disagree: juvenile +0.05, other +0.07, sensation +0.04, but adventure, collection and domestic_realist slightly negative. Genre mix differs sharply by period: juvenile works make up 2128 of 6014 late works but only 84 of 752 early works, so the crude decade trend partly reflects composition. A WLS regression adjusting for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives +0.012, CI [-0.011, 0.034]. Split by date confidence: high +0.031, medium +0.026, low -0.013. n_editions is balanced across periods. Author productivity is somewhat higher among late works. The well-dated subsets lean positive but were not shown to be significant, and the early cells are small. Alternative explanations for the raw increase: the later corpus is weighted toward juvenile and adventure fiction, and errors in assigned dates. Cited passages are examples coded as distance/travel; they do not show a trend. Evidence for a robust shift is not sufficient, so I abstain."
+}

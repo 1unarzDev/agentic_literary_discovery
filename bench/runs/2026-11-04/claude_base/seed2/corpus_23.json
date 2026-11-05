@@ -1,0 +1,30 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0022,
+    0.0452
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "genre composition change (early period small, juvenile-heavy late)",
+    "date uncertainty (27% low-confidence dates)",
+    "sparse early cells (37-165 works per genre before 1876)",
+    "author clustering",
+    "single-passage-per-work sampling",
+    "annotation/classifier drift",
+    "unknown origin for 67% of works"
+  ],
+  "evidence_passage_ids": [
+    "p006432",
+    "p006477",
+    "p003217",
+    "p002503",
+    "p003605",
+    "p001326",
+    "p005518",
+    "p003188"
+  ],
+  "rationale": "Data: 6766 works, one passage each (rate = binary DISTANCE_TRAVEL flag), years 1800-1925, cutoff 1876; only 752 works fall before it. Estimand: work-level rates averaged equally within each genre x period cell, then late-minus-early differences averaged equally across 8 genres. Result +0.025 (2.5 percentage points); 95% CI from a bootstrap stratified by genre x period is [0.002, 0.045], and an author-cluster bootstrap gives a similar [0.001, 0.048]. Six of eight genres go up (romance 0 to 0.059, collection 0.027 to 0.102, juvenile 0.118 to 0.160); adventure and sensation dip slightly. The sign stays positive for cutoffs from 1850 to 1900 (0.009 to 0.045), and the decade means rise from about 0.03-0.07 before 1850 to about 0.11 after 1890. Fragility: keeping only medium or high date confidence gives 0.020 [-0.005, 0.048]; high only gives 0.015 [-0.026, 0.052]; known origin only gives 0.025 [-0.015, 0.057]. Single-edition works give 0.032 [0.008, 0.051], and passage-confidence filtering changes nothing. So the increase is consistent in direction, but its significance is marginal and depends on including works with uncertain dates. Other explanations: small early cells; changes in what gets sampled or digitized within genres; dating errors moving works across the cutoff; drift in how passages were labeled. The cited passage IDs are tagged DISTANCE_TRAVEL and only illustrate the construct; they do not prove a trend. Confidence is moderate."
+}

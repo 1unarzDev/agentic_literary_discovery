@@ -1,0 +1,31 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0029,
+    0.0456
+  ],
+  "confidence": 0.42,
+  "named_confounds": [
+    "early-period sparsity (only 752 of 6766 works before 1876)",
+    "small early cells in romance (n=40, 0 hits) and collection (n=37)",
+    "date uncertainty (low/medium date_confidence for over half of works)",
+    "genre composition shift toward juvenile/adventure in late period",
+    "one passage per work, so rates are binary per work",
+    "annotation/classifier noise in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p001983",
+    "p003625",
+    "p003874",
+    "p001733",
+    "p004640",
+    "p004503",
+    "p005335",
+    "p001532",
+    "p001527",
+    "p002353"
+  ],
+  "rationale": "Methods: The construct is count__domains__DISTANCE_TRAVEL divided by n_passages. Every work has exactly one passage, so each work's rate is 0 or 1. Works are early if year < 1876 and late if year >= 1876. All 6766 works have a year and none are duplicated. I averaged the rate within each genre and period, giving each work equal weight, took the late-minus-early difference in each genre, and averaged those differences across the 8 genres with equal weight. For a 95% CI I ran a stratified bootstrap (2000 resamples) within genre-period cells. Result: the effect is +0.025 passage-rate units, CI [0.003, 0.046]. Six of 8 genres go up and adventure and sensation_mystery go down slightly. Decade means rise roughly from about 0.03-0.08 before 1850 to about 0.11-0.12 after 1890, though the 1870s dip to 0.059. Robustness: the result is fragile. Using only high-date-confidence works gives 0.015, CI [-0.026, 0.055]. Dropping the two genres with very small early samples (romance, where 0 of 40 early works have the domain, and collection, n=37) gives 0.011, CI [-0.014, 0.037]. Using only single-edition works gives 0.032, CI [0.009, 0.051]. The pooled CI only barely excludes zero, and that depends on tiny early cells and uncertain dates. Alternative explanations: changes in which genres were sampled, whether a passage happens to fall in a travel scene when each work has only one passage, dating errors near the cutoff, and labeling noise could all produce a modest apparent rise. The cited passages are examples labeled DISTANCE_TRAVEL from late works. They show what the construct looks like but do not establish a trend. Conclusion: there are signs of an increase, but it does not survive the robustness checks, so I abstain."
+}

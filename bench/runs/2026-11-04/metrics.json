@@ -1,0 +1,815 @@
+{
+  "baseline": {
+    "n_runs": 30,
+    "n_valid": 30,
+    "statuses": {
+      "ok": 30
+    },
+    "models": [],
+    "detection_injected": {
+      "mean": 1.0,
+      "ci": [
+        1.0,
+        1.0
+      ],
+      "n_runs": 10,
+      "n_corpora": 10
+    },
+    "false_claim_null": {
+      "mean": 0.1,
+      "ci": [
+        0.0,
+        0.3
+      ],
+      "n_runs": 10,
+      "n_corpora": 10
+    },
+    "false_claim_by_confound": {
+      "edition_selection_bias": {
+        "mean": 0.5,
+        "ci": [
+          0.0,
+          1.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      },
+      "genre_mix_drift": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      },
+      "origin_composition_drift": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      },
+      "prolific_author_selection": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      },
+      "reprint_date_contamination": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      }
+    },
+    "confound_identified_null": {
+      "mean": 0.0,
+      "ci": [
+        0.0,
+        0.0
+      ],
+      "n_runs": 10,
+      "n_corpora": 10
+    },
+    "confound_identified_by_confound": {
+      "edition_selection_bias": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      },
+      "genre_mix_drift": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      },
+      "origin_composition_drift": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      },
+      "prolific_author_selection": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      },
+      "reprint_date_contamination": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 2,
+        "n_corpora": 2
+      }
+    },
+    "nuisance_column_touched_null": {
+      "mean": 0.0,
+      "ci": [
+        0.0,
+        0.0
+      ],
+      "n_runs": 10,
+      "n_corpora": 10
+    },
+    "abstention_scored": {
+      "mean": 0.0,
+      "ci": [
+        0.0,
+        0.0
+      ],
+      "n_runs": 20,
+      "n_corpora": 20
+    },
+    "brier_scored": {
+      "mean": 0.1990478,
+      "ci": [
+        0.078426245,
+        0.3370394749999998
+      ],
+      "n_runs": 20,
+      "n_corpora": 20
+    },
+    "ci_covers_truth_injected": {
+      "mean": 1.0,
+      "ci": [
+        1.0,
+        1.0
+      ],
+      "n_runs": 10,
+      "n_corpora": 10
+    },
+    "positive_replay_shift_claim_rate": {
+      "mean": 0.2,
+      "ci": [
+        0.0,
+        0.5
+      ],
+      "n_runs": 10,
+      "n_corpora": 10
+    },
+    "evidence_cited_total": 0,
+    "evidence_existence_rate": null,
+    "evidence_validity_rate": null,
+    "cost_usd_per_corpus": null,
+    "cost_usd_total": null,
+    "minutes_per_corpus": {
+      "mean": 0.01043757523111304,
+      "ci": [
+        0.010009544577824271,
+        0.010923978315186407
+      ],
+      "n_runs": 30,
+      "n_corpora": 30
+    },
+    "api_minutes_per_corpus": null,
+    "input_tokens_per_corpus": null,
+    "output_tokens_per_corpus": null,
+    "tool_calls_per_corpus": {
+      "mean": 0.0,
+      "ci": [
+        0.0,
+        0.0
+      ],
+      "n_runs": 30,
+      "n_corpora": 30
+    },
+    "confound_naming_specificity": {
+      "genre_mix_drift": {
+        "own_arm": 0.0,
+        "other_corpora": 0.0
+      },
+      "reprint_date_contamination": {
+        "own_arm": 0.0,
+        "other_corpora": 0.0
+      },
+      "edition_selection_bias": {
+        "own_arm": 0.0,
+        "other_corpora": 0.0
+      },
+      "prolific_author_selection": {
+        "own_arm": 0.0,
+        "other_corpora": 0.0
+      },
+      "origin_composition_drift": {
+        "own_arm": 0.0,
+        "other_corpora": 0.0
+      }
+    },
+    "runs_with_outside_path_refs": 0,
+    "outside_path_refs": [],
+    "n_isolated_runs": 0,
+    "named_confounds_per_answer_by_kind": {
+      "confounded_null": 0.0,
+      "injected_shift": 0.0,
+      "known_positive": 0.0
+    },
+    "nuisance_touched_by_kind": {
+      "confounded_null": 0.0,
+      "injected_shift": 0.0,
+      "known_positive": 0.0
+    },
+    "balanced_accuracy": {
+      "mean": 0.95,
+      "ci": [
+        0.85,
+        1.0
+      ],
+      "n_runs": 20,
+      "n_corpora": 20
+    },
+    "gate_pass_rate_by_seed": {
+      "baseline": true
+    }
+  },
+  "claude_base": {
+    "n_runs": 90,
+    "n_valid": 90,
+    "statuses": {
+      "ok": 90
+    },
+    "models": [
+      "claude-opus-5-5"
+    ],
+    "detection_injected": {
+      "mean": 1.0,
+      "ci": [
+        1.0,
+        1.0
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "false_claim_null": {
+      "mean": 0.1,
+      "ci": [
+        0.0,
+        0.26666666666666666
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "false_claim_by_confound": {
+      "edition_selection_bias": {
+        "mean": 0.3333333333333333,
+        "ci": [
+          0.0,
+          0.8333333333333334
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "genre_mix_drift": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "origin_composition_drift": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "prolific_author_selection": {
+        "mean": 0.16666666666666666,
+        "ci": [
+          0.0,
+          0.6666666666666666
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "reprint_date_contamination": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      }
+    },
+    "confound_identified_null": {
+      "mean": 0.6,
+      "ci": [
+        0.3,
+        0.8666666666666667
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "confound_identified_by_confound": {
+      "edition_selection_bias": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "genre_mix_drift": {
+        "mean": 1.0,
+        "ci": [
+          1.0,
+          1.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "origin_composition_drift": {
+        "mean": 0.8333333333333334,
+        "ci": [
+          0.3333333333333333,
+          1.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "prolific_author_selection": {
+        "mean": 0.16666666666666666,
+        "ci": [
+          0.0,
+          0.6666666666666666
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "reprint_date_contamination": {
+        "mean": 1.0,
+        "ci": [
+          1.0,
+          1.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      }
+    },
+    "nuisance_column_touched_null": {
+      "mean": 0.6666666666666666,
+      "ci": [
+        0.4,
+        0.9
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "abstention_scored": {
+      "mean": 0.1,
+      "ci": [
+        0.0,
+        0.23333333333333334
+      ],
+      "n_runs": 60,
+      "n_corpora": 20
+    },
+    "brier_scored": {
+      "mean": 0.05869,
+      "ci": [
+        0.030449499999999997,
+        0.09529854166666668
+      ],
+      "n_runs": 60,
+      "n_corpora": 20
+    },
+    "ci_covers_truth_injected": {
+      "mean": 1.0,
+      "ci": [
+        1.0,
+        1.0
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "positive_replay_shift_claim_rate": {
+      "mean": 0.6333333333333333,
+      "ci": [
+        0.4,
+        0.8333333333333334
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "evidence_cited_total": 557,
+    "evidence_existence_rate": 1.0,
+    "evidence_validity_rate": 1.0,
+    "cost_usd_per_corpus": {
+      "mean": 0.11503411555555555,
+      "ci": [
+        0.10739235783333334,
+        0.12303142883333332
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "cost_usd_total": 10.353070400000002,
+    "minutes_per_corpus": {
+      "mean": 2.183785782271113,
+      "ci": [
+        1.6026368492447578,
+        2.8792637678683914
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "api_minutes_per_corpus": {
+      "mean": 0.758197962962963,
+      "ci": [
+        0.6157472638888889,
+        1.0751750277777778
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "input_tokens_per_corpus": {
+      "mean": 58588.044444444444,
+      "ci": [
+        54450.637777777774,
+        63082.28166666666
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "output_tokens_per_corpus": {
+      "mean": 3266.766666666667,
+      "ci": [
+        3087.9972222222223,
+        3436.1944444444443
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "tool_calls_per_corpus": {
+      "mean": 4.455555555555556,
+      "ci": [
+        4.155555555555556,
+        4.777777777777778
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "confound_naming_specificity": {
+      "genre_mix_drift": {
+        "own_arm": 1.0,
+        "other_corpora": 1.0
+      },
+      "reprint_date_contamination": {
+        "own_arm": 1.0,
+        "other_corpora": 1.0
+      },
+      "edition_selection_bias": {
+        "own_arm": 0.0,
+        "other_corpora": 0.11904761904761904
+      },
+      "prolific_author_selection": {
+        "own_arm": 0.16666666666666666,
+        "other_corpora": 0.2261904761904762
+      },
+      "origin_composition_drift": {
+        "own_arm": 0.8333333333333334,
+        "other_corpora": 0.8214285714285714
+      }
+    },
+    "runs_with_outside_path_refs": 0,
+    "outside_path_refs": [],
+    "n_isolated_runs": 11,
+    "named_confounds_per_answer_by_kind": {
+      "confounded_null": 5.933333333333334,
+      "injected_shift": 6.333333333333333,
+      "known_positive": 6.133333333333334
+    },
+    "nuisance_touched_by_kind": {
+      "confounded_null": 0.6933333333333336,
+      "injected_shift": 0.78,
+      "known_positive": 0.7266666666666668
+    },
+    "balanced_accuracy": {
+      "mean": 0.95,
+      "ci": [
+        0.8666666666666667,
+        1.0
+      ],
+      "n_runs": 60,
+      "n_corpora": 20
+    },
+    "gate_pass_rate_by_seed": {
+      "seed1": true,
+      "seed2": false,
+      "seed3": true
+    }
+  },
+  "claude_confound_check": {
+    "n_runs": 90,
+    "n_valid": 90,
+    "statuses": {
+      "ok": 90
+    },
+    "models": [
+      "claude-opus-5-5"
+    ],
+    "detection_injected": {
+      "mean": 1.0,
+      "ci": [
+        1.0,
+        1.0
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "false_claim_null": {
+      "mean": 0.1,
+      "ci": [
+        0.0,
+        0.3
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "false_claim_by_confound": {
+      "edition_selection_bias": {
+        "mean": 0.5,
+        "ci": [
+          0.0,
+          1.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "genre_mix_drift": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "origin_composition_drift": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "prolific_author_selection": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "reprint_date_contamination": {
+        "mean": 0.0,
+        "ci": [
+          0.0,
+          0.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      }
+    },
+    "confound_identified_null": {
+      "mean": 0.8333333333333334,
+      "ci": [
+        0.6,
+        1.0
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "confound_identified_by_confound": {
+      "edition_selection_bias": {
+        "mean": 0.16666666666666666,
+        "ci": [
+          0.0,
+          0.5
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "genre_mix_drift": {
+        "mean": 1.0,
+        "ci": [
+          1.0,
+          1.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "origin_composition_drift": {
+        "mean": 1.0,
+        "ci": [
+          1.0,
+          1.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "prolific_author_selection": {
+        "mean": 1.0,
+        "ci": [
+          1.0,
+          1.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      },
+      "reprint_date_contamination": {
+        "mean": 1.0,
+        "ci": [
+          1.0,
+          1.0
+        ],
+        "n_runs": 6,
+        "n_corpora": 2
+      }
+    },
+    "nuisance_column_touched_null": {
+      "mean": 1.0,
+      "ci": [
+        1.0,
+        1.0
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "abstention_scored": {
+      "mean": 0.06666666666666667,
+      "ci": [
+        0.0,
+        0.18333333333333332
+      ],
+      "n_runs": 60,
+      "n_corpora": 20
+    },
+    "brier_scored": {
+      "mean": 0.04968000000000001,
+      "ci": [
+        0.023882124999999997,
+        0.08709183333333326
+      ],
+      "n_runs": 60,
+      "n_corpora": 20
+    },
+    "ci_covers_truth_injected": {
+      "mean": 1.0,
+      "ci": [
+        1.0,
+        1.0
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "positive_replay_shift_claim_rate": {
+      "mean": 0.0,
+      "ci": [
+        0.0,
+        0.0
+      ],
+      "n_runs": 30,
+      "n_corpora": 10
+    },
+    "evidence_cited_total": 532,
+    "evidence_existence_rate": 1.0,
+    "evidence_validity_rate": 1.0,
+    "cost_usd_per_corpus": {
+      "mean": 0.11449188222222222,
+      "ci": [
+        0.1088381181111111,
+        0.12033819633333333
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "cost_usd_total": 10.304269400000003,
+    "minutes_per_corpus": {
+      "mean": 1.125827741046107,
+      "ci": [
+        0.9692798002096894,
+        1.3249730101870558
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "api_minutes_per_corpus": {
+      "mean": 0.5670649999999999,
+      "ci": [
+        0.535284425925926,
+        0.6013195277777776
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "input_tokens_per_corpus": {
+      "mean": 55237.87777777778,
+      "ci": [
+        52168.42111111111,
+        58287.890555555554
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "output_tokens_per_corpus": {
+      "mean": 3315.6,
+      "ci": [
+        3182.4055555555556,
+        3453.5094444444444
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "tool_calls_per_corpus": {
+      "mean": 4.2444444444444445,
+      "ci": [
+        4.011111111111111,
+        4.478055555555551
+      ],
+      "n_runs": 90,
+      "n_corpora": 30
+    },
+    "confound_naming_specificity": {
+      "genre_mix_drift": {
+        "own_arm": 1.0,
+        "other_corpora": 1.0
+      },
+      "reprint_date_contamination": {
+        "own_arm": 1.0,
+        "other_corpora": 1.0
+      },
+      "edition_selection_bias": {
+        "own_arm": 0.16666666666666666,
+        "other_corpora": 0.09523809523809523
+      },
+      "prolific_author_selection": {
+        "own_arm": 1.0,
+        "other_corpora": 0.09523809523809523
+      },
+      "origin_composition_drift": {
+        "own_arm": 1.0,
+        "other_corpora": 1.0
+      }
+    },
+    "runs_with_outside_path_refs": 0,
+    "outside_path_refs": [],
+    "n_isolated_runs": 90,
+    "named_confounds_per_answer_by_kind": {
+      "confounded_null": 4.7,
+      "injected_shift": 5.466666666666667,
+      "known_positive": 4.833333333333333
+    },
+    "nuisance_touched_by_kind": {
+      "confounded_null": 1.0,
+      "injected_shift": 1.0,
+      "known_positive": 1.0
+    },
+    "balanced_accuracy": {
+      "mean": 0.95,
+      "ci": [
+        0.85,
+        1.0
+      ],
+      "n_runs": 60,
+      "n_corpora": 20
+    },
+    "gate_pass_rate_by_seed": {
+      "seed1": true,
+      "seed2": true,
+      "seed3": true
+    }
+  }
+}

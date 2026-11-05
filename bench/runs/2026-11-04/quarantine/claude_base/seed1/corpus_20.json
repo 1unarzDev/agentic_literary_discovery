@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0017,
+    0.0452
+  ],
+  "confidence": 0.45,
+  "named_confounds": [
+    "genre composition imbalance (early period small: 752 of 6766 works)",
+    "date uncertainty (27% low-confidence dates)",
+    "author clustering / prolific authors",
+    "origin mix (66% unknown)",
+    "annotation/classifier drift across period",
+    "cutoff sensitivity"
+  ],
+  "evidence_passage_ids": [
+    "p003523",
+    "p006752",
+    "p001318",
+    "p001154",
+    "p003265",
+    "p005419"
+  ],
+  "rationale": "Method: each work contributes exactly one passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages (0 or 1). I averaged works within each genre-by-period cell (late means year >= 1876), took late minus early within each of the 8 genres, and averaged the 8 genre differences with equal weight. Point estimate: +0.025 passage-rate units. A bootstrap that resamples works within each genre-by-period cell (1000 draws) gives a 95% CI of [0.002, 0.045]. Resampling by author gives [0.000, 0.048]. An OLS with genre, origin and date-confidence controls and author-clustered SEs gives 0.022 with CI [-0.002, 0.045], so that interval includes zero. The sign is positive in every subset I checked: high-confidence dates only 0.015, no low-confidence dates 0.020, UK 0.033, US 0.019, unknown origin 0.028, excluding 'other' and 'collection' 0.020, works from 1850-1900 only 0.014, and alternative cutoffs of 1870 and 1885 give 0.019 and 0.028. Two genres (adventure and sensation_mystery) go down, not up. The weak points are coverage and size. Early cells are small (37-165 works per genre), and romance has 0 of 40 early works with the domain, which inflates its difference. The decade series is noisy: 0.10 in the 1860s, 0.06 in the 1870s, then about 0.09-0.12 afterwards. The effect is small, and its significance depends on the specification and is marginal (the lower bound is near zero). Other possible explanations: changes in genre mix within the 'other' and 'collection' groups, misdated works, a few prolific authors, and labeling drift. The cited passages are only examples of the construct, labeled early and late. They cannot show a trend. Because the evidence for a modest increase is consistent in sign but too weak to call a robust historical shift, I abstain. Note: answer.json could not be written because the disk quota is full, and the file exists but is empty (0 bytes). This stdout JSON is the answer; nothing was deleted to free space."
+}

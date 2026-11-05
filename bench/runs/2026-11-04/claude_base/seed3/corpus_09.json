@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.026,
+  "ci": [
+    0.004,
+    0.046
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "genre composition change (early period small, late period dominant)",
+    "sparse pre-1876 coverage (752 of 6766 works)",
+    "date uncertainty (27% low-confidence dates)",
+    "origin heterogeneity (US subset near zero)",
+    "author clustering",
+    "classifier/annotation drift across periods",
+    "adventure genre runs opposite direction"
+  ],
+  "evidence_passage_ids": [
+    "p004420",
+    "p001389",
+    "p004371",
+    "p002266",
+    "p001165",
+    "p001117"
+  ],
+  "rationale": "Methods: each work has exactly one passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages, which is 0 or 1. I averaged works equally within each genre x period (early <1876, late >=1876), took late minus early for each of the 8 genres, and then averaged those differences with equal genre weights. The estimate is +0.026 passage-rate units. A 95% CI from a bootstrap stratified by genre x period (2000 reps) is [0.004, 0.046], and resampling authors as clusters gives nearly the same interval [0.003, 0.047]. Robustness: the effect stays positive when any single genre is left out (0.019 to 0.038). It is also positive for high-confidence dates only (0.041), when low-confidence dates are excluded (0.019), in a 1856-1896 window (0.022), and for UK (0.021) and unknown-origin (0.032) works. Caveats: the US subset is near zero (0.006). Adventure goes the other way (-0.060), while 7 of 8 genres increase. Coverage is thin before the cutoff (35 to 270 works per genre-period cell), and decade means are fairly flat from the 1840s onward (about 0.07 to 0.11). So the contrast leans partly on noisy early decades, and the lower CI bound is close to zero. Alternative explanations: the early sample may differ in which works and authors survived or were selected; dating errors could move works across the cutoff; the domain labels could drift with vocabulary across periods; and the mix of subgenres within genres may have changed. The cited passage IDs only show passages labelled with this domain and cannot establish the trend themselves. Conclusion: a modest increase that is statistically supported but borderline in size."
+}

@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0037,
+    0.0454
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "early-period sparsity (752 of 6766 works pre-1876; several genre-early cells n<60)",
+    "date uncertainty (52% of works medium/low date confidence; effect smaller in high-confidence subset)",
+    "genre composition shift toward juvenile/adventure in late period",
+    "one passage per work so passage-level sampling noise equals work-level noise",
+    "annotation/classifier drift across text styles",
+    "reprint/edition selection effects"
+  ],
+  "evidence_passage_ids": [
+    "p000328",
+    "p003083",
+    "p000166",
+    "p004873",
+    "p005073",
+    "p004247"
+  ],
+  "rationale": "Methods: each work has exactly one passage, so the work rate is count__domains__DISTANCE_TRAVEL/n_passages (0/1). Works were split at year 1876 (early <1876, late >=1876); per genre I averaged work rates in each period with equal work weights, took late-minus-early differences, and averaged the 8 genre differences equally. 95% CI from a 2000-replicate stratified bootstrap resampling works within genre x period. Result: +0.025 passage-rate units, CI [0.004, 0.045]. Six of eight genres rise (romance 0.00->0.06, collection 0.03->0.10, juvenile 0.12->0.16, historical 0.07->0.10); adventure and sensation_mystery fall slightly. Leave-one-genre-out estimates all stay positive (0.018-0.032). Decade means rise broadly from about 0.03-0.07 (1810s-1840s) to about 0.11-0.12 (1890s-1920s). Caveats: the CI lower bound is close to zero; the early period is thin (752 works, some genre cells only 37-77 works), and the romance and collection early cells pull the estimate up. Restricted to high date-confidence works, the effect is +0.015 with a CI of [-0.024, 0.051] that includes zero, so the result is sensitive to dating. Alternative explanations: changes in genre mix or in which works were sampled or reprinted, annotation drift, and dating error near the cutoff. The cited passage IDs are only examples of passages labeled with the construct; they do not show a trend. Conclusion: a modest increase that is supported by the main analysis but not robust in every check."
+}

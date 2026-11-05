@@ -1,0 +1,25 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0052,
+    0.0449
+  ],
+  "confidence": 0.42,
+  "named_confounds": [
+    "date_confidence imbalance across periods (dating artifact)",
+    "sparse early-period cells per genre",
+    "n_editions imbalance (reprint/canon selection)",
+    "genre composition skew toward late juvenile works",
+    "single passage per work (sampling noise)"
+  ],
+  "evidence_passage_ids": [
+    "p005183",
+    "p000908",
+    "p001576",
+    "p006174",
+    "p000785"
+  ],
+  "rationale": "Method: there are 6,766 works with one passage each. A work's rate is count__domains__DISTANCE_TRAVEL / n_passages. Works dated 1876 or later count as late. I averaged works equally within each genre-by-period cell, took the late-minus-early difference for each of the 8 genres, and averaged those differences equally across genres. The 95% CI comes from 1,000 bootstrap resamples within each genre-by-period cell. Result: effect +0.025, CI [0.005, 0.045]. That would suggest an increase. Six of the 8 genres go up; adventure and sensation_mystery go slightly down. The decade means rise from about 0.03-0.08 before 1860 to about 0.11-0.12 after 1890, though the 1800s decade is noisy (0.17, n=12). Coverage: only 752 works are early and 6,014 are late. Early genre cells are small, with 37 to 165 works each. Artifact checks: origin mix and author productivity are balanced across periods. date_confidence is not: 34% of early works are high-confidence versus 48% of late works. Early works also have more editions on average (1.26 vs 1.06). An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives +0.026, CI [0.001, 0.050]. That is barely above zero. By dating stratum, the effect is +0.043 for low-confidence dates, +0.022 for medium and +0.015 for high. So the contrast is largest where dates are least reliable. Restricted to high-confidence dates, the estimate is +0.015 with CI [-0.029, 0.053], which includes zero. Early cells there have only 10 to 69 works. Origin strata all point the same way (+0.019 to +0.033). Alternative explanations: misdating could put travel-heavy works in the late period. Early survivors may be selected for reprints. Late genres, especially juvenile, may simply contain more travel episodes, so the change may not be a historical shift. The cited passages are late, well-dated works coded for distance/travel. They illustrate the construct but cannot establish a trend. Conclusion: the direction is consistently positive, but the effect does not survive restricting to well-dated works and is only marginal after adjustment. I abstain rather than claim a robust shift."
+}

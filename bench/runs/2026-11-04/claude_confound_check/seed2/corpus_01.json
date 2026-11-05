@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0817,
+    -0.0216
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "genre composition (juvenile/domestic share rises late)",
+    "imbalanced early sample (752 early vs 6014 late works)",
+    "date_confidence heterogeneity",
+    "author productivity differences",
+    "single-passage-per-work sampling noise"
+  ],
+  "evidence_passage_ids": [
+    "p001679",
+    "p005309",
+    "p003357",
+    "p002358",
+    "p004245",
+    "p006286"
+  ],
+  "rationale": "Method: 6,766 works, each with one passage (n_passages=1), all dated. Rate = DISTANCE_TRAVEL count / n_passages. Late means year >= 1876. Within each of the 8 genres I took the work-equal mean rate, computed late minus early, and averaged the 8 differences with equal weight: -0.050. The 95% CI comes from a genre-stratified work bootstrap (2,000 resamples). Robustness: all 8 genres decline (by -0.043 to -0.059 each). The estimate holds within each origin (UK -0.034, US -0.045, unknown -0.057). Among high-date-confidence works it is -0.079 (CI -0.123 to -0.037); it is -0.042 for low and -0.009 for medium. A WLS regression adjusting for genre, origin, log editions, date confidence and log author productivity, with author-clustered SEs, gives -0.050 (CI -0.075 to -0.025). Metadata imbalance is modest: genre mix differs by period, which the stratification handles, and n_editions and author productivity differ only slightly. By decade, rates are about 0.13-0.16 in 1830-1870 and about 0.09-0.11 from 1880 on, so the drop is a step, not driven by one odd decade. Caveats: the early period is thin (752 works, with 37-165 per genre); the medium-confidence stratum shows almost no effect; the passage labels come from an annotation scheme whose drift is unknown; and with one passage per work there is a lot of sampling noise. The cited passages are illustrative examples of the DISTANCE_TRAVEL label, not evidence of the trend."
+}

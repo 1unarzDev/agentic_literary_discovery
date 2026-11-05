@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0834,
+    -0.0219
+  ],
+  "confidence": 0.75,
+  "named_confounds": [
+    "early-period sparsity and imbalance (752 early vs 6014 late works)",
+    "date uncertainty near the cutoff (low/medium date_confidence for ~half of works)",
+    "genre composition shift toward juvenile in late period",
+    "annotation/labeling drift of the domain classifier",
+    "single passage sampled per work",
+    "author clustering not modeled",
+    "non-monotonic decade pattern (1920s rebound)"
+  ],
+  "evidence_passage_ids": [
+    "p003511",
+    "p000260",
+    "p004496",
+    "p000633",
+    "p006392"
+  ],
+  "rationale": "Method: 6766 works, each with exactly 1 passage. Per-work rate = count__domains__DISTANCE_TRAVEL / n_passages. Works were split at 1876 (late = year >= 1876). Within each genre I took the equal-weight mean of work rates for early and for late, computed late minus early, and averaged the 8 genre differences with equal weight. Estimate: -0.050 in passage-rate units. 95% CI [-0.083, -0.022], from 2000 bootstrap resamples of works stratified by genre and period. All 8 genres point the same way (differences from about -0.04 to -0.06). Robustness checks: high date-confidence works only gave -0.059; single-edition works gave -0.047; UK -0.043, US -0.087, unknown origin -0.045. Caveats: decade means are noisy and not monotonic. They peak around 0.16 in the 1830s-1850s, fall to about 0.10 in the 1890s-1910s, and rise to 0.116 in the 1920s. Early cells are small (37 to 165 works per genre), so the early-period estimate depends on few works. Other possible explanations: the domain labels come from a model and may drift with prose style, and dates near the cutoff are uncertain. Authors were not clustered, which may make the CI too narrow. Who and what got sampled into the corpus could also differ between periods. The cited passage IDs are labeled examples of distance/travel passages from both periods. They show what the construct looks like, not the trend itself."
+}

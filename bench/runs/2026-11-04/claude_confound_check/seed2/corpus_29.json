@@ -1,0 +1,25 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0183,
+  "ci": [
+    -0.007,
+    0.0419
+  ],
+  "confidence": 0.3,
+  "named_confounds": [
+    "genre composition shift (domestic_realist dominant early, juvenile dominant late)",
+    "small early-period sample (752 of 6766 works before 1876)",
+    "date_confidence heterogeneity (effect is -0.013 in low-confidence works)",
+    "author productivity higher among late works"
+  ],
+  "evidence_passage_ids": [
+    "p003957",
+    "p004260",
+    "p002517",
+    "p000973",
+    "p001688",
+    "p002355"
+  ],
+  "rationale": "Every work has one passage (n_passages=1), so the rate is a 0/1 flag for DISTANCE_TRAVEL. I split works into early (<1876) and late (>=1876). For each genre I took the mean over works of late minus early, then averaged the 8 genres with equal weight. Effect = +0.018, with a 95% CI from a 400-replicate bootstrap stratified by genre x period of [-0.007, 0.042], which includes zero. Composition checks: the genre mix changes a lot across the cutoff (domestic_realist is 37% of early works vs 15% of late; juvenile is 11% vs 35%). Because juvenile has a high travel rate and domestic_realist a low one, the raw decade means rise from about 0.05 to 0.12. Most of that rise is a composition effect. Within genres the changes are mixed: juvenile, other and sensation go up, while adventure, collection and domestic_realist go slightly down. Origin, date_confidence and n_editions are roughly balanced across periods. Author productivity is a bit higher late. Restricting to high-confidence dates gives +0.031 with CI [-0.006, 0.064], still including zero. Low-confidence dates give -0.013. A WLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives +0.012 with CI [-0.011, 0.034]. No specification excludes zero. The early cells are small (47-280 works per genre), so a modest true increase cannot be ruled out. The passage IDs only show that the construct appears in the texts; they do not show a trend."
+}

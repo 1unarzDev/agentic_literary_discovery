@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0077,
+  "ci": [
+    -0.036,
+    0.012
+  ],
+  "confidence": 0.1,
+  "named_confounds": [
+    "author productivity imbalance (late works come from far more prolific authors: mean 22.4 vs 9.6 works per author)",
+    "genre composition change (juvenile share rises 28% to 33%)",
+    "small early sample (752 early vs 6014 late works)",
+    "date_confidence heterogeneity",
+    "origin largely unknown (about 66%)"
+  ],
+  "evidence_passage_ids": [
+    "p006041",
+    "p005821",
+    "p003710",
+    "p000553",
+    "p000323",
+    "p004291"
+  ],
+  "rationale": "There are 6766 works, each with exactly one coded passage (n_passages=1), so the work rate is 0 or 1 for DISTANCE_TRAVEL. 726 passages carry this tag. Cutoff year 1876: 752 works fall before it and 6014 on or after. Estimand: within each genre, late mean rate minus early mean rate, with every work weighted equally; the 8 genre differences are then averaged with equal weight. Result: -0.0077, with a 95% bootstrap CI (stratified by genre and period) of [-0.036, 0.012]. The CI includes zero. Genre differences point in mixed directions (adventure, juvenile, romance and sensation go up; collection, domestic, historical and other go down). Decade means move up and down with no trend (0.07 to 0.19 early, about 0.10 to 0.11 late). Composition checks: period is associated with author productivity, with genre mix (juvenile share up), and slightly with date_confidence and origin. A Poisson GLM adjusting for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives a late coefficient of -0.001 (95% CI -0.22 to 0.22). Restricting to high-confidence dates gives -0.024 [-0.062, 0.013]. Strata by origin and by productivity tercile give small effects of inconsistent sign. Because the early group is small and passages are binary, uncertainty is large, but the data are consistent with no robust change. The cited passage IDs only show that the construct is coded in the corpus; they say nothing about a trend."
+}

@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.0318,
+    0.0206
+  ],
+  "confidence": 0.08,
+  "named_confounds": [
+    "origin composition (late period dominated by unknown-origin works)",
+    "sparse and unbalanced early period (752 of 6766 works before 1876)",
+    "genre mix",
+    "dating uncertainty (date_confidence)",
+    "single passage per work"
+  ],
+  "evidence_passage_ids": [
+    "p002210",
+    "p001807",
+    "p003564",
+    "p004924",
+    "p005975",
+    "p001949"
+  ],
+  "rationale": "Construct: DISTANCE_TRAVEL domain rate, measured as count/n_passages per work. Every work has exactly one passage, so each work's rate is 0 or 1. Estimand: for each genre, the mean late-period work rate (year >= 1876) minus the mean early-period work rate; then the unweighted average of those differences across the 8 genres. Result: -0.0048. A 95% CI from a bootstrap of works within each genre-period cell (2000 resamples) is [-0.032, 0.021]. Raw rates are 0.109 early and 0.107 late. Decade means move between 0.07 and 0.15 with no trend. Artifact checks: early works are only 11% of the corpus. Origin is associated with year (mean year UK 1891, US 1896, unknown 1904). n_editions, author productivity and date_confidence are balanced across the cutoff. Robustness checks: restricting to high-confidence dates gives -0.009 [-0.051, 0.029]. Within origin, UK gives -0.033, US +0.021 and unknown -0.012, and all three CIs include 0. An OLS model adjusting for genre, origin, date_confidence, n_editions and log author productivity, with SEs clustered by author, gives a late coefficient of -0.005 [-0.026, 0.016]. A linear year term is null (p=0.92). Genre explains far more variation than period does. The cited passage IDs are travel-domain passages from well-dated works from both periods, chosen by random sampling; they only show what the code captures and are not trend evidence. Alternative explanations for a small apparent difference include sampling noise in the thin early cells and origin or genre composition. None of the checks gives evidence of a robust historical change."
+}

@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0314,
+    0.069
+  ],
+  "confidence": 0.88,
+  "named_confounds": [
+    "unbalanced sampling across periods (pre-1876 works are a small share, ~11%)",
+    "genre mix changing over time",
+    "author clustering",
+    "uncertain dating (low/medium date_confidence)",
+    "unknown origin dominating the late period",
+    "annotation/classifier drift across period language",
+    "the cutoff falls inside a gradual trend, not at a break"
+  ],
+  "evidence_passage_ids": [
+    "p001045",
+    "p002079",
+    "p002184",
+    "p004492",
+    "p004140",
+    "p005671",
+    "p005026"
+  ],
+  "rationale": "Data: 6766 works, one passage each (n_passages=1), dated 1800-1925, in 8 genres. Early (<1876) n=752 and late n=6014. Method: for each work, rate = count__domains__DISTANCE_TRAVEL / n_passages. I averaged works equally within each genre and period, took late minus early per genre, then averaged the 8 genres with equal weight. Estimate +0.052 passage-rate units. 95% CI [0.031, 0.069] from 2000 bootstrap draws, resampling works within each genre x period cell. An author-cluster bootstrap gives a similar CI [0.032, 0.071]. Robustness: the late-minus-early difference is positive in every genre (+0.045 to +0.059). It holds with high-date-confidence works only (+0.049), with high+medium (+0.053), within UK (+0.039), US (+0.032) and unknown origin (+0.064), and in a narrow 1856-1895 window (+0.040). By decade the rate climbs gradually from about 0.04-0.07 before 1880 to about 0.09 in the 1880s and 0.11-0.12 after 1890. So the change looks like a gradual rise rather than a sharp break at 1876. Caveats: early cells are small, and two genres (domestic_realist, romance) have zero early hits from 164 and 40 works, so those per-genre contrasts are noisy. Rates come from one passage per work, so they are coarse. Alternative explanations: the annotation scheme may tag travel more readily in later language; the selection of which works survive or were sampled may differ by period; and the late period is dominated by works of unknown origin. Because the effect is consistent across genres, origins and dating-quality subsets, sampling artifacts are a less likely explanation, but they cannot be ruled out. The cited passage IDs are passages tagged DISTANCE_TRAVEL, from both periods; they only illustrate the construct and do not establish the trend."
+}

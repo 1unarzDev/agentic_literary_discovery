@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0033,
+    0.0455
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "early-period sparsity (752 of 6766 works before 1876; some genre-period cells have only 37-51 works)",
+    "date uncertainty (about half of works have low or medium date confidence)",
+    "genre composition and labeling",
+    "origin imbalance (most works have unknown origin)",
+    "one passage per work, so the rate is a 0/1 indicator from a single sampled passage",
+    "passage annotation/classifier error"
+  ],
+  "evidence_passage_ids": [
+    "p006477",
+    "p003217",
+    "p002503",
+    "p003605",
+    "p004892",
+    "p002089"
+  ],
+  "rationale": "Method: each of the 6766 works has one passage (n_passages=1), so the work rate is count__domains__DISTANCE_TRAVEL/1. Works are early if year<1876 and late otherwise. Within each genre I took the equal-weight mean of work rates for late minus early, then averaged across the 8 genres with equal weight. Estimate: +0.0253 passage-rate units. The 95% CI from a 2000-draw bootstrap stratified by genre and period is [0.0033, 0.0455]. An OLS check with genre and origin fixed effects and HC1 errors gave +0.024 [0.004, 0.045]. Dropping any one genre leaves the estimate positive (0.018 to 0.032). Decade means rise roughly from 0.03-0.08 (1810s-1850s) to 0.11-0.12 (1890s-1920s). Robustness is weak, though. Among high-date-confidence works only, the estimate is +0.015 with CI [-0.024, 0.056]. A narrow 1857-1895 window gives just +0.010. Early cells are small, and some genres (romance at 0/40, collection) drive much of the gap. Adventure and sensation_mystery show small decreases. Alternative explanations: changes over time in which works or passages were sampled, genre mix or labels shifting within the corpus, dating error placing works on the wrong side of the cutoff, and annotation drift. The passages cited are tagged with this domain and only show what the construct looks like; they cannot establish the trend. Conclusion: a modest increase that is statistically supported in the full data but fragile, so confidence is moderate."
+}

@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0846,
+    -0.0237
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "genre composition shift (juvenile over-represented late, historical/domestic_realist early)",
+    "small early sample (752 pre-1876 vs 6014 late works)",
+    "origin heterogeneity (UK subset shows no decrease)",
+    "date_confidence / dating error",
+    "author productivity"
+  ],
+  "evidence_passage_ids": [
+    "p006051",
+    "p000480",
+    "p002331",
+    "p003497",
+    "p004088",
+    "p003960"
+  ],
+  "rationale": "Method: there is one passage per work (n_passages=1 for all 6766 works), so each work's rate is count__domains__DISTANCE_TRAVEL divided by n_passages. Works dated 1876 or later count as late. Within each genre I took the equal-work mean late minus the equal-work mean early, then averaged that difference equally across the 8 genres. The 95% CI comes from 1000 bootstrap resamples drawn within each genre-period cell. Result: -0.050 [-0.085, -0.024]. The decrease shows up in every one of the 8 genres, with within-genre differences from -0.04 to -0.06. Composition checks: genre mix changes a lot across the cutoff (juvenile is 21% of early works and 34% of late; historical drops from 22% to 10%). Genre-stratified estimation handles this. Origin, date_confidence, n_editions and author productivity are roughly balanced between periods. I also ran a regression weighted by n_passages, with standard errors clustered by author, adjusting for genre, origin, date_confidence, log editions and log author productivity. The late coefficient was -0.051 [-0.076, -0.026]. Restricting to works with high date confidence gave -0.043 [-0.087, -0.003]. Narrowing the window around the cutoff gave -0.068 for 1856-1895 and -0.075 for 1866-1885, both with CIs excluding zero. Caveats: only 752 works are early, so early cell sizes are small (37-165 per genre). The UK subset shows no decrease (+0.014 [-0.036, 0.059], with only 124 early works), while US works and works of unknown origin both decrease. Decade means are not monotonic: they peak in the 1830s and again in the 1860s-70s, then sit flat around 0.10 from the 1880s on. So the change looks more like a step than a steady trend. Other possible explanations are differences in how passages were sampled or annotated across periods, and genre labels that may mean different things in different periods. Passage IDs only illustrate what the construct looks like in the data. They do not establish the trend."
+}

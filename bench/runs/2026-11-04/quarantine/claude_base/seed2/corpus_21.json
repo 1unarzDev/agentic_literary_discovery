@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0063,
+    0.0463
+  ],
+  "confidence": 0.62,
+  "named_confounds": [
+    "date_confidence (low-confidence dates drive larger effect)",
+    "sparse early cells (e.g., romance early n=40 with 0 hits; collection early n=37)",
+    "genre composition / juvenile dominance late",
+    "author clustering (prolific authors)",
+    "origin mix (67% unknown)",
+    "annotation/classifier drift across periods",
+    "imbalanced period sizes (early ~752 vs late ~6014 works)"
+  ],
+  "evidence_passage_ids": [
+    "p005744",
+    "p001038",
+    "p005899",
+    "p004030",
+    "p001982",
+    "p002557"
+  ],
+  "rationale": "Data: 6,766 works, one annotated passage each (n_passages=1). Years 1800-1925; cutoff 1876 (late = year>=1876). Rate = count__domains__DISTANCE_TRAVEL / n_passages. Estimand: average the works within each genre-period cell equally, take the late-minus-early difference in each of the 8 genres, then average those 8 differences equally. Result: +0.0253 passage-rate units. 95% CI [0.0063, 0.0463] from 400 bootstrap resamples stratified by genre-period cell; an author-cluster bootstrap gave a similar CI [0.0045, 0.0479]. Six of 8 genres point upward (collection +0.075, romance +0.059, juvenile +0.042, historical +0.030, domestic +0.018, other +0.007); adventure (-0.022) and sensation (-0.006) point down. Dropping any one genre leaves the effect between 0.018 and 0.032. By decade, rates rise from about 0.03-0.08 before 1860 to about 0.09-0.12 after 1880. Caveats that reduce confidence: high-date-confidence works alone give +0.015 and low-confidence works +0.043. A narrow 1856-1895 window gives +0.013 with a CI that includes zero [-0.019, 0.046]. Early cells are small; romance is 0/40. Alternative explanations: the corpus samples periods differently, genre labels may mean different things in each period, dating is imprecise around the cutoff, prolific authors weigh heavily, and annotation may have drifted. The passage IDs are random examples of the coded construct. They illustrate it but cannot establish the trend. The full-period increase is statistically supported but modest, and it weakens under the stricter checks. So I report a shift with moderate confidence."
+}

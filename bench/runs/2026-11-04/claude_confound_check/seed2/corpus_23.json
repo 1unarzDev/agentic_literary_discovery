@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0007,
+    0.0449
+  ],
+  "confidence": 0.33,
+  "named_confounds": [
+    "date_confidence imbalance (early period has more low/medium-dated works; effect concentrated in low-confidence dates)",
+    "sparse early-period cells (e.g. romance n=40 with 0 hits, collection n=37)",
+    "n_editions composition (reprinted works over-represented before 1876)",
+    "genre mix shift toward juvenile after 1876",
+    "one passage per work so work rate is binary, which makes it noisy"
+  ],
+  "evidence_passage_ids": [
+    "p006432",
+    "p003217",
+    "p002503",
+    "p006477",
+    "p003301",
+    "p001513"
+  ],
+  "rationale": "Data: 6766 works, all dated, each with exactly 1 passage, so the work rate is 0/1. With cutoff 1876 there are 752 early and 6014 late works. Estimand: within each genre, the mean work rate late minus early, then an unweighted mean across 8 genres. The result is +0.025, with a stratified bootstrap 95% CI of [0.0007, 0.045] (1000 reps, resampled within genre x period). That CI only just excludes zero. A WLS with genre, origin, date_confidence, log n_editions and log author productivity, with author-clustered SEs, gives +0.026 [0.001, 0.050]. Artifact checks: year is associated with metadata. Early works are more often low/medium date_confidence (66% vs 52%), and early works have more editions (mean 1.26 vs 1.06). Author productivity is balanced. Restricted to high-date-confidence works, the effect falls to +0.015 with CI [-0.029, 0.053], which includes zero. Within the low-confidence works it is +0.043, so a dating artifact could explain much of the signal. Restricted to single-edition works it is +0.032 [0.007, 0.053]. Origin strata are all positive (0.019 to 0.033). Dropping any one genre gives 0.018 to 0.032. The genres disagree: adventure and sensation_mystery decline. Several early cells are small, and romance has n=40 with 0 hits, which inflates the equal-genre average. The decade means are non-monotonic (the 1870s dip at 0.059). Cited passages are examples of DISTANCE_TRAVEL coding from both periods and are not evidence of a trend. Conclusion: a small positive contrast is visible, but it does not hold up when restricted to well-dated works and it depends on sparse early cells. So I abstain rather than claim a robust shift."
+}

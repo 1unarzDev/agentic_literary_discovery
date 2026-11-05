@@ -1,0 +1,25 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0823,
+    -0.022
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "genre composition shift (juvenile share rises, historical share falls after 1876)",
+    "small early-period sample (752 of 6766 works)",
+    "date uncertainty (low/medium date_confidence)",
+    "passage-level annotation error"
+  ],
+  "evidence_passage_ids": [
+    "p001679",
+    "p005309",
+    "p003357",
+    "p002358",
+    "p004245",
+    "p006286"
+  ],
+  "rationale": "Method: each work has one passage, so the work rate is count__domains__DISTANCE_TRAVEL / n_passages. I split works at 1876 (early = year < 1876), averaged rates over works within each genre-period cell, and then took the mean of the late-minus-early differences across the 8 genres, each weighted equally. Result: -0.050. The 95% CI from 400 bootstrap resamples, stratified by genre and period, is [-0.082, -0.022]. Robustness: all 8 genres point the same way, with drops of 0.04 to 0.06. Restricting to well-dated works (date_confidence=high) gives -0.079 [-0.124, -0.033]. An OLS model adjusting for genre, origin, date_confidence, log n_editions and log author productivity, with SEs clustered by author, gives -0.050 [-0.075, -0.025]. The estimate is also negative within each origin stratum: UK -0.034, US -0.045, unknown -0.057. Composition checks: year is linked to genre (juvenile 21% early vs 34% late; historical 22% vs 10%). Equal genre weighting and stratification handle this. Origin, date_confidence, n_editions (1.13 vs 1.07) and author productivity (18 vs 21) are similar across periods. Decade means are about 0.13-0.16 from the 1830s to the 1870s and about 0.09-0.11 from the 1880s on. That looks like a level drop around the cutoff rather than a smooth trend. A linear year slope within genre is small, which matches a step pattern. Caveats: the early sample is small (752 works, and some genre cells have only about 40), the pre-1830 decades are very sparse, and the domain labels are annotations of single sampled passages. Other explanations I cannot rule out include changes in which works were selected or sampled after 1876, and classifier drift in how travel is labelled. The cited passage IDs are passages labelled DISTANCE_TRAVEL. They only show what the construct looks like and do not establish the trend."
+}

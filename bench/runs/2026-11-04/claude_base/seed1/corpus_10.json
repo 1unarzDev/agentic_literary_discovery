@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0038,
+    0.0452
+  ],
+  "confidence": 0.65,
+  "named_confounds": [
+    "genre composition shift (late period dominated by juvenile works)",
+    "sparse early-period cells (e.g. romance n=40, collection n=37)",
+    "date uncertainty (low/medium date_confidence for over half of works)",
+    "one passage per work so rates are binary and noisy",
+    "annotation/classifier drift across period language",
+    "origin mix (majority unknown)"
+  ],
+  "evidence_passage_ids": [
+    "p004228",
+    "p001289",
+    "p004021",
+    "p000605",
+    "p004697",
+    "p005122"
+  ],
+  "rationale": "Methods: 6766 works, one annotated passage each; rate = count__domains__DISTANCE_TRAVEL / n_passages. Early = year<1876, late = year>=1876. Within each of 8 genres, works averaged with equal weight per period; late-minus-early differences averaged with equal genre weight. 95% CI from 2000 bootstrap resamples of works stratified by genre x period. Result: +0.025 passage-rate units, CI [0.004, 0.045]. 6 of 8 genres increase (adventure and sensation_mystery decrease slightly). Decade means rise from ~0.03-0.07 pre-1850 to ~0.11-0.12 after 1890. Sensitivity: the effect stays positive within high (0.015), medium (0.022) and low (0.043) date-confidence subsets, within UK, US and unknown origin, and in a narrow 1850-1899 window (0.018). Caveats: the early period is thin (about 750 works vs 6000 late), and some genre cells are tiny. Romance (0/40 early) and collection contribute a large share of the effect. Point estimates are weaker for well-dated works, and the CI lower bound is close to zero. Alternative explanations include changes in corpus sampling or genre makeup, and labeling drift. The cited passages are travel-tagged passages from late works. They show the construct but cannot establish the trend on their own. Overall: a modest increase, supported with moderate confidence."
+}

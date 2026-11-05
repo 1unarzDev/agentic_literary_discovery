@@ -1,0 +1,97 @@
+{
+  "condition": "base",
+  "token_budget": 8000,
+  "token_budget_enforcement": "prompt_only",
+  "workdir": "/tmp/bench-agent-runs/bench-agent-0d_d24pc",
+  "status": "ok",
+  "returncode": 0,
+  "elapsed": 52.13495453700307,
+  "summary": {
+    "model": "claude-opus-5-5",
+    "cli_version": "2.1.318",
+    "tools_available": [
+      "Bash",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Read",
+      "Write"
+    ],
+    "duration_ms": 51450,
+    "duration_api_ms": 27350,
+    "num_turns": 4,
+    "total_cost_usd": 0.0792484,
+    "usage": {
+      "input_tokens": 8,
+      "cache_creation_input_tokens": 5341,
+      "cache_read_input_tokens": 33657,
+      "output_tokens": 2289,
+      "output_tokens_details": {
+        "thinking_tokens": 37
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 5341
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 820,
+          "cache_read_input_tokens": 10825,
+          "cache_creation_input_tokens": 999,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 999,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "modelUsage": {
+      "claude-opus-5-5": {
+        "inputTokens": 8,
+        "outputTokens": 2289,
+        "cacheReadInputTokens": 33657,
+        "cacheCreationInputTokens": 5341,
+        "webSearchRequests": 0,
+        "costUSD": 0.0792484,
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "thinkingTokens": 37,
+        "cacheCreationEphemeral5mInputTokens": 5341,
+        "cacheCreationEphemeral1hInputTokens": 0,
+        "canonicalModel": "claude-opus-5-5",
+        "provider": "firstParty",
+        "costBasis": "list"
+      }
+    },
+    "is_error": false,
+    "subtype": "success",
+    "tool_calls": [
+      {
+        "tool": "Bash",
+        "input": "cd /tmp/bench-agent-runs/bench-agent-0d_d24pc; ls; cat task.json; python -I -c \"\nimport pandas as pd\nw=pd.read_parquet('works.parquet');p=pd.read_parquet('passages.parquet')\nprint(w.head());print(w.dtypes);print(p.head());print(p.dtypes);print(len(w),len(p))\nfor c in w.columns:\n  if w[c].nunique()<20: print(w[c].value_counts())\nfor c in p.columns:\n  if p[c].nunique()<20: print(p[c].value_counts())\n\""
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /tmp/bench-agent-runs/bench-agent-0d_d24pc; python -I -c \"\nimport pandas as pd,numpy as np\nw=pd.read_parquet('works.parquet')\nprint(w.year.isna().sum(), w.work_id.nunique())\nw=w.dropna(subset=['year'])\nc='count__domains__DISTANCE_TRAVEL'\nw['r']=w[c]/w.n_passages; w['late']=w.year>=1876\nprint(w.groupby(['genre','late']).r.agg(['mean','count']).unstack())\ndef est(d):\n  g=d.groupby(['genre','late']).r.mean().unstack(); return (g[True]-g[False]).mean()\ne=est(w); rng=np.random.default_rng(0); bs=[]\nfor i in range(2000):\n  bs.append(est(w.groupby(['genre','late'],group_keys=False).apply(lambda x:x.sample(len(x),replace=True,random_state=rng.integers(1e9)))))\nprint(e,np.percentile(bs,[2.5,97.5]))\nfor dc in ['high','medium','low']:\n  print(dc,est(w[w.date_confidence==dc]))\nfor o in ['UK','US','unknown']: print(o,est(w[w.origin==o]))\nprint(w.groupby('decade').r.mean())\nprint(est(w[(w.year<1866)|(w.year>=1886)]))\n\""
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /tmp/bench-agent-runs/bench-agent-0d_d24pc; python -I -c \"\nimport pandas as pd,numpy as np\nw=pd.read_parquet('works.parquet')\nc='count__domains__DISTANCE_TRAVEL'\nw['r']=w[c]/w.n_passages; w['late']=w.year>=1876\ndef est(d):\n  g=d.groupby(['genre','late']).r.mean().unstack(); return (g[True]-g[False]).mean()\ne=est(w); rng=np.random.default_rng(0); bs=[]\nidx=[g.index.values for _,g in w.groupby(['genre','late'])]\nfor i in range(2000):\n  s=np.concatenate([rng.choice(ix,len(ix)) for ix in idx]); bs.append(est(w.loc[s]))\nprint(e,np.percentile(bs,[2.5,97.5]))\n# author cluster bootstrap\na=w.author_key.unique(); g=w.groupby('author_key').groups; bs2=[]\nfor i in range(1000):\n  s=np.concatenate([g[k] for k in rng.choice(a,len(a))]); bs2.append(est(w.loc[s]))\nprint(np.percentile(bs2,[2.5,97.5]))\nfor dc in ['high','medium','low']: print(dc,est(w[w.date_confidence==dc]))\nfor o in ['UK','US','unknown']: print(o,est(w[w.origin==o]))\nprint(w.groupby('decade').r.mean().round(3).to_dict())\nprint(est(w[(w.year<1866)|(w.year>=1886)]))\nprint(w[(w[c]>0)&w.late].sample(3,random_state=1).sample_passage_ids.tolist(), w[(w[c]>0)&~w.late].sample(2,random_state=1).sample_passage_ids.tolist())\n\""
+      }
+    ],
+    "n_tool_calls": 3
+  },
+  "final_text": "```json\n{\n  \"claim\": \"no_shift\",\n  \"direction\": \"none\",\n  \"effect\": 0.0082,\n  \"ci\": [-0.0166, 0.0306],\n  \"confidence\": 0.12,\n  \"named_confounds\": [\"genre composition change over time\", \"sparse early-period sample\", \"dating uncertainty near cutoff\", \"national origin imbalance\", \"author clustering\", \"single-passage-per-work sampling noise\"],\n  \"evidence_passage_ids\": [\"p005438\", \"p005402\", \"p005763\", \"p006005\", \"p000654\"],\n  \"rationale\": \"Method: there are 6,766 works with one passage each, and every work has a year. Each work's rate is count__domains__DISTANCE_TRAVEL divided by n_passages. Works dated 1876 or later count as late; earlier works count as early. For each of the 8 genres I took the unweighted mean of work rates in each period and subtracted early from late. I then averaged those 8 differences with equal weight. Estimate: +0.0082 passages per passage. The 95% CI comes from a bootstrap that resampled works within each genre and period (2,000 draws): [-0.0166, 0.0306]. A bootstrap clustered by author gave a similar interval: [-0.0156, 0.0293]. Coverage: the early period is thin, with 752 works against 6,014 late works. Some early genre cells hold only 38-123 works, so the early means are noisy. Robustness: the genre differences do not agree. Historical (+0.04) and romance (+0.035) go up, while adventure (-0.026) and juvenile (-0.015) go down. Splitting by date confidence gives +0.023 for high, +0.009 for medium and -0.017 for low. Splitting by origin gives UK -0.017 and US +0.032. Dropping works within 10 years of the cutoff gives -0.003. Decade means stay flat at about 0.10-0.12 from the 1830s to the 1910s, with a small dip in the 1920s. Alternative explanations for any apparent difference: changes in which genres and countries are represented, uneven sampling of early works, misdated works near the cutoff, and noise from using a single passage per work. The cited passage IDs are works whose passage is coded for the distance/travel domain, from both periods. They only show that the domain is present and say nothing about a trend. Conclusion: the evidence does not support a robust historical shift.\"\n}\n```",
+  "stderr": "",
+  "corpus_id": "corpus_25"
+}

@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.032,
+    0.021
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "early-period sparsity (only 752 of 6766 works before 1876)",
+    "genre composition imbalance across periods",
+    "date uncertainty (half of works have low/medium date confidence)",
+    "origin mix (most works of unknown origin)",
+    "single-passage sampling per work"
+  ],
+  "evidence_passage_ids": [
+    "p003494",
+    "p003935",
+    "p002270",
+    "p004558",
+    "p002691",
+    "p006477"
+  ],
+  "rationale": "Each work contributes one passage, so a work's rate is count__domains__DISTANCE_TRAVEL divided by n_passages (0 or 1). Early means year<1876 and late means year>=1876. Within each of the 8 genres I took the equal-work mean rate for early and late works, computed late minus early, and averaged across genres with equal weight. Result: -0.0048. A stratified bootstrap (2000 reps, resampling works within each genre-by-period cell) gives a 95% CI of [-0.032, 0.021], which includes zero. The genre differences point in different directions: adventure +0.05, collection -0.06, romance -0.03, and the rest near zero. The sign also depends on the subset. High-date-confidence works give -0.034 and low-confidence works give +0.036. Dropping 1866-1885 gives -0.018. By origin, UK is -0.028, US -0.005 and unknown +0.006. Decade means move around 0.04-0.17 early, where samples are small, and settle near 0.10-0.11 later, with no clear trend. Coverage: 6766 works from 1800 to 1925, but only 752 early, with as few as 39-41 early works in some genres, so early estimates are noisy. Possible alternative explanations for any apparent difference are changes in genre or origin mix, dating errors near the cutoff, and how passages were sampled and labeled. The cited passage IDs are passages tagged with this domain from both periods. They show the construct exists in the corpus but say nothing about a trend. Conclusion: the data do not support a robust shift."
+}

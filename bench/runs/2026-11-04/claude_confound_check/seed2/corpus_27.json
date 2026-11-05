@@ -1,0 +1,28 @@
+{
+  "claim": "abstain",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0072,
+    0.0459
+  ],
+  "confidence": 0.5,
+  "named_confounds": [
+    "genre composition shift (juvenile share 21%->34%, historical 22%->10%)",
+    "date_confidence imbalance (high-confidence dating 34% early vs 48% late)",
+    "small early sample (752 of 6766 works pre-1876; some genre cells 37-57 works)",
+    "loss of significance when restricted to well-dated works",
+    "n_editions difference between periods"
+  ],
+  "evidence_passage_ids": [
+    "p001653",
+    "p001211",
+    "p001035",
+    "p004503",
+    "p000961",
+    "p005056",
+    "p001612",
+    "p006085"
+  ],
+  "rationale": "Each work has exactly one passage, so a work's rate is 0/1 for DISTANCE_TRAVEL. Estimand: for each of 8 genres, take the late (>=1876) minus early mean of work rates, then average the genres with equal weight. Result +0.025 (bootstrap within genre x period, 400 reps, 95% CI 0.007-0.046). Six of 8 genres are positive. Decade means rise loosely from about 0.03-0.08 (1810s-1850s) to about 0.11-0.12 (1890s-1910s); the 1870s dip to 0.06 and the 1800s (n=12) sit at 0.17. Checks: genre mix changes a lot across the cutoff, but the estimand already stratifies by genre. Origin mix is stable and the effect holds within UK (+0.033), US (+0.019) and unknown (+0.028). OLS adjusted for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives +0.026 (CI 0.001-0.050, p=0.04), which is barely significant. Late works are more often high-confidence dated. Restricted to high-confidence dates the effect shrinks to +0.015 (CI -0.025 to 0.053) and is no longer distinguishable from zero. The effect is largest among low-confidence dates (+0.043), which fits a dating artifact. Alternative explanations: changes in the sampling of early works, misdated early works, shifts in subgenre (e.g. more juvenile travel stories) within the broad genre labels, and noise from small early cells. The passage IDs only show the travel/distance domain in use and cannot establish a trend. Overall the evidence leans toward an increase but does not hold up under the well-dated check, so I abstain."
+}

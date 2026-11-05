@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": 0.0082,
+  "ci": [
+    -0.0166,
+    0.0306
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition change over time",
+    "sparse early-period sample",
+    "dating uncertainty near cutoff",
+    "national origin imbalance",
+    "author clustering",
+    "single-passage-per-work sampling noise"
+  ],
+  "evidence_passage_ids": [
+    "p005438",
+    "p005402",
+    "p005763",
+    "p006005",
+    "p000654"
+  ],
+  "rationale": "Method: there are 6,766 works with one passage each, and every work has a year. Each work's rate is count__domains__DISTANCE_TRAVEL divided by n_passages. Works dated 1876 or later count as late; earlier works count as early. For each of the 8 genres I took the unweighted mean of work rates in each period and subtracted early from late. I then averaged those 8 differences with equal weight. Estimate: +0.0082 passages per passage. The 95% CI comes from a bootstrap that resampled works within each genre and period (2,000 draws): [-0.0166, 0.0306]. A bootstrap clustered by author gave a similar interval: [-0.0156, 0.0293]. Coverage: the early period is thin, with 752 works against 6,014 late works. Some early genre cells hold only 38-123 works, so the early means are noisy. Robustness: the genre differences do not agree. Historical (+0.04) and romance (+0.035) go up, while adventure (-0.026) and juvenile (-0.015) go down. Splitting by date confidence gives +0.023 for high, +0.009 for medium and -0.017 for low. Splitting by origin gives UK -0.017 and US +0.032. Dropping works within 10 years of the cutoff gives -0.003. Decade means stay flat at about 0.10-0.12 from the 1830s to the 1910s, with a small dip in the 1920s. Alternative explanations for any apparent difference: changes in which genres and countries are represented, uneven sampling of early works, misdated works near the cutoff, and noise from using a single passage per work. The cited passage IDs are works whose passage is coded for the distance/travel domain, from both periods. They only show that the domain is present and say nothing about a trend. Conclusion: the evidence does not support a robust historical shift."
+}

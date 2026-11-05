@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.026,
+  "ci": [
+    0.004,
+    0.047
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "genre composition (juvenile/adventure have high base rates)",
+    "date_confidence heterogeneity (medium-dated subset reverses)",
+    "small early-period cells (35-270 works per genre before 1876)",
+    "one passage per work: sampling noise",
+    "origin heterogeneity (US subset near zero)"
+  ],
+  "evidence_passage_ids": [
+    "p004955",
+    "p003479",
+    "p006088",
+    "p004896",
+    "p003729",
+    "p001524"
+  ],
+  "rationale": "There are 6,766 works, each with one passage (n_passages=1). The rate is count__domains__DISTANCE_TRAVEL/n_passages, and works are split at 1876 (752 early, 6,014 late). Estimand: the mean of genre-level differences in late-minus-early mean work rates, with all 8 genres weighted equally. The result is +0.026, with a genre-stratified work bootstrap 95% CI of [0.004, 0.047]. Six of 8 genres increased. Adventure fell (0.20 to 0.14) and 'other' was flat. Artifact checks: genre, origin and date_confidence shares are nearly the same before and after the cutoff, and mean n_editions (1.02 vs 1.09) and author productivity (21.1 vs 20.9) are similar. A weighted least squares model with late, genre, origin, date_confidence, log editions and log author productivity, using author-clustered SEs, gives +0.026 [0.003, 0.049]. Restricting to high-confidence dates gives +0.041 [0.010, 0.068]. The estimate holds at alternative cutoffs from 1860 to 1890 (+0.021 to +0.028). Decade means rise from about 0.04-0.09 before 1860 to about 0.11 after 1880. Points against robustness: the medium-confidence subset reverses (-0.014), high+medium together gives +0.019 with a CI that includes 0 [-0.008, 0.045], US works show about +0.006, and early cells are small with only one passage per work. The evidence is a modest, borderline increase. The cited passage IDs are travel-coded passages from the earliest and latest works; they show what the construct covers but cannot by themselves establish the trend."
+}

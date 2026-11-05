@@ -1,0 +1,24 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0149,
+  "ci": [
+    -0.0401,
+    0.0109
+  ],
+  "confidence": 0.1,
+  "named_confounds": [
+    "date_confidence composition (early works mostly high-confidence dates, late works more low/medium)",
+    "sparse early-period cells (43-251 works per genre before 1876)",
+    "origin heterogeneity (UK vs US subgroups differ in sign)",
+    "single passage per work (binary work-level rates)"
+  ],
+  "evidence_passage_ids": [
+    "p000884",
+    "p000090",
+    "p001878",
+    "p002577",
+    "p001176"
+  ],
+  "rationale": "Estimand: per-genre mean of work-level DISTANCE_TRAVEL passage rates (count/n_passages; every work has exactly 1 passage) for year>=1876 minus <1876, averaged equally over 8 genres. N=6766 works (752 early, 6014 late). Point estimate -0.015; 95% stratified bootstrap CI (1000 resamples within genre x period) [-0.040, 0.011], which includes zero. Genre-level differences are mixed in sign (collection +0.08, adventure/juvenile ~0, others negative), and the decade series is flat at ~0.10-0.13 after 1820. Checks: genre and origin shares are similar across periods, as are n_editions and author productivity. date_confidence differs a lot: 71% of early works have high-confidence dates versus 44% of late works. An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives late=-0.008, CI [-0.032, 0.016]. Restricting to high-confidence dates gives -0.010. By origin the sign flips (UK +0.016, US -0.046). The estimate is small and unstable, and its CI covers zero under every specification, so the data do not support a robust historical change. The cited passages only show what the coded construct looks like; they do not establish a trend."
+}

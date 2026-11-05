@@ -1,0 +1,29 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0129,
+  "ci": [
+    -0.0401,
+    0.0139
+  ],
+  "confidence": 0.2,
+  "named_confounds": [
+    "genre composition change (juvenile-heavy late period)",
+    "sparse early cells (35-93 works per genre pre-1876)",
+    "date uncertainty (low/medium date_confidence)",
+    "origin imbalance (UK vs US diverge)",
+    "annotation/label noise in domain coding",
+    "one passage per work sampling"
+  ],
+  "evidence_passage_ids": [
+    "p002189",
+    "p002670",
+    "p001021",
+    "p005230",
+    "p002114",
+    "p002319",
+    "p005250",
+    "p003476"
+  ],
+  "rationale": "Methods: rate = count__domains__DISTANCE_TRAVEL / n_passages per work (each of 6766 works has one passage). Split at year>=1876. Mean rate per genre-period across works, late minus early per genre, averaged with equal weight over 8 genres. Effect -0.013; 95% CI from 4000 stratified bootstrap resamples of works within genre-period cells is [-0.040, 0.014], which includes zero. Coverage: early period is thin (752 works, under 100 per genre in most genres; late has 6014). Genre signs differ: adventure, collection and sensation up; romance, historical and juvenile down. Sensitivity checks are unstable: high date confidence only -0.022; high+medium -0.002; excluding other/collection -0.018; 1856-1895 window -0.011; UK +0.010 vs US -0.086. So the estimate depends on subset choice, origin mix and noisy dating rather than showing one consistent historical change. Alternatively, a small decrease could come from shifts in genre/subgenre makeup, coding noise, or small early samples. Cited passages are coded for the travel/distance domain on both sides of the cutoff; they show the construct exists but cannot establish a trend. Conclusion: no robust shift is detected. I can't rule out a small effect of either sign."
+}

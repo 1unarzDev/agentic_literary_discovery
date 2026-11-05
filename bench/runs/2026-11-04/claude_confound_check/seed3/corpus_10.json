@@ -1,0 +1,25 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.004,
+    0.0462
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "dating artifact: effect concentrated in low/medium date_confidence works",
+    "genre/origin/date_confidence/n_editions composition associated with year",
+    "sparse early cells (romance n=40 early with zero rate, collection n=37)",
+    "early period small (752 vs 6014 works)"
+  ],
+  "evidence_passage_ids": [
+    "p002729",
+    "p004774",
+    "p002352",
+    "p002487",
+    "p006180",
+    "p000820"
+  ],
+  "rationale": "6766 works, each with one passage, so rate = DISTANCE_TRAVEL presence per work. Cutoff 1876: 752 early vs 6014 late works. Equal-genre mean of equal-work late-minus-early rates = +0.0253; genre-by-period stratified bootstrap (2000 reps) 95% CI [0.004, 0.046]. A WLS model adjusted for genre, origin, date_confidence, log editions and author productivity, with author-clustered SEs, gives +0.025 [0.001, 0.050], which is barely significant. Checks: year is strongly associated with the other metadata (joint F p~1e-145), and early works have more editions (1.26 vs 1.06). The contrast is largest among low-confidence dates (+0.043) and smaller for medium (+0.022) and high (+0.015). In the high-confidence works alone, an adjusted OLS gives +0.015 [-0.022, 0.053], which is not significant. Sign varies by genre: adventure and sensation decrease, while romance and collection increase from tiny early samples. Decade means do not rise steadily (1870s 0.059, 1860s 0.105). Other possible explanations are uncertain dating, a changing genre mix, and noise in small early cells. The cited passages only show that the construct appears; they do not show a trend. Because the effect does not hold up when restricted to well-dated works, I abstain."
+}

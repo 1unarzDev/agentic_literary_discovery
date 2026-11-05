@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0037,
+    0.0454
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "genre composition change (early period small, late dominated by juvenile)",
+    "date uncertainty (27% low-confidence dates)",
+    "unbalanced early sample (752 early vs 6014 late works)",
+    "origin mix (67% unknown origin)",
+    "annotation/classifier drift across periods",
+    "reprint/edition popularity selection"
+  ],
+  "evidence_passage_ids": [
+    "p004838",
+    "p004964",
+    "p006558",
+    "p002594",
+    "p000350",
+    "p004959"
+  ],
+  "rationale": "Data: 6766 works, one annotated passage each (n_passages=1), 8 genres, years 1800-1925, cutoff 1876. Early (<1876) = 752 works, late = 6014. Estimand: per-work rate count__domains__DISTANCE_TRAVEL/n_passages, averaged equally within genre x period, late-minus-early difference per genre, then equally averaged over the 8 genres: +0.0253. 95% CI from 2000 stratified bootstrap resamples (within genre x period): [0.0037, 0.0454]. Genre differences are positive in 6 of 8 genres (collection +0.075, romance +0.059, juvenile +0.042, historical +0.030, domestic_realist +0.018, other +0.007) and negative in adventure (-0.022) and sensation_mystery (-0.006). OLS with genre, origin, date-confidence and log editions controls (HC1) gives a similar +0.0255 [0.0046, 0.0463]. Sensitivity checks: estimate stays positive in every subset: high-confidence dates only +0.015, medium +0.022, low +0.043, UK +0.033, US +0.019, unknown origin +0.028, and +0.023 without juvenile. The effect is weaker among securely dated works, and the decade means do not rise steadily (1860s 0.105, 1870s 0.059, 1880s-1920s 0.093-0.121), so the change is modest and partly depends on the sparse early cells: some early genre cells have only 37-57 works with 0-4 hits. Alternative explanations: shifts in which subgenres or works were sampled after 1876, labeling drift by the annotator or model, misdated works near the cutoff, and selection by edition popularity. The cited passage IDs are passages labeled DISTANCE_TRAVEL. They show what the label covers and cannot establish the trend on their own. Conclusion: there is a small, statistically supported increase, but its robustness is moderate."
+}

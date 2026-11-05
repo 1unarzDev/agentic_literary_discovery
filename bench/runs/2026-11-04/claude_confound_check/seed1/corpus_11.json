@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0321,
+    0.0699
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition (late period dominated by juvenile/adventure)",
+    "sparse early-period cells (e.g., romance n=40, collection n=37 pre-1876)",
+    "dating uncertainty (54% of works medium/low date_confidence)",
+    "single passage per work (binary rates, coarse measurement)",
+    "passage-annotation/classifier drift across periods",
+    "author productivity / prolific-author clustering"
+  ],
+  "evidence_passage_ids": [
+    "p005085",
+    "p005197",
+    "p006524",
+    "p000362",
+    "p005489",
+    "p002108"
+  ],
+  "rationale": "Data: 6,766 works, each with exactly one annotated passage (n_passages=1), so work rates are 0/1 indicators of DISTANCE_TRAVEL. Years run from 1800 to 1925; cutoff 1876 gives 752 early and 6,014 late works. Estimand: for each of 8 genres, take the late-minus-early difference of mean work rates, then average across genres with equal weight. Result: +0.0517. A 95% CI from a 2,000-draw bootstrap stratified by genre and period is [0.032, 0.070]. The difference is positive in all 8 genres, ranging from +0.045 to +0.059. Artifact checks: the share of high/medium/low date_confidence is almost the same early and late (46/27/26% vs 47/26/27%). Origin mix is similar (UK 18% in both periods; US 19% early vs 15% late). Mean n_editions is 1.09 vs 1.08 and mean author productivity is 19 vs 21, so the assigned years do not appear to depend much on metadata. Genre mix does change strongly (juvenile works are mostly late), but the genre-stratified estimand controls for this. Stratified estimates: high-confidence dates +0.054, medium +0.058, low +0.039; origin UK +0.054, US +0.076, unknown +0.044. An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives a late effect of +0.051 [0.034, 0.068]. Among high-confidence-dated works only, a linear year trend within genre is positive (p=0.006). Decade means are about 0.04-0.06 in the 1850s-1870s and about 0.11-0.12 from the 1880s on, and the slope after 1876 is flat (p=0.83). This looks like a step change around the cutoff rather than a long drift. Caveats: there are few early works and pre-1850 decades are tiny; the measure is one passage per work; annotation could behave differently on older texts; and the genre labels or corpus sampling (for example, which works were digitized) could favor travel-heavy late works within a genre. The cited passage IDs are works annotated with DISTANCE_TRAVEL. They show the construct in use but cannot establish the trend on their own."
+}

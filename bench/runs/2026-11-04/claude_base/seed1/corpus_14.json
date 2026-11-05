@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0077,
+  "ci": [
+    -0.033,
+    0.016
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "genre composition change (late period dominated by juvenile/adventure)",
+    "sparse early-period sample (~750 early works vs ~6000 late)",
+    "date uncertainty (half of works medium/low date confidence)",
+    "origin mix (US vs UK subsets diverge in sign)",
+    "one passage per work gives a noisy 0/1 rate per work",
+    "passage classifier/annotation error"
+  ],
+  "evidence_passage_ids": [
+    "p005821",
+    "p003710",
+    "p000553",
+    "p000323",
+    "p003242",
+    "p002919"
+  ],
+  "rationale": "Data: 6766 works, each with exactly 1 passage; 726 are coded DISTANCE_TRAVEL. Every work has a year; late means year >= 1876. Method: for each genre I took the mean per-work rate (count/n_passages) in the early and late periods, subtracted early from late, then averaged the 8 genre differences with equal weight. Result: effect = -0.0077, and a 95% CI from a 2000-replicate bootstrap stratified by genre and period is [-0.033, 0.016], which contains zero. Genre differences go both ways: adventure, juvenile, romance and sensation go up a little, while collection, historical, domestic and other go down. Decade means sit flat at about 0.10-0.13. Robustness checks: high-date-confidence works only gives -0.024; first-edition-only gives -0.009; dropping the other and collection genres gives +0.003; UK gives +0.005, US gives -0.040, unknown origin gives +0.001. None of these shows a consistent, sizeable change. Caveats: the early period is thin (47-207 works per genre), so small real changes could be missed. Uneven dating quality and the corpus's shift toward juvenile fiction could also hide or create differences. The cited passage IDs only show that the construct appears in the corpus; they do not establish a trend. Conclusion: the data do not support a robust historical shift."
+}

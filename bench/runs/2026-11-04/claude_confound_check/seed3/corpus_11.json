@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.032,
+    0.07
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition (juvenile share rises, historical/domestic falls after 1876)",
+    "sparse early-period sample (~13% of works pre-1876)",
+    "date uncertainty (low/medium date_confidence)",
+    "origin mix / unknown origin",
+    "author productivity",
+    "annotation/classifier drift across period language"
+  ],
+  "evidence_passage_ids": [
+    "p005660",
+    "p005229",
+    "p003181",
+    "p005274",
+    "p002309",
+    "p002738"
+  ],
+  "rationale": "Method: there are 6,766 works with one passage each. Each work's rate is count__domains__DISTANCE_TRAVEL / n_passages. Works are early if year < 1876 and late if year >= 1876. Within each genre I averaged works with equal weight, took late minus early, then averaged the 8 genres equally. Estimate: +0.0517. The 95% CI from a 1,000-replicate bootstrap of works stratified by genre is [0.032, 0.070]. The rise appears in all 8 genres, with per-genre gaps of roughly +0.04 to +0.06. Checks: the genre mix shifts between periods (juvenile goes from 21% to 34% of works, historical from 22% to 10%), but the estimand already compares within genres. Origin, date_confidence, n_editions and author productivity are about balanced across the two periods. The effect holds within each date-confidence group (high-confidence dates +0.054, medium +0.058, low +0.039) and within each origin (UK +0.054, US +0.076, unknown +0.044). An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives +0.051 [0.034, 0.068]. By decade the rate is about 0.04-0.06 from the 1850s to 1870s and about 0.11-0.12 from the 1880s on. That looks like a step up around the cutoff, though the decades before 1850 are small and noisy. Caveats: the early period is thin (about 880 works), and some early genre cells have fewer than 60 works, with two early cells at a rate of 0. The labels come from an annotator or classifier and could drift with period language. Each work contributes only one sampled passage. The cited passage IDs are high-confidence-dated passages tagged DISTANCE_TRAVEL from both periods. They show what the construct looks like but do not by themselves establish the trend."
+}

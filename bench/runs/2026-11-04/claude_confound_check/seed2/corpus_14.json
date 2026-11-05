@@ -1,0 +1,24 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0077,
+  "ci": [
+    -0.0331,
+    0.0167
+  ],
+  "confidence": 0.1,
+  "named_confounds": [
+    "author productivity imbalance (late authors far more prolific)",
+    "sparse early-period sample",
+    "date_confidence heterogeneity",
+    "origin heterogeneity"
+  ],
+  "evidence_passage_ids": [
+    "p006041",
+    "p005821",
+    "p003710",
+    "p000553",
+    "p000323"
+  ],
+  "rationale": "There are 6,766 works with one passage each, and all years are present. The DISTANCE_TRAVEL rate is count/n_passages. With a cutoff of 1876, the estimate gives each of the 8 genres equal weight and each work within a genre equal weight. The late-minus-early effect is -0.0077 passage-rate units. A 95% CI from 1,000 bootstrap resamples within genres is [-0.033, 0.017], which includes zero. The signs differ across genres: adventure and juvenile go up, while collection and historical go down. Coverage is lopsided: only 752 works fall before 1876, against 6,014 after. Composition checks: the early and late periods have similar shares of genre, origin and date_confidence, and similar n_editions. Author productivity differs sharply, though: late works average about 22 works per author versus about 10 early. The result does not hold up under stratification. Among high-confidence dates the effect is -0.024, among medium +0.003 and among low +0.014. By origin it is US -0.040, UK +0.005 and unknown +0.001. An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives a late coefficient of -0.0004, CI [-0.024, 0.023]. Decade means stay flat at about 0.10\u20130.13 from the 1870s onward. The cited passages only show what the construct looks like in the text; they cannot show a trend. The data do not support a robust historical shift."
+}

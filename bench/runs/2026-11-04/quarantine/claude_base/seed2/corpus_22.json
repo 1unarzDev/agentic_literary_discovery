@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0814,
+    -0.0222
+  ],
+  "confidence": 0.7,
+  "named_confounds": [
+    "genre composition change (juvenile/adventure share)",
+    "date uncertainty (low/medium date_confidence)",
+    "origin imbalance (UK subset shows no decline)",
+    "sparse early sample (~1,000 pre-1876 works vs ~6,000 late)",
+    "one passage per work sampling noise",
+    "annotation/classifier drift across period language"
+  ],
+  "evidence_passage_ids": [
+    "p006142",
+    "p006051",
+    "p003497",
+    "p004088",
+    "p003960",
+    "p004188"
+  ],
+  "rationale": "Method: each work has one passage (n_passages=1), so the work rate is count__domains__DISTANCE_TRAVEL/n_passages. Works dated before 1876 are early and 1876 or later are late. For each genre I averaged rates over works with equal weight, took late minus early, then averaged the 8 genres with equal weight. Effect = -0.050 passage-rate units. The 95% CI is a percentile bootstrap (2,000 reps, resampled within genre x period cells): [-0.081, -0.022]. All 8 genres decline, by between -0.04 and -0.06. Robustness: high date-confidence works only give -0.043; single-edition works give -0.044; US works -0.052; unknown origin -0.060. UK works alone give +0.014, which weakens the case. Decade means peak in the 1830s-1870s at about 0.14-0.18, then stay flat at about 0.09-0.11 from 1880 to 1920. So the change looks like a step around the cutoff, not a steady trend, and early decades have small samples. Alternative explanations: which kinds of works got selected or digitized in each period; imprecise dates; the coding of travel content changing with period vocabulary; and composition differences within genres. The cited passage IDs are passages coded as DISTANCE_TRAVEL. They show what the construct looks like but cannot by themselves establish the trend. The consistent within-genre decline supports a moderate claim of a decrease. Confidence is tempered by the UK result and the sparse early data."
+}

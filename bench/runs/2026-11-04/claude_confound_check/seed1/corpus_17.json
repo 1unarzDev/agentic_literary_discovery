@@ -1,0 +1,24 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0048,
+  "ci": [
+    -0.032,
+    0.021
+  ],
+  "confidence": 0.1,
+  "named_confounds": [
+    "date_confidence (dating precision)",
+    "unknown origin dominates (~67%)",
+    "sparse early-period cells (<=247 works per genre before 1876)",
+    "genre composition"
+  ],
+  "evidence_passage_ids": [
+    "p000585",
+    "p003048",
+    "p002473",
+    "p002411",
+    "p000326"
+  ],
+  "rationale": "Methods: 6,766 works, each with exactly one passage, so a work's rate is its DISTANCE_TRAVEL count divided by n_passages. A work is late if its year is 1876 or later. I took the early and late mean rate within each of the 8 genres and averaged the late-minus-early differences with equal weight per genre. The 95% CI comes from a bootstrap that resampled works within each genre-by-period cell (500 reps). Result: effect -0.0048, CI [-0.032, 0.021], which includes zero. Genre-level differences go both ways: adventure +0.05, collection -0.06, romance -0.03, and the rest are near zero. Composition checks: the early and late periods have nearly the same mix of origin (UK 16% vs 18%, unknown 70% vs 66%) and of date_confidence (high 47% vs 47%). Mean n_editions (1.02 vs 1.09) and mean author productivity (20 vs 21 works) barely differ. An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives a late coefficient of +0.004 (CI -0.019 to 0.026). Restricting to high-confidence dates gives -0.034 (CI -0.078 to 0.007). By date confidence the estimate ranges from -0.034 (high) to +0.036 (low), and by origin from -0.028 to +0.006, so the sign is unstable. Decade means hover around 0.09-0.11 with no trend, and the noisy early decades rest on few works. Coverage: only about 11% of works fall before 1876, which limits power. A true change smaller than about 0.03 cannot be ruled out. The cited passages only show what the DISTANCE_TRAVEL label looks like in use; they say nothing about a trend. Conclusion: none of the checks shows a robust historical shift."
+}

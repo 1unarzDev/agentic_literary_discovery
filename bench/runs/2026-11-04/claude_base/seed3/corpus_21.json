@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0253,
+  "ci": [
+    0.0034,
+    0.0465
+  ],
+  "confidence": 0.6,
+  "named_confounds": [
+    "date uncertainty (low/medium date_confidence for over half of works)",
+    "imbalance between periods (752 early vs 6014 late works; early cells as small as 37-40 works)",
+    "changing genre mix and subgenre composition within genres",
+    "origin mix (large unknown-origin share)",
+    "reprint/edition selection bias",
+    "annotation/classifier drift across periods",
+    "one passage per work, so passage sampling noise equals work-level noise"
+  ],
+  "evidence_passage_ids": [
+    "p000021",
+    "p004656",
+    "p001148",
+    "p005744",
+    "p001038",
+    "p005899"
+  ],
+  "rationale": "Methods: 6,766 works with exactly one annotated passage each. For each work, the rate is count__domains__DISTANCE_TRAVEL divided by n_passages. Works dated 1876 or later count as late. I averaged works equally within each genre-period cell, took late minus early for each of the 8 genres, and averaged those differences with equal genre weights. The 95% CI comes from a 2,000-replicate bootstrap that resamples works within each genre-period cell. Result: +0.025 passages per passage, CI [0.003, 0.046]. Six of 8 genres go up; adventure (-0.022) and sensation_mystery (-0.006) go down slightly. Dropping any one genre leaves the estimate between 0.018 and 0.032. The increase appears for UK (+0.033), US (+0.019) and unknown-origin (+0.028) works, and for single-edition works (+0.032). Decade means rise from about 0.03-0.07 before 1850 to about 0.11-0.12 after 1890, though the series is noisy. Caveats: in the high-date-confidence subset the estimate is +0.015 with CI [-0.028, 0.053], which includes zero. Restricting to works dated 1861-1891 gives +0.013. The early period is thin: 752 works, with romance at 0/40 and collection at 1/37, so a few cells drive part of the effect. Alternative explanations: changes in which works survived or were sampled; shifts in subgenre within each genre label; errors in dating; drift in the annotation process. The cited passage IDs are late passages coded for this domain and only show how the construct is annotated; they do not establish the trend. Overall the evidence is modest and borderline. A small increase is supported in the full data, but it is not robust to the date-quality restriction, so confidence is moderate."
+}

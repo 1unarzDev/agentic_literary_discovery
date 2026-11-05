@@ -1,0 +1,26 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0328,
+    0.0692
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "sample imbalance: few pre-1876 works (752 of 6766), with juvenile genre dominating the late period",
+    "imprecise dating (date_confidence low/medium for many works)",
+    "annotation/classifier drift tied to period vocabulary such as railway or steamship terms",
+    "author clustering",
+    "changes over time in which works got digitized or selected"
+  ],
+  "evidence_passage_ids": [
+    "p000961",
+    "p002985",
+    "p000696",
+    "p004277",
+    "p004974",
+    "p006320"
+  ],
+  "rationale": "Each work has 1 passage (6766 works, all dated). Rate = count__domains__DISTANCE_TRAVEL / n_passages per work. I averaged works equally within each genre x period (early <1876, late >=1876), took late minus early per genre, then averaged the 8 genres equally. Estimate: +0.052 passages per passage. 95% CI from a stratified bootstrap (2000 resamples within genre x period): [0.033, 0.069]. The rise shows up in all 8 genres (about +0.04 to +0.06 each). Robustness checks: high-confidence dates +0.053; medium +0.065; one work per author +0.059; 1850-1899 window only +0.057. Low-confidence dates give a weaker +0.018. Caveats: early cells are small (37-165 works), and two genres have 0 early hits, so their early rates are unstable. One passage per work is a sparse sample. The labels may reflect period-specific travel vocabulary rather than a change in function. Corpus composition may also differ by period. The cited passages are from works labeled DISTANCE_TRAVEL; they only illustrate the label and cannot show a trend by themselves."
+}

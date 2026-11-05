@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0805,
+    -0.0226
+  ],
+  "confidence": 0.7,
+  "named_confounds": [
+    "genre composition (juvenile-heavy late period)",
+    "date_confidence / dating imprecision",
+    "unbalanced early vs late sample sizes (752 vs 6014 works)",
+    "author productivity",
+    "unknown origin dominance",
+    "annotation/classifier drift"
+  ],
+  "evidence_passage_ids": [
+    "p004641",
+    "p004631",
+    "p005347",
+    "p002932",
+    "p003302",
+    "p002912"
+  ],
+  "rationale": "Estimand: for each work, rate = count__domains__DISTANCE_TRAVEL / n_passages. Every work has n_passages=1, so a work's rate is 0 or 1. Works are split at year>=1876 (late) vs earlier, averaged with equal weight within each genre, differenced within genre, and the 8 genre differences averaged with equal weight. Coverage: 6766 works, none missing a year, 752 early and 6014 late. Early decades are thin (fewer than 40 works per decade before 1840). Result: late-minus-early = -0.050, 95% CI [-0.081, -0.023], from a stratified bootstrap over works within genre x period cells (2000 reps). All 8 genres decline: adventure 0.195 to 0.144, domestic_realist 0.091 to 0.038, juvenile 0.205 to 0.153, and so on. Artifact checks: genre composition shifts strongly (juvenile dominates the late period), but the equal-genre estimand neutralises it. Date_confidence shares are almost the same in both periods. Mean n_editions is similar (1.10 vs 1.08). Author productivity is slightly higher late (19 vs 21 works per author). Origin is mostly 'unknown' in both periods. A weighted regression adjusting for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives -0.050 [-0.076, -0.024]. By date confidence, the point estimates are all negative: high -0.040 [-0.087, 0.001], medium -0.053, low -0.071. The well-dated-only interval just touches zero because the sample is smaller. Origin strata are also all negative. Caveats: decade means are noisy and not monotonic (1880s 0.07, 1890s 0.12), so this looks more like an early-vs-late level difference than a smooth trend. In a narrow window around the cutoff (1866-1885) the drop is smaller (0.127 to 0.107). Years cluster on round numbers (e.g. 1910, 1920), which points to some imprecise dating. Other explanations: the early sample is small and may be canon-selected and over-represent travel-heavy works; the label coding may have changed over time. Each work contributes only one passage, so per-work measurement is very noisy. The cited passage IDs are passages tagged with the DISTANCE_TRAVEL domain from early and late works. They show what the construct looks like but do not establish the trend. Conclusion: a modest, fairly robust decrease, with moderate confidence."
+}

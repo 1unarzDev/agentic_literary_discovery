@@ -1,0 +1,27 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0077,
+  "ci": [
+    -0.0327,
+    0.0156
+  ],
+  "confidence": 0.12,
+  "named_confounds": [
+    "early-period sparsity (only ~752 of 6766 works before 1876)",
+    "genre composition shift toward juvenile fiction",
+    "date uncertainty (about half the works have low/medium date confidence)",
+    "origin imbalance (UK vs US vs unknown)",
+    "annotation/classifier noise in domain labels",
+    "author clustering"
+  ],
+  "evidence_passage_ids": [
+    "p005821",
+    "p003710",
+    "p000553",
+    "p000323",
+    "p003242",
+    "p002919"
+  ],
+  "rationale": "Method: each work has exactly one passage, so a work's rate is count__domains__DISTANCE_TRAVEL / n_passages, which is 0 or 1. For each of 8 genres I took the mean rate of late works (year >= 1876) minus the mean rate of early works, weighting works equally. I then averaged those 8 differences with equal weight per genre. Estimate: -0.0077. The 95% CI [-0.033, 0.016] comes from a bootstrap that resamples works within each genre-by-period cell (2000 reps). An author-cluster bootstrap gave nearly the same interval [-0.032, 0.015]. Coverage: 6766 works spanning 1800-1925, all with dates, but heavily skewed late. Only 47-207 works fall in each early genre cell. Per-genre differences have mixed signs, from -0.05 (collection) to +0.034 (juvenile). Decade means hover around 0.10-0.13 with no monotone trend. Sensitivity checks also have mixed signs: high-date-confidence works only gave -0.024, dropping 1866-1885 gave -0.016, UK only gave +0.005, and US only gave -0.040. So no robust change is supported. Small subsets could produce apparent shifts through early-cell sparsity, date errors, origin mix, label noise or genre-specific composition, but no such shift holds across specifications. The cited passages are only examples of the domain being labeled; they do not show a trend."
+}

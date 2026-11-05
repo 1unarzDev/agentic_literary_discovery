@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0035,
+    0.0458
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "date_confidence (dating artifact: effect concentrated in low-confidence dates)",
+    "sparse early cells (752 of 6766 works pre-1876; romance/collection early n<=40)",
+    "n_editions differs by period (1.26 early vs 1.06 late)",
+    "author productivity higher in late period",
+    "genre composition skew toward late juvenile/adventure"
+  ],
+  "evidence_passage_ids": [
+    "p006174",
+    "p005310",
+    "p002369",
+    "p006313",
+    "p002433",
+    "p005685"
+  ],
+  "rationale": "Coverage: 6766 works with one passage each (1800-1925). 752 fall before the 1876 cutoff and 6014 after. The early cells per genre are small (37-165 works). Method: for each work, rate = count__domains__DISTANCE_TRAVEL / n_passages. Within each genre I took the late mean minus the early mean, giving equal weight to works, then averaged the 8 genres equally. The 95% CI comes from a bootstrap resampling works within each genre-by-period cell (1000 draws). Pooled result: +0.025 [0.003, 0.046]. Genre results are mixed: adventure and sensation_mystery decline, and the others rise. Checks: (1) OLS adjusted for genre, origin, date_confidence, n_editions and log author productivity, with SEs clustered by author, gives +0.024 with a lower CI bound near 0 (about 0.0002). (2) Stratifying by date confidence: high-confidence works +0.015 [-0.030, 0.051], medium +0.022 [-0.007, 0.058], low +0.043 [0.012, 0.080]. The contrast is therefore not significant among well-dated works and is driven mainly by low-confidence dates. (3) Year is associated with other metadata: late works have fewer editions and more prolific authors, and low-confidence works are dated earlier on average. The decade series is noisy (for example 1860s 0.105, 1870s 0.059) and shows no clean break at 1876. Alternative explanations: imprecise or misassigned dates for low-confidence works, changes in which genres and authors were sampled, selection by reprinting (n_editions), and the small early samples. The positive point estimate hints at an increase, but it does not survive restriction to well-dated works and is weak after adjustment, so I abstain. The cited passages were coded with the travel domain; they show the construct but cannot establish a trend."
+}

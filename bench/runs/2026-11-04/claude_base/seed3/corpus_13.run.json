@@ -1,0 +1,105 @@
+{
+  "condition": "base",
+  "token_budget": 8000,
+  "token_budget_enforcement": "prompt_only",
+  "workdir": "/tmp/bench-agent-runs/bench-agent-6dkrn_af",
+  "status": "ok",
+  "returncode": 0,
+  "elapsed": 53.13320121400466,
+  "summary": {
+    "model": "claude-opus-5-5",
+    "cli_version": "2.1.318",
+    "tools_available": [
+      "Bash",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Read",
+      "Write"
+    ],
+    "duration_ms": 51939,
+    "duration_api_ms": 36005,
+    "num_turns": 6,
+    "total_cost_usd": 0.10125899999999999,
+    "usage": {
+      "input_tokens": 12,
+      "cache_creation_input_tokens": 6667,
+      "cache_read_input_tokens": 56180,
+      "output_tokens": 2832,
+      "output_tokens_details": {
+        "thinking_tokens": 82
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 6667
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 657,
+          "cache_read_input_tokens": 11678,
+          "cache_creation_input_tokens": 1472,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 1472,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "modelUsage": {
+      "claude-opus-5-5": {
+        "inputTokens": 12,
+        "outputTokens": 2832,
+        "cacheReadInputTokens": 56180,
+        "cacheCreationInputTokens": 6667,
+        "webSearchRequests": 0,
+        "costUSD": 0.10125899999999999,
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "thinkingTokens": 82,
+        "cacheCreationEphemeral5mInputTokens": 6667,
+        "cacheCreationEphemeral1hInputTokens": 0,
+        "canonicalModel": "claude-opus-5-5",
+        "provider": "firstParty",
+        "costBasis": "list"
+      }
+    },
+    "is_error": false,
+    "subtype": "success",
+    "tool_calls": [
+      {
+        "tool": "Bash",
+        "input": "cd /tmp/bench-agent-runs/bench-agent-6dkrn_af; ls -la; cat task.json; python -I -c \"\nimport pandas as pd\nw=pd.read_parquet('works.parquet');p=pd.read_parquet('passages.parquet')\nprint(w.head());print(w.dtypes);print(p.head());print(p.dtypes);print(len(w),len(p))\nfor c in p.columns:\n  if p[c].nunique()<20: print(p[c].value_counts())\n\""
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /tmp/bench-agent-runs/bench-agent-6dkrn_af; cat TASK.md | head -5; python -I -c \"\nimport pandas as pd\nw=pd.read_parquet('works.parquet');p=pd.read_parquet('passages.parquet')\nprint(w.work_id.nunique(), w.year.isna().sum(), w.date_confidence.value_counts(), w.genre.value_counts(), w.origin.value_counts())\nprint(w.n_passages.describe()); print(w.year.describe())\nprint(p.work_id.nunique(), p.passage_id.nunique())\nd=w[w.work_id.duplicated(keep=False)].sort_values('work_id'); print(len(d)); print(d[['work_id','year','genre','n_passages','count__domains__DISTANCE_TRAVEL']].head(10))\nprint(pd.crosstab(w.genre, w.year>=1876))\n\""
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /tmp/bench-agent-runs/bench-agent-6dkrn_af; python -I -c \"\nimport pandas as pd,numpy as np\nw=pd.read_parquet('works.parquet');p=pd.read_parquet('passages.parquet')\nc='count__domains__DISTANCE_TRAVEL'\nw['r']=w[c]/w.n_passages; w['late']=w.year>=1876\ndef est(d):\n  g=d.groupby(['genre','late']).r.mean().unstack(); return (g[True]-g[False]).mean(), g[True]-g[False]\ne,gg=est(w); print(e); print(gg)\nrng=np.random.default_rng(0); bs=[]\ngrp=[x for _,x in w.groupby(['genre','late'])]\nfor i in range(2000):\n  d=pd.concat([x.sample(len(x),replace=True,random_state=rng.integers(1e9)) for x in grp]); bs.append(est(d)[0])\nprint(np.percentile(bs,[2.5,97.5]))\nfor dc in [['high'],['high','medium']]:\n  print(dc, est(w[w.date_confidence.isin(dc)])[0])\nprint('no 1800-1810?', (w.year<1876).sum(), w[w.year<1876].year.value_counts().sort_index().head(20))\nprint(est(w[(w.year>=1850)&(w.year<1900)])[0])\nprint(w.groupby('decade').r.agg(['mean','size']))\nprint(w.groupby(['origin','late']).r.mean().unstack())\n# author clustering\nprint(w.author_key.nunique())\n\""
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /tmp/bench-agent-runs/bench-agent-6dkrn_af; python -I -c \"\nimport pandas as pd\np=pd.read_parquet('passages.parquet')\nm=p[p.domains.apply(lambda d:'DISTANCE_TRAVEL' in list(d))&(p.confidence>=0.9)]\nprint(len(m), m.passage_id.head(6).tolist())\n\""
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /tmp/bench-agent-runs/bench-agent-6dkrn_af; cat > answer.json <<'EOF'\n{\n  \"claim\": \"no_shift\",\n  \"direction\": \"none\",\n  \"effect\": -0.0048,\n  \"ci\": [-0.0318, 0.0206],\n  \"confidence\": 0.1,\n  \"named_confounds\": [\"date uncertainty (27% of works have low date confidence)\", \"unbalanced early/late sample sizes (752 vs 6014 works)\", \"genre composition change\", \"author clustering (1669 authors)\", \"origin metadata mostly unknown\", \"single passage per work\"],\n  \"evidence_passage_ids\": [\"p005158\", \"p002575\", \"p002203\", \"p004088\", \"p000529\", \"p003208\"],\n  \"rationale\": \"Method: each work has one annotated passage, so its rate is count__domains__DISTANCE_TRAVEL / n_passages (0 or 1). Works were split at year 1876. Within each genre I took the late-mean minus early-mean with equal weight per work, then averaged the 8 genres equally. The estimate is -0.0048. The 95% CI, from a stratified bootstrap over genre x period (2000 reps), is [-0.032, 0.021], which includes zero. Results by genre are mixed and small (about -0.003 to +0.014), except 'other' at -0.072, which rests on only 33 early works. Robustness checks: high-date-confidence works only gives -0.009; high+medium gives +0.002; restricting to 1850-1899 gives -0.032, which is noisy. Decade means stay flat between about 0.07 and 0.15 with no monotone trend. The UK, US and unknown origin groups each drop slightly, by under 0.01. Coverage: 6766 works, but only 752 are pre-1876 and the earliest decades are sparse. That makes the early estim"
+      }
+    ],
+    "n_tool_calls": 5
+  },
+  "final_text": "{\"claim\":\"no_shift\",\"direction\":\"none\",\"effect\":-0.0048,\"ci\":[-0.0318,0.0206],\"confidence\":0.1,\"named_confounds\":[\"date uncertainty (27% of works have low date confidence)\",\"unbalanced early/late sample sizes (752 vs 6014 works)\",\"genre composition change\",\"author clustering (1669 authors)\",\"origin metadata mostly unknown\",\"single passage per work\"],\"evidence_passage_ids\":[\"p005158\",\"p002575\",\"p002203\",\"p004088\",\"p000529\",\"p003208\"],\"rationale\":\"Method: each work has one annotated passage, so its rate is count__domains__DISTANCE_TRAVEL / n_passages (0 or 1). Works were split at year 1876. Within each genre I took the late-mean minus early-mean with equal weight per work, then averaged the 8 genres equally. The estimate is -0.0048. The 95% CI, from a stratified bootstrap over genre x period (2000 reps), is [-0.032, 0.021], which includes zero. Results by genre are mixed and small (about -0.003 to +0.014), except 'other' at -0.072, which rests on only 33 early works. Robustness checks: high-date-confidence works only gives -0.009; high+medium gives +0.002; restricting to 1850-1899 gives -0.032, which is noisy. Decade means stay flat between about 0.07 and 0.15 with no monotone trend. The UK, US and unknown origin groups each drop slightly, by under 0.01. Coverage: 6766 works, but only 752 are pre-1876 and the earliest decades are sparse. That makes the early estimates imprecise, and there is also author clustering and date misassignment. The cited passages are high-confidence passages tagged DISTANCE_TRAVEL. They only show what the construct looks like and do not establish a trend. Conclusion: the data do not support a robust historical shift in this construct.\"}",
+  "stderr": "",
+  "corpus_id": "corpus_13"
+}

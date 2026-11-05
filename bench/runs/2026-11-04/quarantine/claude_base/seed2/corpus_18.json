@@ -1,0 +1,29 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.033,
+    0.07
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "early-period sparsity (564 of 6766 works before 1876; some genre-early cells have only 37-77 works, and two have zero DISTANCE_TRAVEL passages)",
+    "date uncertainty (27% of works have low date confidence)",
+    "regional composition (UK vs US effects differ: 0.029 vs 0.068)",
+    "author clustering (prolific authors, up to 110 works each)",
+    "annotation/classifier drift across period language",
+    "genre mix shifting over time"
+  ],
+  "evidence_passage_ids": [
+    "p004610",
+    "p002399",
+    "p000067",
+    "p002310",
+    "p005830",
+    "p006338",
+    "p006192",
+    "p004075"
+  ],
+  "rationale": "Method: each work has one passage, so its rate is count__domains__DISTANCE_TRAVEL / n_passages. Within each of the 8 genres I took the mean rate over works for early (<1876) and late (>=1876) works, computed late minus early, and averaged those 8 differences with equal weight per genre. Estimate: +0.0517. A 95% bootstrap CI, resampling works within each genre-period cell (4000 reps), is [0.033, 0.070]. Resampling whole authors (2000 reps) gives [0.032, 0.071]. Every genre shows the same direction and a similar size, between +0.045 and +0.059. Robustness checks: high-date-confidence works only gives 0.044; dropping low-confidence dates gives 0.054; by origin, UK 0.029, US 0.068, unknown 0.054. Raw decade means rise from about 0.05 in the 1850s-1870s to 0.10-0.13 in the 1880s-1920s. Coverage: 6766 works, 1669 authors, years 1800-1925, but only 564 works fall before 1876, so the early cells are small and noisy. Alternative explanations: changes in how the corpus was sampled or which genres it covers; date errors near the cutoff; the annotation scheme picking up travel vocabulary differently over time; and the early UK subsample being thin. The cited passage IDs are DISTANCE_TRAVEL-tagged passages from both periods. They only show that the label is in use and do not by themselves establish the trend. The result is consistent across genres and survives clustering, so I report an increase, with some leftover uncertainty about how the corpus was built."
+}

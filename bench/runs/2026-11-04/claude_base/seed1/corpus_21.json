@@ -1,0 +1,28 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    -0.0009,
+    0.0484
+  ],
+  "confidence": 0.45,
+  "named_confounds": [
+    "author clustering (prolific authors dominate late period)",
+    "sparse early cells (37-165 works per genre pre-1876; romance early has 0 hits)",
+    "date uncertainty (27% low-confidence dates; effect shrinks to 0.015 with high-confidence dates only)",
+    "genre heterogeneity (adventure and sensation_mystery negative)",
+    "non-monotone decade pattern (1860s rate 0.105 above 1870s 0.059)",
+    "corpus composition shift (late period roughly 8x larger, juvenile-heavy)",
+    "annotation/classifier noise in domain labels"
+  ],
+  "evidence_passage_ids": [
+    "p003683",
+    "p005280",
+    "p003747",
+    "p002355",
+    "p000800",
+    "p006352"
+  ],
+  "rationale": "Methods: 6,766 works, each with exactly one passage (n_passages=1). The rate per work is count__domains__DISTANCE_TRAVEL / n_passages. Works were split at year>=1876. Within each of the 8 genres I took the equal-weight mean across works for each period and the late-minus-early difference, then averaged those differences with equal genre weights. Point estimate: +0.0253 passage-rate units. Uncertainty: a bootstrap that resamples works within genre-by-period cells gives a 95% CI of [0.0034, 0.0465]. A bootstrap that resamples authors as clusters, which better reflects how the data are dependent, gives [-0.0009, 0.0484]; this crosses zero and is the CI reported. Coverage: only 752 of the works are early, and they are concentrated in the 1850s-1860s. Each genre has 37-165 early works with few positive hits, and early romance has none. Robustness: the effect is positive in all origin subsets (UK 0.033, US 0.019, unknown 0.028) and in 6 of 8 genres. It is negative for adventure (-0.022) and sensation_mystery (-0.006). It shrinks to 0.015 with high-confidence dates only, and to 0.018 when the 1866-1885 window is excluded. The decade pattern does not fit a clean break at 1876: rates climb from about 0.03 in the 1820s to 0.105 in the 1860s, fall to 0.059 in the 1870s, then hold at about 0.09-0.12 afterwards. Alternative explanations: a gradual long-run drift rather than a break at the cutoff; changes in which genres and authors are sampled over time; prolific late authors; misdated works; and labeling noise. The cited passage IDs are early and late passages tagged with this domain. They only show how the label is used and cannot establish a trend. The evidence points toward a small increase but is not robust once author clustering is accounted for, so I abstain."
+}

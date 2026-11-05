@@ -1,0 +1,26 @@
+{
+  "claim": "no_shift",
+  "direction": "none",
+  "effect": -0.0077,
+  "ci": [
+    -0.033,
+    0.016
+  ],
+  "confidence": 0.1,
+  "named_confounds": [
+    "author productivity imbalance (late authors much more prolific)",
+    "early-period sparsity (752 of 6766 works before 1876)",
+    "date_confidence mix",
+    "origin heterogeneity (US vs UK)",
+    "genre composition"
+  ],
+  "evidence_passage_ids": [
+    "p005821",
+    "p003710",
+    "p000553",
+    "p000323",
+    "p003242",
+    "p002919"
+  ],
+  "rationale": "Estimand: works are split at the 1876 cutoff (late = year >= 1876). For each work, the rate is DISTANCE_TRAVEL count / n_passages; every work has exactly 1 passage, so each rate is 0 or 1. Within each genre, works were averaged with equal weight, the early mean was subtracted from the late mean, and the 8 genre differences were averaged with equal weight. Result: effect = -0.0077, with a 95% stratified bootstrap CI (2000 resamples within genre x period cells) of [-0.033, 0.016]. The CI includes zero. Genre-level differences go both ways: adventure and juvenile rise, while collection, historical and domestic_realist fall. Artifact checks: the period split is very unbalanced, with only 752 early works and sparse decades before 1850. Mean author productivity is 9.6 works per author early versus 22.4 late, a large composition difference. n_editions is similar across periods, and the genre, origin and date_confidence shares are broadly similar. Stratified results: high date confidence -0.024 (CI -0.062 to 0.011), low 0.014, medium 0.003; US -0.040, UK 0.005, unknown origin 0.001. A passage-weighted regression adjusting for genre, origin, date_confidence, log editions and log author productivity, with author-clustered SEs, gives late = -0.0004 (CI -0.024 to 0.023). Decade means are flat at about 0.10-0.11 from the 1880s through the 1920s, and the noisy early decades show no clear trend. The cited passage IDs are only examples of the construct (high-confidence DISTANCE_TRAVEL tags); they cannot establish a trend. Conclusion: no robust historical shift is supported. Alternative explanations for the small apparent differences are random noise from the small early sample, shifts in author composition and dating uncertainty."
+}

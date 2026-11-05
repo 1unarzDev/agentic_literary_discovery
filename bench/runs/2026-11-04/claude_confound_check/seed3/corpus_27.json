@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.005,
+    0.0456
+  ],
+  "confidence": 0.4,
+  "named_confounds": [
+    "date_confidence composition shift (high-confidence dating 34% early vs 48% late)",
+    "effect concentrated in low/medium-confidence dated works",
+    "sparse early cells (e.g., romance n=10, collection n=12 well-dated early works)",
+    "n_editions differs by period (1.26 early vs 1.06 late)",
+    "single passage per work (rates are 0/1 indicators)"
+  ],
+  "evidence_passage_ids": [
+    "p004503",
+    "p000805",
+    "p006705",
+    "p005148",
+    "p001211",
+    "p006043"
+  ],
+  "rationale": "Data: 6766 works, each with one passage (n_passages=1), so a work's rate is a 0/1 indicator for the DISTANCE_TRAVEL domain. Overall rate is 0.107. Cutoff is 1876. Only about 376 works fall before the cutoff, so the early period is thin. Estimand: within each genre, take the late mean minus the early mean of work rates, then average the 8 genres with equal weight. Result: +0.025, with a 95% CI of [0.005, 0.046] from a 1000-replicate bootstrap resampling works within genre. The difference is positive in 6 of 8 genres; adventure and sensation_mystery go slightly the other way. Some genres contribute very little early data (romance's early rate is 0 on a small n). Composition checks: genre and origin shares are similar across periods, and author productivity is similar (about 21 works per author). Mean n_editions is higher early (1.26 vs 1.06). date_confidence is linked to period: high-confidence dates make up 34% of early works and 48% of late works. An OLS adjusted for genre, origin, date_confidence, log author productivity and n_editions, with author-clustered SEs, gives late = +0.024 [0.0002, 0.049], which only just excludes zero. Stratified by date confidence, the effect is 0.015 for high, 0.022 for medium and 0.043 for low, so the low-confidence works carry the most effect. Restricting to well-dated works gives +0.015 with a bootstrap CI of [-0.032, 0.052], and the adjusted estimate is +0.016 [-0.019, 0.052]. Neither excludes zero. The decade means rise loosely from the 1820s to the 1910s, but early decades are noisy (1800s: 0.167 on n=12). Alternative explanations: dating error among low-confidence works may push travel-heavy texts into the late period; the small early cells make genre-weighted contrasts unstable; reprint and edition selection differs by period; and annotation is a single-passage indicator. Conclusion: there is a modest positive association, but it does not hold when restricted to well-dated works, so a robust historical shift is not established. I abstain rather than claim no_shift because the well-dated subset is too small to rule out an effect of this size. The cited passage IDs are works tagged DISTANCE_TRAVEL; they illustrate the construct only and do not show a trend."
+}

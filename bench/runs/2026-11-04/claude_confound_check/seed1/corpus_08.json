@@ -1,0 +1,26 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    0.0034,
+    0.0451
+  ],
+  "confidence": 0.35,
+  "named_confounds": [
+    "date_confidence dating artifact (low/medium-confidence works dated earlier)",
+    "n_editions (reprinted works dated earlier)",
+    "genre composition over time (historical/domestic_realist skew early)",
+    "author productivity",
+    "small and sparse pre-1876 sample"
+  ],
+  "evidence_passage_ids": [
+    "p005110",
+    "p001044",
+    "p004148",
+    "p004574",
+    "p003646",
+    "p004421"
+  ],
+  "rationale": "Data: 6766 works, one coded passage each (n_passages=1), years 1800-1925; only 752 works fall before the 1876 cutoff, versus 6014 at or after it. Outcome: count__domains__DISTANCE_TRAVEL / n_passages. Estimand: within each of 8 genres, the mean rate of late works minus the mean rate of early works (works weighted equally), then averaged across genres with equal weight. Result: +0.025 passage-rate units. A stratified bootstrap (genre x period, 2000 reps) gives a 95% CI of [0.003, 0.045]. The genre effects disagree: adventure (-0.022) and sensation_mystery (-0.006) go down, while collection (+0.075) and romance (+0.059) go up. A cluster-robust OLS by author, adjusting for genre, origin, date_confidence, n_editions and log author productivity, gives +0.024 [0.0002, 0.049], only just excluding zero. Artifact checks: year is clearly associated with other metadata. Works with low or medium date_confidence are dated about 5-7 years earlier. Each extra edition moves a work about 7 years earlier. Historical and domestic_realist works are dated earlier, and works by more productive authors are dated slightly earlier. Restricting to high-date-confidence works shrinks the effect to +0.015 with CI [-0.030, 0.050]. Restricting to high-confidence, single-edition works gives +0.025 with CI [-0.015, 0.059]. The estimate is largest among low-confidence dates (+0.043), which points to a dating artifact. The decade means are noisy before 1880 and show no clear step at 1876. Alternative explanations: early dates may be assigned wrongly (for example from reprint or first-edition guesses); genre and reprint composition differs between periods; the early cells are small, so a few works can move the estimate; and passage coding is noisy. The cited passages are coded DISTANCE_TRAVEL from both periods; they only show how the construct is coded and say nothing about a trend. Conclusion: there is a small positive contrast, but it does not hold up under restriction to well-dated works and its CI only barely excludes zero, so I abstain from claiming a robust historical shift."
+}

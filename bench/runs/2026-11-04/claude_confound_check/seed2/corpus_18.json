@@ -1,0 +1,27 @@
+{
+  "claim": "shift",
+  "direction": "increase",
+  "effect": 0.0517,
+  "ci": [
+    0.0332,
+    0.0703
+  ],
+  "confidence": 0.85,
+  "named_confounds": [
+    "genre composition (juvenile share rises late, historical/domestic shares fall)",
+    "date_confidence / imprecise dating",
+    "sparse early-period coverage (few pre-1876 works, some early genre cells near zero)",
+    "one passage per work (binary outcome, low per-work information)",
+    "author productivity and repeated authors",
+    "unknown origin for most works"
+  ],
+  "evidence_passage_ids": [
+    "p000116",
+    "p004694",
+    "p002471",
+    "p001253",
+    "p004473",
+    "p006677"
+  ],
+  "rationale": "Data: 6,766 works, each with exactly one coded passage, so a work's rate is 0 or 1 for DISTANCE_TRAVEL. Cutoff is 1876. The early period is small (about 1,000 works before 1876, with the 1800s-1860s thin) and the late period is about 5,700 works. Estimand: within each genre, the late-minus-early mean of work rates, then averaged with equal weight over the 8 genres. Effect = +0.052 passage-rate units. A stratified bootstrap (genre x period, 1,000 reps) gives a 95% CI of [0.033, 0.070]. All 8 genres show an increase, from about +0.04 to +0.06. Artifact checks: the genre mix does change across the cutoff (juvenile goes from 21% to 34% of works; historical and domestic shares fall). That is handled by the equal-genre weighting, and juvenile has a high baseline anyway. Origin, date_confidence, n_editions and author productivity are roughly balanced between periods. Restricting to one date-confidence level still gives a positive effect (high +0.044, medium +0.070, low +0.044), and so does each origin stratum (UK +0.029, US +0.068, unknown +0.054). An OLS model adjusting for genre, origin, date_confidence, log editions and log author productivity, with SEs clustered by author, gives +0.051 [0.032, 0.071]. By decade, the rate stays at about 0.05 from the 1850s to the 1870s and is about 0.10-0.13 from the 1880s on, so the rise is a step near the cutoff, not noise from one decade. Caveats: early cells are small (some early genre means are 0 because n is tiny), each work contributes only one passage, and the coding comes from a passage classifier whose error may vary over time. The cited passage IDs are well-dated late passages coded DISTANCE_TRAVEL. They only illustrate the construct; they do not establish the trend."
+}

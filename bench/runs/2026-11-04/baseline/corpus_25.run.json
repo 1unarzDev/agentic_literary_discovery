@@ -1,0 +1,16 @@
+{
+  "condition": "base",
+  "token_budget": 8000,
+  "token_budget_enforcement": "prompt_only",
+  "workdir": "/tmp/bench-agent-runs/bench-agent-hv2hgtvs",
+  "status": "ok",
+  "returncode": 0,
+  "elapsed": 0.6406493489994318,
+  "summary": {
+    "tool_calls": [],
+    "n_tool_calls": 0
+  },
+  "final_text": "{\"claim\": \"no_shift\", \"direction\": \"none\", \"effect\": 0.008185843369388345, \"ci\": [-0.01555877204477964, 0.030522019485475244], \"confidence\": 0.518, \"named_confounds\": [], \"evidence_passage_ids\": [], \"rationale\": \"Equal-genre, equal-work late-minus-early rate; 1000-draw author-cluster bootstrap.\"}\n",
+  "stderr": "",
+  "corpus_id": "corpus_25"
+}

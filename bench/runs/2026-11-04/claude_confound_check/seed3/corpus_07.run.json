@@ -1,0 +1,102 @@
+{
+  "condition": "confound_check",
+  "token_budget": 8000,
+  "isolated": true,
+  "token_budget_enforcement": "prompt_only",
+  "workdir": "/home/lunarz/.cache/bench-agent-runs/bench-agent-0z7f7jpt",
+  "status": "ok",
+  "returncode": 0,
+  "elapsed": 66.67540183100209,
+  "summary": {
+    "model": "claude-opus-5-5",
+    "cli_version": "2.1.318",
+    "tools_available": [
+      "Bash",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Read",
+      "Write"
+    ],
+    "duration_ms": 66284,
+    "duration_api_ms": 34488,
+    "num_turns": 5,
+    "total_cost_usd": 0.1315036,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 12699,
+      "cache_read_input_tokens": 40143,
+      "output_tokens": 2997,
+      "output_tokens_details": {
+        "thinking_tokens": 227
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 12699
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 974,
+          "cache_read_input_tokens": 5701,
+          "cache_creation_input_tokens": 7169,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 7169,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "modelUsage": {
+      "claude-opus-5-5": {
+        "inputTokens": 10,
+        "outputTokens": 2997,
+        "cacheReadInputTokens": 40143,
+        "cacheCreationInputTokens": 12699,
+        "webSearchRequests": 0,
+        "costUSD": 0.1315036,
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "thinkingTokens": 227,
+        "cacheCreationEphemeral5mInputTokens": 12699,
+        "cacheCreationEphemeral1hInputTokens": 0,
+        "canonicalModel": "claude-opus-5-5",
+        "provider": "firstParty",
+        "costBasis": "list"
+      }
+    },
+    "is_error": false,
+    "subtype": "success",
+    "tool_calls": [
+      {
+        "tool": "Bash",
+        "input": "cd /home/lunarz/.cache/bench-agent-runs/bench-agent-0z7f7jpt; ls; cat task.json; python -I -c \"\nimport pandas as pd\nw=pd.read_parquet('works.parquet');p=pd.read_parquet('passages.parquet')\nprint(w.head());print(w.dtypes);print(p.head());print(p.dtypes);print(len(w),len(p))\nfor c in w.columns:\n  if w[c].nunique()<20: print(w[c].value_counts())\n\""
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /home/lunarz/.cache/bench-agent-runs/bench-agent-0z7f7jpt; cat > /tmp/a.py <<'EOF'\nimport pandas as pd,numpy as np,statsmodels.formula.api as smf\nw=pd.read_parquet('works.parquet');c='count__domains__DISTANCE_TRAVEL'\nw=w.dropna(subset=['year']);w['r']=w[c]/w.n_passages;w['late']=(w.year>=1876).astype(int)\nw['ap']=w.groupby('author_key').work_id.transform('count')\nprint(len(w),w.year.min(),w.year.max(),w.r.mean())\ndef est(d):\n    g=d.groupby(['genre','late']).r.mean().unstack();return (g[1]-g[0]).mean(),g\ne,g=est(w);print(e);print(g)\nrng=np.random.default_rng(0);bs=[]\nfor i in range(1000):\n    d=w.groupby(['genre','late'],group_keys=False).apply(lambda x:x.sample(len(x),replace=True,random_state=rng.integers(1e9)))\n    bs.append(est(d)[0])\nprint(np.percentile(bs,[2.5,97.5]))\nprint(pd.crosstab(w.late,w.genre,normalize='index').round(2))\nprint(pd.crosstab(w.late,w.origin,normalize='index').round(2))\nprint(pd.crosstab(w.late,w.date_confidence,normalize='index').round(2))\nprint(w.groupby('late')[['n_editions','ap']].mean())\nfor dc in ['high','medium','low']: print(dc,est(w[w.date_confidence==dc])[0])\nfor o in w.origin.unique(): print(o,est(w[w.origin==o])[0])\nm=smf.ols('r~late+C(genre)+C(origin)+C(date_confidence)+np.log(n_editions)+np.log(ap)',w).fit(cov_type='cluster',cov_kwds={'groups':pd.factorize(w.author_key)[0]})\nprint(m.params['late'],m.conf_int().loc['late'].values)\nprint(w.groupby('decade').r.mean().round(3))\nprint(w[(w.late==1)&(w[c]>0)&(w.date_confidence=='high')].p"
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /home/lunarz/.cache/bench-agent-runs/bench-agent-0z7f7jpt; python - <<'EOF'\ns=open('/tmp/a.py').read()\ns=s.replace(\"\"\"    d=w.groupby(['genre','late'],group_keys=False).apply(lambda x:x.sample(len(x),replace=True,random_state=rng.integers(1e9)))\"\"\",\"\"\"    d=pd.concat([x.iloc[rng.integers(0,len(x),len(x))] for _,x in w.groupby(['genre','late'])])\"\"\")\nopen('/tmp/a.py','w').write(s)\nEOF\npython -I /tmp/a.py 2>&1 | grep -v Warn | tail -60"
+      },
+      {
+        "tool": "Bash",
+        "input": "cd /home/lunarz/.cache/bench-agent-runs/bench-agent-0z7f7jpt; cat >> /tmp/a.py <<'EOF'\nprint(w.late.value_counts())\nh=w[w.date_confidence=='high'];bs=[]\nfor i in range(1000):\n    d=pd.concat([x.iloc[rng.integers(0,len(x),len(x))] for _,x in h.groupby(['genre','late'])]);bs.append(est(d)[0])\nprint('high',np.percentile(bs,[2.5,97.5]))\na=w.author_key.unique();bs=[]\ngi=w.groupby('author_key').indices\nfor i in range(500):\n    s=rng.choice(a,len(a));d=w.iloc[np.concatenate([gi[k] for k in s])];bs.append(est(d)[0])\nprint('auth',np.percentile(bs,[2.5,97.5]))\nx=w[(w.year>=1856)&(w.year<1896)];print('window',est(x)[0])\nprint(w[(w.late==0)&(w[c]>0)&(w.date_confidence=='high')].passage_ids.head(3).tolist())\nEOF\npython -I /tmp/a.py 2>&1 | grep -v Warn | tail -8"
+      }
+    ],
+    "n_tool_calls": 4
+  },
+  "final_text": "{\"claim\":\"shift\",\"direction\":\"decrease\",\"effect\":-0.0504,\"ci\":[-0.0808,-0.0212],\"confidence\":0.75,\"named_confounds\":[\"genre composition differs between periods\",\"few early works (752 early vs 6014 late)\",\"uncertain dating (date_confidence)\",\"one author contributing many works\",\"origin mix\",\"reprint/edition selection\"],\"evidence_passage_ids\":[\"p003194\",\"p005581\",\"p001783\",\"p003776\",\"p000109\",\"p001765\"],\"rationale\":\"Methods: The data cover 6,766 works dated 1800\u20131925, with one passage per work. The outcome is count__domains__DISTANCE_TRAVEL / n_passages. A work counts as late if its year is 1876 or later. For each genre I took the unweighted mean across works of late minus early, then averaged the 8 genres with equal weight. The 95% CI comes from 1,000 bootstrap resamples drawn within each genre-period cell. Result: the effect is -0.050 (CI -0.081 to -0.021). All 8 genres decline, by between -0.040 and -0.060. An author-cluster bootstrap gives a CI of [-0.080, -0.024]. Composition and dating checks: the share of each genre, origin and date_confidence level is almost the same in the early and late periods (within about 3 points). Mean n_editions and the number of works per author are also similar, so the assigned years show little association with this metadata. The decline holds within each date_confidence level (high -0.040, medium -0.053, low -0.071) and within each origin (UK -0.067, US -0.043, unknown -0.058). An OLS model adjusting for genre, origin, date_confidence, log n_editions and log author productivity, with SEs clustered by author, gives -0.050 [-0.076, -0.024]. Restricting to a window of 1856\u20131895 gives -0.065. Uncertainty: when I keep only high-confidence dates, the effect is -0.040 but the CI reaches zero ([-0.084, 0.001]), which partly reflects a smaller sample. The early period is thin (752 works, and very few before 1840). Decade means are noisy: about 0.13\u20130.19 in the 1840s\u20131870s, a dip to 0.07 in the 1880s, then about 0.10\u20130.12. Alternative explanations: the corpus may not be a representative sample of each period's publishing, and early texts that survived or were digitised may favour travel narratives. The coder that assigns passage labels could also behave differently on older prose. Each work contributes only one passage, so the rate for any single work is very noisy. The cited passage IDs are examples of passages tagged with the travel domain; they show what the label captures but cannot by themselves establish a trend. Overall I judge the decrease moderately robust.\"}",
+  "stderr": "",
+  "corpus_id": "corpus_07"
+}

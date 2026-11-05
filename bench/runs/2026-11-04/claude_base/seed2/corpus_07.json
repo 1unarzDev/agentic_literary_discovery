@@ -1,0 +1,28 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0806,
+    -0.0223
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "genre composition change (late period dominated by juvenile)",
+    "early-period sparsity (752 early vs 6014 late works)",
+    "author clustering (prolific authors up to 110 works)",
+    "date uncertainty (low/medium date_confidence)",
+    "origin/provenance mix",
+    "annotation/classifier drift across periods",
+    "reprint/edition selection"
+  ],
+  "evidence_passage_ids": [
+    "p002206",
+    "p004179",
+    "p001181",
+    "p003617",
+    "p001579",
+    "p004240"
+  ],
+  "rationale": "Methods: 6766 works, each with one passage (n_passages=1), all dated. Rate = count__domains__DISTANCE_TRAVEL / n_passages per work. Early = year<1876, late = year>=1876. Mean taken within genre and period with equal weight per work, then late-minus-early averaged with equal weight over 8 genres. Effect -0.050. 95% CI from a bootstrap stratified by genre x period: [-0.081,-0.022]. A bootstrap resampling authors gave a similar CI of [-0.080,-0.025]. Every one of the 8 genres decreases (e.g. domestic_realist 0.091->0.038, juvenile 0.205->0.153). Robustness: the decrease holds within each date_confidence level (high -0.040, medium -0.053, low -0.071), after dropping 1866-1885 (-0.062), within 1850-1899 (-0.050), for single-edition works only (-0.045), after dropping the top 20 authors (-0.054), and within each origin when genre-weighted (UK -0.067, US -0.043, unknown -0.058). Caveats: the early period is small (37-165 works per genre), so the estimate is fairly imprecise. Decade means are noisy and not monotonic: 1840s-1870s are high (~0.13-0.19), and 1880s onward are ~0.07-0.12. So the change looks more like a step down around the cutoff than a steady trend. Pre-1840 decades are low but have very few works. Alternative explanations: which surviving or digitized works got sampled may differ by period, a single passage per work may not represent its subject matter, the annotator may label passages differently across periods, and travel content may move into genres that are underrepresented here. Cited passages are illustrative DISTANCE_TRAVEL-coded examples only and do not by themselves establish the trend."
+}

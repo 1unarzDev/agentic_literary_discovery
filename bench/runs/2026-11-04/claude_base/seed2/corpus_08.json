@@ -1,0 +1,27 @@
+{
+  "claim": "abstain",
+  "direction": "unknown",
+  "effect": 0.0253,
+  "ci": [
+    -0.0011,
+    0.0469
+  ],
+  "confidence": 0.42,
+  "named_confounds": [
+    "genre composition change (early period small: 752 vs 6014 works)",
+    "author clustering / prolific authors",
+    "dating uncertainty (low/medium date_confidence for ~53% of works)",
+    "one passage per work sampling noise",
+    "annotation/classifier drift across period",
+    "origin mix (67% unknown origin)"
+  ],
+  "evidence_passage_ids": [
+    "p002723",
+    "p003698",
+    "p005437",
+    "p000072",
+    "p001566",
+    "p004292"
+  ],
+  "rationale": "Data: 6766 works, each contributing exactly one annotated passage (n_passages=1); 8 genres; years 1800-1925, cutoff 1876 (late = year>=1876). Estimand: rate = count__domains__DISTANCE_TRAVEL/n_passages per work, averaged equally within genre-period cells, late minus early per genre, then averaged equally across genres. Point estimate +0.025 (passage-rate units). Genre-period stratified work bootstrap 95% CI [0.003, 0.046], but author-cluster bootstrap (1669 authors) gives [-0.001, 0.047], and a cluster-robust OLS with genre/origin/date-confidence controls gives +0.022 [-0.002, 0.045]. Sensitivity: high-date-confidence works only +0.015; excluding low confidence +0.020; excluding other/collection +0.020; cutoffs 1866/1886 give +0.015/+0.026. Direction is positive in 6 of 8 genres but adventure and sensation_mystery decrease slightly, and early cells are small (37-165 works each; romance early rate 0 of 40). The early period is sparse, so a single passage per work makes the estimates noisy. The direction is consistently positive, but the interval crosses zero once author dependence is accounted for, and the effect gets smaller among confidently dated works. That means I can't call this a robust historical shift, so I abstain. Alternative explanations: changing genre and author mix within genres, dating errors moving works across the cutoff, changes in annotation behaviour, and sampling noise. The cited passages are late and early passages tagged with the distance/travel domain. They show what the construct looks like but do not establish a trend."
+}

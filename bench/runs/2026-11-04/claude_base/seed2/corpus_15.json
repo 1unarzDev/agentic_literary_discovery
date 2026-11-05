@@ -1,0 +1,25 @@
+{
+  "claim": "shift",
+  "direction": "decrease",
+  "effect": -0.0504,
+  "ci": [
+    -0.0804,
+    -0.0203
+  ],
+  "confidence": 0.8,
+  "named_confounds": [
+    "early-period sparsity and genre-mix imbalance (only 752 of 6766 works predate 1876)",
+    "date uncertainty (about 27% of works have low date_confidence)",
+    "single passage per work (sampling noise, passage-selection bias)",
+    "annotation/classifier drift across periods",
+    "origin composition (mostly unknown origin; the US-only effect is smaller)"
+  ],
+  "evidence_passage_ids": [
+    "p006674",
+    "p004309",
+    "p000379",
+    "p004045",
+    "p000619"
+  ],
+  "rationale": "Methods: The outcome is the per-work rate count__domains__DISTANCE_TRAVEL / n_passages. Every work has n_passages = 1, so each rate is 0 or 1. Works dated year >= 1876 are late; earlier works are early. Within each of the 8 genres I took the unweighted mean of work rates for each period and computed late minus early. I then averaged that difference equally across genres. The 95% CI comes from a percentile bootstrap (4000 draws) that resamples works within each genre-by-period cell. Result: the effect is -0.050, 95% CI [-0.080, -0.020]. The decrease shows up in all 8 genres, with per-genre differences between -0.043 and -0.059. Robustness checks: dropping juvenile works gives -0.050. A 1850-1899 window gives -0.040. Splitting by date confidence gives -0.062 (high), -0.038 (medium) and -0.035 (low). Splitting by origin gives -0.059 (UK), -0.022 (US) and -0.054 (unknown). The direction is negative in every check, though the size varies. Decade means fall from about 0.15-0.20 before 1840 to about 0.10-0.11 from the 1890s onward. Coverage: 6766 works. The early cells are small, from 37 to 165 works per genre, so the uncertainty mostly comes from the pre-1876 side. Alternative explanations: early works are few and may be an unrepresentative selection (for example, canonical or travel-heavy texts surviving). Uncertain dating could blur the cutoff. Coding of the domain labels could drift over time. Having one passage per work makes passage selection noisy. The cited passage IDs are DISTANCE_TRAVEL-tagged passages (p006674 from 1864, p004309 from 1893, and others from after 1900). They only show that the construct is present and do not by themselves establish the trend. The conclusion rests on a consistent, moderate decrease whose CI excludes zero."
+}
