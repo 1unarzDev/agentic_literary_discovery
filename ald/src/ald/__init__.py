@@ -1,4 +1,4 @@
 """ald: worker client for the distributed passage-labeling system."""
 
-__version__ = "0.1.26"
+__version__ = "0.1.27"
 CLIENT_VERSION = __version__
