@@ -8,8 +8,10 @@ works_v2 = works.parquet + author identity v2 (pipeline/author_identity.py) + ca
   decade_v2), primary_v2, primary_v2_capv2, downloads, sitelinks, canon_score, canonical.
 
 Verified early dates (prereg v0.5 §2, research/date_audit/verify/report.md): the 630 works catalogued <= 1853
-(decade 1790-1840 with year < 1850, plus 1847-1853) were source-reviewed. year_v2 = the verified first BOOK year where
-resolved, else the catalog year. date_verified = True (in scope, resolved) / False (in scope, unresolved) / null
+(decade 1790-1840 with year < 1850, plus 1847-1853) were source-reviewed. year_v2 = FIRST APPEARANCE (prereg v0.6
+dating rule, 2026-11-05): earliest_documented_year (min of the verified serial and book years) where available, else
+the verified first book year, else the catalog year; year_v2_source records which. A work with a documented first
+appearance counts as resolved even if its book year is unresolved. date_verified = True (in scope, resolved) / False (in scope, unresolved) / null
 (not in scope: catalogued >= 1854). date_exclusion (first reason; null = eligible) removes a work from both primary
 flags: unresolved_early_date, out_of_window (year_v2 outside 1800-1929), translation, derivative_text (a later
 third-party edited/condensed text, DERIVATIVE_TEXT below), placeholder_1900 (year exactly 1900 and not verified).
@@ -95,19 +97,27 @@ def cap_rank(df: pd.DataFrame, group_col: str, decade_col: str = "decade") -> pd
 
 def apply_verified_dates(w: pd.DataFrame, early: pd.DataFrame | None) -> pd.DataFrame:
     """Add year_v2, decade_v2, era_v2, date_verified, placeholder_1900, date_exclusion (see module doc).
-    `early` = early_dates.parquet (work_id, true_book_year, status, translation); None = no verification yet
-    (every early-scope work then counts as unresolved)."""
+    `early` = early_dates.parquet (work_id, true_book_year, status, translation, earliest_documented_year);
+    None = no verification yet (every early-scope work then counts as unresolved).
+    Dating rule (prereg v0.6): first appearance = earliest_documented_year where available, else the reviewed
+    first book year, else the catalog year."""
     w = w.copy()
     y = w.year.astype(float)
     in_scope = y <= 1853
     if early is None:
-        early = pd.DataFrame(columns=["work_id", "true_book_year", "status", "translation"])
+        early = pd.DataFrame(columns=["work_id", "true_book_year", "status", "translation", "earliest_documented_year"])
+    if "earliest_documented_year" not in early:
+        early = early.assign(earliest_documented_year=np.nan)
     e = early.set_index("work_id")
     if not e.index.isin(w.work_id).all():
         raise ValueError("early_dates has work_ids that are not in works")
-    resolved_year = w.work_id.map(e.true_book_year.where(e.status.eq("reviewed")).dropna().astype(float))
+    book_year = w.work_id.map(e.true_book_year.where(e.status.eq("reviewed")).dropna().astype(float))
+    first_year = w.work_id.map(pd.to_numeric(e.earliest_documented_year, errors="coerce").dropna().astype(float))
+    resolved_year = first_year.where(first_year.notna(), book_year)
     resolved = in_scope & resolved_year.notna()
     w["year_v2"] = np.where(resolved, resolved_year, y)
+    w["year_v2_source"] = np.where(resolved & first_year.notna() & (first_year != book_year), "first_appearance",
+                                   np.where(resolved, "book", "catalog"))
     w["decade_v2"] = (w.year_v2 // 10 * 10).astype(int)
     w["era_v2"] = w.year_v2.map(era_of)
     w["date_verified"] = pd.array([pd.NA] * len(w), dtype="boolean")
@@ -207,7 +217,8 @@ def build(k: int = CANON_K) -> tuple[pd.DataFrame, pd.DataFrame]:
     gen = pd.read_parquet(WORK / "genre.parquet")
     w = w.merge(gen[["work_id", "genre"]], on="work_id", how="left")
     w["era"] = w.year.map(era_of)  # catalog-year era (history); analyses use era_v2
-    early = pd.read_parquet(EARLY_DATES, columns=["work_id", "true_book_year", "status", "translation"]) \
+    early = pd.read_parquet(EARLY_DATES, columns=["work_id", "true_book_year", "status", "translation",
+                                                  "earliest_documented_year"]) \
         if EARLY_DATES.exists() else None
     w = apply_verified_dates(w, early)
     w["juvenile"] = [juvenile(g, s) for g, s in zip(w.genre, w.Subjects)]

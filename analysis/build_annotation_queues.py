@@ -223,13 +223,38 @@ def resolve_works(works: pd.DataFrame, works_v2: pd.DataFrame | None, mapper=Non
                      if mapper is not None else "works_v2.split_v2 (by work_id)", "works_v2.author_group")
 
 
+JOB_SEED = 20261031   # must equal pipeline/make_jobs.SEED (checked in rand_a_k)
+
+
+def rand_a_k(passages: pd.DataFrame) -> pd.Series:
+    """k = the within-work rank of each random-stratum passage exactly as pipeline/make_jobs.ranked_view
+    defines it (row_number over hash(passage_id || SEED)); rand_a = k < 12 is the labelled backbone
+    (prereg v0.6: 12 passages per work). Returns k indexed by passage_id."""
+    import re
+
+    import duckdb
+    mj = (ROOT / "pipeline/make_jobs.py").read_text(encoding="utf-8")
+    m = re.search(r"^SEED = (\d+)", mj, re.M)
+    if not m or int(m.group(1)) != JOB_SEED:
+        raise SystemExit("JOB_SEED out of sync with pipeline/make_jobs.SEED")
+    con = duckdb.connect()
+    con.register("p", passages[["passage_id", "work_id", "stratum"]])
+    k = con.execute(f"""SELECT passage_id, row_number() OVER (PARTITION BY work_id, stratum='random'
+                        ORDER BY hash(passage_id || '{JOB_SEED}')) - 1 AS k FROM p""").df()
+    return k.set_index("passage_id").k
+
+
 def confirmation_pool(passages: pd.DataFrame, split: SplitInfo, genre: pd.DataFrame | None,
-                      canon: pd.DataFrame | None = None, group_col: str = "genre") -> pd.DataFrame:
+                      canon: pd.DataFrame | None = None, group_col: str = "genre",
+                      pool_k_max: int | None = 12) -> pd.DataFrame:
     """Confirmation random-stratum pool from metadata only (no labels): resolved split == confirmation,
     primary works only (primary_v2), stratum random. Columns: passage_id, work_id, author_key (=
     author_group under v2), decade, year, era, split, stratum, genre [, canonical]."""
     p = split.assign(passages[["passage_id", "work_id", "stratum"]])
     p = p[(p.split == "confirmation") & (p.stratum == "random")]
+    if pool_k_max is not None:   # prereg v0.6: pool = the labelled rand_a backbone (k < 12) only
+        k = rand_a_k(passages[passages.stratum == "random"])
+        p = p[p.passage_id.map(k).lt(pool_k_max).values]
     p = p.drop(columns="split").merge(split.works, on="work_id", how="inner")
     p = p[p.primary.astype(bool)].drop(columns="primary").copy()
     p["era"] = era_of_year(p.year.values)
@@ -546,7 +571,8 @@ def build_design(pool: pd.DataFrame, disc: pd.DataFrame, annotators: list[str] =
         "teaching_annotator": teaching_annotator,
         "params": {"n_target": n_target, "overlap_frac": overlap_frac, "expert_frac": expert_frac,
                    "expert_rule": "n_e = floor(frac * n_cell + 0.5), >= 1 when n_cell >= 2",
-                   "n_teacher": n_teacher, "n_teaching": n_teaching},
+                   "n_teacher": n_teacher, "n_teaching": n_teaching,
+                   "pool": "Confirmation primary_v2_capv2, stratum random, rand_a backbone k < 12 (--pool-k-max)"},
         "pi_note": ("roles do not change pi: every audit item is dealt to exactly one peer; the expert subsample "
                     "is nested within audit cells with P(expert | audit) = pi_expert_given_audit (audit.parquet)"),
         "n_target": n_target, "audit_drawn": int(len(audit)), "audit_pool": int(len(frame)),
@@ -616,7 +642,8 @@ def load_inputs(a: argparse.Namespace) -> tuple[pd.DataFrame, pd.DataFrame, Spli
     canon = None
     if not a.no_canonical and Path(a.canon).exists():
         canon = pd.read_parquet(a.canon, columns=["work_id", "canonical"])
-    pool = confirmation_pool(passages, split, genre, canon, a.group_col or "genre")
+    pool = confirmation_pool(passages, split, genre, canon, a.group_col or "genre",
+                             None if a.pool_k_max <= 0 else a.pool_k_max)
     pw = passages[["passage_id", "work_id"]]
     lab, dropped = read_discovery_labels(Path(a.labels), split, pw)
     if dropped:
@@ -704,6 +731,8 @@ def main(argv: list[str] | None = None) -> None:
             p.add_argument("--no-canonical", action="store_true", help="stratify era x genre only")
             p.add_argument("--practice-ref", default=str(PRACTICE_REF))
             p.add_argument("--no-practice", action="store_true")
+            p.add_argument("--pool-k-max", type=int, default=12,
+                           help="audit pool = random passages with k < this (rand_a backbone; 0 = all random)")
             p.set_defaults(fn=cmd_build)
     a = ap.parse_args(argv)
     a.fn(a)

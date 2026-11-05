@@ -15,15 +15,15 @@ Everything else in this document is final. Four items need the owner (the studen
 1. This file, `docs/prereg.md`, at tag `prereg-v0.6`.
 2. `docs/codebook.md` (v0.9 production, `v09lean_r2`; model pin `41ca3c7d`).
 3. `docs/canon_measure.md`.
-4. `data/work/annotation/design_summary.json`, metadata only (SHA-256 `0a08d346db640015b2c1330417e2cae996c115e4cf0959d744f1a7819861ecbd`).
-5. The deposited audit-frame hash, **`cell_table_hash = 1b4580c7ef37703ecde956475360a096ca0b01410997b00dda4594aea6924cc6`**. Verified 2026-11-05 against `data/work/annotation/audit_frame.parquet`: 40 cells, 97,152 pool passages. Frame file SHA-256: `f34cc68c1426a7ced86a673ccd60d701c901c31045aaf70288487ac58a33f314`.
+4. `data/work/annotation/design_summary.json`, metadata only (SHA-256 `7ea6040ed0e6a91cf663ce709d10922c7ec3ce34690c277a76543aa1eda30a42`).
+5. The deposited audit-frame hash, **`cell_table_hash = 3cc016d4e2a4266f8d251c2e54241e77bfe78cad952b8d66395012c749837394`**. This is the final draw of 2026-11-05 (§3.2): 41 cells, 48,576 pool passages (the `rand_a` backbone). Frame file SHA-256: `5baf37710383abc221dbed506190614243ef666d0ad4fefa24b5d9dceb124420`. Superseded draws, never sent or labelled: `1b4580c7…24cc6` and `1b56919b…736a` (§8, item 25).
 6. The SHA-256 of the frozen metadata inputs (data are not committed by design):
 
    | File | SHA-256 |
    |---|---|
    | `canon.parquet` | `a0f136e45e3b171f355e1874bc4073e2142c580559aa1144d0dc80f38edb26ff` |
    | `genre.parquet` | `09a577c711f4d438667de3bdc6f76c15f007478bcf52ce15e1ae93579d110f26` |
-   | `works_v2.parquet`, pre-sign-off | `b70ef4baae2664c72147699e279dd9adab66cbcad79629fc3854675c3250eb1b` |
+   | `works_v2.parquet`, pre-sign-off, first-appearance dating | `df043870855a685b487cc569bd87b98ad66cf53dbdb6ae54cd758dca703f7244` |
    | `works_v2.parquet`, final | `[OWNER ACTION B]` |
 
 7. The analysis code at tag `prereg-v0.6` (`analysis/stats/`, `analysis/select_annotation.py`, `analysis/build_annotation_queues.py`), and the power outputs `analysis/stats/out/{power_v05_expert,power_tf,power_claude}.csv`.
@@ -130,14 +130,14 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
   - non-teaching authors;
   - the author cap.
 - **Dates:**
-  - **Date variable:** the earliest documented book or serial publication. Composition dates are not used.
+  - **Date variable (dating rule, fixed 2026-11-05): FIRST APPEARANCE.** `year_v2` = `earliest_documented_year`, the minimum of the verified serial and book years, where available; else the verified first book year; else the catalog year (`pipeline/build_works_v2.py`, column `year_v2_source`). A work with a documented first appearance counts as resolved even if its book year is not. Composition dates are not used. Example: Eliot's *The Lifted Veil* (Blackwood's 1859) is dated 1859, not 1878. Against the book-year version, 16 works change era (8 per split), and the Confirmation primary set changes by +3 / −3 works (cap re-ranking), staying at 4,048 works.
   - **Early era [OWNER ACTION B: the human sign-off]:** every early-era work (year < 1850) and every work dated 1847–1853 is **hand-verified** against first-edition bibliographies (Garside/Raven/Schöwerling, ATCL, Wright). Agents prepare the evidence, and a human signs off. Works whose date cannot be resolved, or resolves outside the window, are **excluded**.
   - **Round-year placeholders:** years exactly 1900 (and other round hundreds) count as unverified, and those works are excluded unless verified (methods review P3.5).
   - **Tiers:** confidence tiers are redefined from the verified dates. Open Library agreement no longer defines "high".
 - **Canonicity:**
   - `data/work/canon.parquet` (`docs/canon_measure.md`): a **metadata-only** binary `canonical` per work, built from `downloads`, `sitelinks` and `canon_score` at the `author_group` level, with no labels. It is frozen at the registration commit.
   - In the Confirmation primary set, after the verified early dates and the 1900-placeholder exclusion (2026-11-04, `docs/canon_measure.md` §3.1): **4,048 works (E 87, M 538, L 3,423)**, of which **37% / 19% / 9%** are canonical by era. (Before the dates: 4,211.)
-- **Passages:** **12 random passages per work** (random backbone `rand_a`, k < 12). This replaces the unimplemented adaptive stopping (methods review P9). Early-era works may contribute up to 24 if those passages were labelled before the audit draw, and within-work Hájek weights handle this. Enrichment passages never enter a confirmatory estimate.
+- **Passages:** **12 random passages per work** (random backbone `rand_a`, k < 12). This replaces the unimplemented adaptive stopping (methods review P9). Only `rand_a` passages are analysed and audited; the audit pool is exactly these passages. Any other labelled passages, such as early-era k ≥ 12, have π_audit = 0 and are not used. Enrichment passages never enter a confirmatory estimate.
 - **Unit and SEs:** the work is the unit. SEs are author-clustered (CR1) on the new author keys.
 - **Model labels:** codebook v0.9 production (`v09lean_r2`, pinned). **There is no v1.0 relabel.** DSL is valid for any predictor; a better model buys efficiency, not validity (§7.6: model accuracy is a weak lever).
 
@@ -163,11 +163,15 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
   - Strata are era (3) × genre (8) × canonical (2).
   - The budget is split equally over the 6 era × canonical cells, then proportional to N within each cell. Each cell gets at least 2 items and at most N_cell.
   - **The draw is done** (2026-11-05, `analysis/build_annotation_queues.py build`, seed 20261105, `draw_audit_metadata`, era × genre × canonical, `works_v2` with `split_v2`, `primary_v2_capv2` and `year_v2`):
-    - **1,801 items drawn** (E 600 / M 600 / L 601) from a pool of 97,152 in **40 cells**;
-    - **909 expert items** (nested, fraction 0.5);
+    - **1,800 items drawn** (E 599 / M 600 / L 601) from a pool of **48,576 `rand_a` passages** (4,048 works × 12) in **41 cells**;
+    - **910 expert items** (nested, fraction 0.5);
     - peers (student, peer1, peer2, peer3) about 495 each, with 180 peer-overlap items;
     - 8 teacher items.
-  - **Deposited frame hash:** `cell_table_hash = 1b4580c7ef37703ecde956475360a096ca0b01410997b00dda4594aea6924cc6`, with `design_summary.json` (metadata only) attached on OSF.
+  - **Deposited frame hash:** `cell_table_hash = 3cc016d4e2a4266f8d251c2e54241e77bfe78cad952b8d66395012c749837394`, with `design_summary.json` (metadata only) attached on OSF.
+  - **This draw replaced two earlier ones on 2026-11-05, before any packet was sent or any item labelled** (item 25 in §8):
+    - `1b4580c7…` dated works by book year and drew from all 24 random passages per work, so 880 of its 1,800 items had no model labels.
+    - `1b56919b…` used first-appearance dates but still drew from 24 passages per work.
+    - The final draw uses first-appearance dates and the `rand_a` pool (`build_annotation_queues.py --pool-k-max 12`, the default). It is deterministic: same seed, same parameters.
   - π = n_cell / N_cell is written for **every** pool passage in `audit_frame.parquet`.
   - Canon balancing is what makes TF estimable: canonical works are 4% of L. Without canon strata, TF's MDE nearly doubles (§7.7).
 - **Hash deposit.** The frame's `cell_table_hash` is deposited (OSF addendum) before anyone opens it. The counts are metadata, so they are harmless, but they are not published before registration.
@@ -603,6 +607,11 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
   21. **v0.5, replication.** Replication is optional: it never counts as a failed check.
   22. **v0.5, codebook.** No v1.0 relabel. The v0.9 production codebook (`v09lean_r2`) is registered as the model's codebook. The planned v1.0 content in former §4.1 is not adopted.
   24. **v0.6 (2026-11-05, decided by the user).** TF and H1 are both primary under the fallback procedure (TF .04; H1 .01 or .05 if TF rejects). The TF statistic is the joint 2-df Wald, with the inwardness index as summary. TF-adult and TF-era-equal are registered sensitivities. The internal-construct risk is flagged. This replaces item 17's family. It was decided on Discovery evidence (§7.8–7.9) before unsealing.
+  25. **Pre-registration fixes, 2026-11-05 (before any annotation).**
+      - **(i) Dating rule:** `year_v2` = first appearance, the earliest documented serial or book year, matching the corpus's own "earliest known publication" target. The book-year implementation mis-dated serialized works.
+      - **(ii) Audit pool:** restricted to the `rand_a` backbone (k < 12) that the registered analysis labels. The first draw sampled all 24 random passages, half of which will never be labelled.
+      - The audit was **redrawn deterministically** (seed 20261105) and the packets re-exported (`pipeline/offline_annotation.py export-audit`). Superseded frame hashes: `1b4580c7ef37703ecde956475360a096ca0b01410997b00dda4594aea6924cc6` and `1b56919b90fc2d7e3c4d21a5f7b09d99ce454c9fd2a6f1326ffc1a1652be736a`. No packet from either was sent and no label was collected.
+      - **Labelling top-up before unseal:** 12 Confirmation works newly in the primary set relative to the w02p queue, 144 `rand_a` passages (`data/work/topup_first_appearance_rand_a.csv`). They contain 74 audit items.
   23. **v0.5, levers.** The STEP-1880 and LINEAR contrasts and Neyman allocation on predicted labels were explored (§7.6) and **not adopted**. They are logged here as forks (methods review P5).
 - **Unforeseen problems.** If an analysis cannot be run as registered (e.g., an era with no audited obstacles), the nearest pre-specified fallback is used: the identity link, then the raw DSL ratio contrast without covariates. The fallback is reported as such.
 
@@ -665,8 +674,14 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
   - §7.8–7.9 power.
 - **v0.6 (2026-11-05): REGISTRATION-READY.**
   - User adopted the fallback (TF .04 / H1 .01 or .05), the joint Wald with the index summary, works weighting, the juvenile and era-equal sensitivities, and the internal-construct flag.
-  - Audit draw done and frame hash deposited (40 cells, 1,801 items, 909 expert); teaching set 28.
+  - Audit draw done and frame hash deposited (final: 41 cells, 1,800 items, 910 expert, `rand_a` pool); teaching set 28.
   - Frozen-input hashes recorded.
   - OSF submission checklist added.
   - Remaining owner actions: A (attestation), B (date sign-off), C (disclosure choice), D (register and hash).
+- **v0.6 (2026-11-05, pre-registration fixes):**
+  - First-appearance dating rule.
+  - Audit pool = `rand_a`.
+  - Deterministic redraw: frame hash `3cc016d4…7394`, 1,800 items, 910 expert, 41 cells.
+  - Top-up of 144 `rand_a` passages in 12 works.
+  - Frozen-input hashes updated.
 
