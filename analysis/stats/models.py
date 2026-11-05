@@ -415,6 +415,62 @@ def two_fictions(wd: WorkData, design: Design | None = None, ref_cov=None, adjus
                                       "shares_noncanon_canon": shares, "link": tf.fit.link, "converged": tf.fit.converged})
 
 
+def tf_statistics(wd: WorkData, design: Design | None = None, ref_cov=None, weights: str = "works",
+                  adjust_genre: bool = False, interact: bool = False) -> dict:
+    """Candidate TF primary statistics (prereg v0.5 §7.8) from ONE fit of the TF model.
+    weights="works": g-computation over the standard population pooled across eras (each work at its
+      own year; eras weighted by their share of works = the registered TF estimand);
+    weights="era_equal": the canonical - non-canonical gap computed within each era's standard works,
+      then averaged with equal era weights (1/3 each).
+    interact=True adds canonical x era (M, L) terms so era-specific gaps can differ (needed for the
+    era weighting to matter); interact=False is the registered constant-gap (main effect) model.
+    Returns estimates, SEs and p-values (two-sided) for: material gap (1 df), internal gap, the joint
+    2-df Wald test of (material, internal), and the inwardness index gap
+    d_I = d_internal - d_material (1 df)."""
+    base = design or Design.from_data(wd)
+    def add(c):
+        c = c.assign(canon_num=c.canonical.astype(float).values) if "canonical" in c and "canon_num" not in c else c
+        if interact:
+            y = c.year.values
+            c = c.assign(canon_M=c.canon_num * ((y >= MID[0]) & (y <= MID[1])), canon_L=c.canon_num * (y >= LATE[0]))
+        return c
+    cov = add(wd.cov)
+    wd2 = WorkData(cov, wd.Y, wd.method, wd.info)
+    extra = tuple(base.extra) + ("canon_num",) + (("canon_M", "canon_L") if interact else ())
+    d = Design(base.knots, base.genres if adjust_genre else base.genres[:1], base.origins, base.loglen_mean,
+               "spline", base.cut, extra)
+    tf = fit_target(wd2, "locus", d)
+    ref = _ref(wd2, ref_cov)
+    if weights == "works":
+        parts = [(1.0, ref)]
+    else:
+        yr = ref.year.values
+        groups = [ref[(yr >= a) & (yr <= b)] for a, b in (EARLY, MID, LATE)]
+        parts = [(1 / 3, g) for g in groups if len(g)]
+        tot = sum(w for w, _ in parts)
+        parts = [(w / tot, g) for w, g in parts]
+    est, grads = np.zeros(2), [0, 0]
+    for w, r in parts:
+        r1, r0 = add(r.assign(canon_num=1.0)), add(r.assign(canon_num=0.0))
+        for j, num in enumerate(([1], [3])):
+            s1, g1 = standardized_share(tf, r1, None, num, [1, 2, 3])
+            s0, g0 = standardized_share(tf, r0, None, num, [1, 2, 3])
+            est[j] += w * (s1 - s0)
+            grads[j] = grads[j] + w * (g1 - g0)
+    G = np.column_stack(grads)
+    V = G.T @ tf.fit.cov @ G
+    se = np.sqrt(np.diag(V))
+    gI = grads[1] - grads[0]
+    dI = est[1] - est[0]
+    seI = float(np.sqrt(max(gI @ tf.fit.cov @ gI, 0)))
+    W, pW = wald(est, V)
+    p2 = lambda z: float(2 * stats.norm.sf(abs(z)))
+    return {"d_mat": est[0], "se_mat": se[0], "p_mat": p2(est[0] / se[0]),
+            "d_int": est[1], "se_int": se[1], "p_int": p2(est[1] / se[1]),
+            "corr_mat_int": float(V[0, 1] / (se[0] * se[1])), "wald": W, "p_wald": pW,
+            "d_index": dI, "se_index": seI, "p_index": p2(dI / seI), "link": tf.fit.link}
+
+
 def within_strata(fn, wd: WorkData, col: str = "canonical", **kw) -> dict:
     """Secondary (v0.5): run an era contrast (e.g. h1) separately within each level of `col`."""
     return {lev: fn(wd.subset(wd.cov[col].values == lev), **kw) for lev in pd.unique(wd.cov[col])}

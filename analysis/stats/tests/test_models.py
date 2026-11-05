@@ -161,3 +161,16 @@ def test_apply_works_v2_and_canon(corpus):
     c2 = canon.copy(); c2["canonical"] = c2.canonical.fillna(False)
     out = models.attach_canon(corpus.labels, c2)
     assert out.canonical.dtype == bool
+
+
+def test_tf_statistics_candidates():
+    from analysis.stats.simulate import LLMNoise, SimConfig, simulate
+    c = simulate(SimConfig.tf_disc(n_works=8000, noise=LLMNoise.perfect(), seed=3), audit=False)
+    wd = dsl.prepare(c.labels, method="oracle", truth=c.truth, targets=("locus",))
+    for wts, inter in (("works", False), ("works", True), ("era_equal", True)):
+        r = models.tf_statistics(wd, weights=wts, interact=inter)
+        assert abs(r["d_index"] - (r["d_int"] - r["d_mat"])) < 1e-12
+        assert r["d_mat"] < 0 < r["d_int"] and 0 <= r["p_wald"] <= 1 and r["se_index"] > 0
+    # juvenile dependence built into the truth: the non-juvenile gap is smaller
+    nj = models.tf_statistics(wd.subset(wd.cov.genre.values != "juvenile"))
+    assert abs(nj["d_mat"]) < abs(models.tf_statistics(wd)["d_mat"])

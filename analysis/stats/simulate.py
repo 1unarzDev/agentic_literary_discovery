@@ -114,6 +114,10 @@ class SimConfig:
     canon: bool = False
     canon_shares: tuple = (0.31, 0.22, 0.04)
     canon_shift: dict = field(default_factory=dict)
+    canon_shift_era: tuple | None = None      # (E, M, L) dicts; overrides canon_shift by work era
+    genre_shift: dict = field(default_factory=dict)   # genre -> {domain: logit shift}
+    genre_logit_shift: dict = field(default_factory=dict)   # genre -> shift of genre-mix logit
+    canon_avoid_juvenile: float = 0.0         # P(canonical work's juvenile genre is redrawn as domestic)
     # optional step change in the domain logits at step_year (pilot-like "1880s step" scenario)
     dom_step: dict = field(default_factory=dict)
     step_year: int = 1883
@@ -152,6 +156,30 @@ class SimConfig:
                    canon=True, canon_shift={d: gap for d in mat})
         cfg.update(kw)
         return SimConfig(**cfg)
+
+    @staticmethod
+    def tf_disc(scale: float = 1.0, **kw) -> "SimConfig":
+        """Discovery-calibrated two-fictions truth (docs/pilot_analysis_2_two_fictions.md, raw labels):
+        canonical - non-canonical material gap about E -7 / M -10 / L -3 pp, internal gap +3 to +6 pp,
+        social about equal; the late gap is carried by juvenile fiction (juvenile material ~0.30 vs
+        ~0.17 for other non-canonical works; ~30% of late non-canonical works juvenile; canonical works
+        rarely juvenile). Primary set as corrected 2026-11-04: Confirmation ~4,050 works, E ~87,
+        M ~540, L ~3,420; canonical authors 37% / 19% / 9.3%. `scale` multiplies every canon shift
+        (0 = null, 0.7 = deflated)."""
+        mat = ("DISTANCE_TRAVEL", "DARKNESS_VISIBILITY", "NATURE_WEATHER", "ILLNESS_BODY_DEATH")
+        def sh(m, i):
+            d = {x: scale * m for x in mat}
+            d["INNER_STATE"] = scale * i
+            return d
+        base = SimConfig.v05()
+        cfg = dict(canon_shares=(0.37, 0.19, 0.093), canon_shift={},
+                   canon_shift_era=(sh(-0.35, 0.35), sh(-1.25, 0.45), sh(0.0, 0.30)),
+                   genre_shift={"juvenile": {x: 1.1 for x in mat}},
+                   genre_logit_shift={"juvenile": 1.1}, canon_avoid_juvenile=0.85,
+                   dom_base={**base.dom_base, **{x: base.dom_base[x] - 0.35 for x in mat}},
+                   decade_profile=(2, 4, 9, 20, 52, 100, 130, 160, 330, 690, 880, 980, 560))
+        cfg.update(kw)
+        return SimConfig.v05(**cfg)
 
     def with_(self, **kw) -> "SimConfig":
         return replace(self, **kw)
@@ -216,9 +244,10 @@ def make_works(cfg: SimConfig, rng: np.random.Generator) -> pd.DataFrame:
     n = len(a_idx)
     year = np.clip(np.round(centre[a_idx] + rng.normal(0, 6, n)), 1800, 1929).astype(int)
     t = (year - 1860) / 60
-    gl = genre_logits(t, cfg.genre_drift)
+    gls = np.array([cfg.genre_logit_shift.get(g, 0.0) for g in GENRES])
+    gl = genre_logits(t, cfg.genre_drift) + gls
     # authors have a home genre (drawn at their career centre); works follow it with prob 0.7
-    home = _draw(rng, _softmax(genre_logits((centre - 1860) / 60, cfg.genre_drift)))
+    home = _draw(rng, _softmax(genre_logits((centre - 1860) / 60, cfg.genre_drift) + gls))
     g = np.where(rng.random(n) < 0.7, home[a_idx], _draw(rng, _softmax(gl)))
     tc = (centre - 1860) / 60
     p_us = np.clip(0.18 + 0.15 * tc, 0.05, 0.6)
@@ -229,6 +258,10 @@ def make_works(cfg: SimConfig, rng: np.random.Generator) -> pd.DataFrame:
         canon_a = rng.random(n_auth) < np.asarray(cfg.canon_shares)[ce]
     else:
         canon_a = np.zeros(n_auth, bool)
+    if cfg.canon_avoid_juvenile > 0:
+        jv = GENRES.index("juvenile")
+        redraw = canon_a[a_idx] & (g == jv) & (rng.random(n) < cfg.canon_avoid_juvenile)
+        g = np.where(redraw, GENRES.index("domestic"), g)
     n_words = np.exp(rng.normal(np.log(95_000), 0.5, n)).clip(15_000, 600_000).astype(int)
     dc = _draw(rng, np.tile([0.47, 0.27, 0.26], (n, 1)))     # G0 shares high/medium/low
     canon = rng.random(n_auth) < 0.1
@@ -271,8 +304,15 @@ def _truth(cfg: SimConfig, rng: np.random.Generator, wk: pd.DataFrame, w_of_p: n
     has = np.where(u < p_obs, 1, np.where(u < p_obs + 0.03 * (1 - p_obs), 2, 0))  # 1 yes, 0 no, 2 insufficient
     gdom = np.array([_vec(GENRE_DOM[g], DOMAINS) for g in GENRES])[gi] * ge
     eta = _vec(cfg.dom_base, DOMAINS) + cfg.effect * np.outer(t, _vec(cfg.dom_slope, DOMAINS)) + gdom + re[:, 1:11]
-    if cfg.canon and cfg.canon_shift:
+    if cfg.canon and cfg.canon_shift_era is not None:
+        ye = np.searchsorted([1850, 1885], (1860 + 60 * t), side="right")
+        S = np.array([_vec(d, DOMAINS) for d in cfg.canon_shift_era])
+        eta = eta + wk.canonical.values[w_of_p][:, None] * S[ye]
+    elif cfg.canon and cfg.canon_shift:
         eta = eta + np.outer(wk.canonical.values[w_of_p], _vec(cfg.canon_shift, DOMAINS))
+    if cfg.genre_shift:
+        G = np.array([_vec(cfg.genre_shift.get(gg, {}), DOMAINS) for gg in GENRES])
+        eta = eta + G[gi]
     if cfg.dom_step:
         yr = 1860 + 60 * t
         eta = eta + np.outer(yr >= cfg.step_year, _vec(cfg.dom_step, DOMAINS))
