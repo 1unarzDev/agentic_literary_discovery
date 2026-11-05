@@ -7,3 +7,4 @@ answers/
 .agent-tmp/
 .pytest-tmp/
 scores.json
+pilot/

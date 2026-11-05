@@ -1,171 +1,187 @@
 # Plausible Stories from Null Corpora
 
-Deterministic, work-resampled benchmark implementing research plan §4.8. No LLM
-inference or passage-text generation is used to build it. All implementation,
-tests, caches and example outputs belong under `bench/`.
-
-From the repository root:
+A blinded, work-level benchmark built from **Discovery-only** labels. Generation
+and the dummy pilot require no model inference. Everything produced by these
+commands, including caches, belongs under `bench/`. Run from the repository root:
 
 ```bash
 export UV_PROJECT_ENVIRONMENT="$PWD/bench/.venv"
 export UV_CACHE_DIR="$PWD/bench/.uv-cache"
-uv run --with pandas,numpy,pyarrow,pytest pytest bench
-uv run python -m bench.generate path/to/labels.parquet bench/generated --seed 1729 --delta .2
-uv run python -m bench.run_agents bench/generated bench/answers --command "python $PWD/bench/dummy_agent.py"
-uv run python -m bench.score bench/generated bench/answers --output bench/scores.json
+uv run --with pandas,numpy,pyarrow,pytest,duckdb,scikit-learn pytest bench -q
+uv run --with pandas,numpy,pyarrow,duckdb,scikit-learn python -m bench.pilot
 ```
 
-The first input path is a placeholder. Tests create their own synthetic labeled
-fixtures. The output directory must be empty. Production labels are not yet
-available; no empirical historical result or agent benchmark result is claimed.
-No paid agents are invoked by the tests. `bench/scores.json` is an optional local
-output, not a supplied result.
+`bench.pilot` runs the read-only adapter, generates 30 corpora, audits structural
+leaks, runs the dummy on all 30, and scores its answers. Its output directory
+(`bench/pilot/`, ignored by Git) must be empty. See [pilot_report.md](pilot_report.md)
+for actual measurements, retained/dropped controls, and paid-run planning.
+No paid agents have been run. Do not redistribute source dates without checking
+their licence; generated pilot data and identity mappings are local artifacts.
 
-## Input and estimand
+## Input and sampling
 
-`generate.py` validates the requested columns, unique passage IDs, finite dates
-and work-level metadata consistency. `domains` must be a list (or JSON list
-string). IDs must be unique after conversion to strings. Work metadata is
-constant across passages. `has_obstacle` uses codebook strings `yes`, `no`,
-`insufficient_context`; domain counts and internal counts require `yes`.
-Confidence is not used as a weight. Insufficient-context passages remain in the
-all-passages denominator: this is explicitly a passage prevalence estimand, not
-the conditional share among obstacles. Restrict splits/upstream sampling before
-generation; the generator does not enforce a Confirmation seal.
+`prepare.py` attaches `data/work/ald.duckdb` **READ_ONLY** to an in-memory DuckDB
+connection. It selects valid, non-twin, error-free `stage='label'` results whose
+pin starts `41ca3c7d`, retaining the latest valid result per passage. It joins
+`works.parquet`, `genre.parquet`, and `passages.parquet` for identifiers and
+sampling metadata, requiring Discovery on both works and passages. The earliest
+PG identifier breaks work-edition ties deterministically. No source is modified.
+No quotes, summaries, titles, or raw text enter the adapter output.
 
-Each row is a sampled **work occurrence**, with a unique `row_id`; `work_id` and
-`author_key` preserve dependence and duplicates. Work rows contain year, decade,
-genre, origin, split, stratum, memorization score, edition count, date confidence,
-passage denominator, counts for each observed categorical value and domain,
-all passage IDs and up to five passage pointers. Both CSV and Parquet are written;
-CSV list columns contain JSON arrays. Missing categories have implicit zero
-counts; a completely missing target makes that control unsupported.
+`generate.py` validates the adapter schema (the `REQUIRED` constant), finite
+metadata, unique passage IDs, within-work metadata consistency, Discovery split,
+and integer dates in 1800–1925. Domains must be lists or JSON lists. Source
+passages may have different strata. It samples **one real labelled passage per
+work without replacement**, then uses that same fixed panel in every arm.
+Consequently, every corpus contains exactly the same number of unique works,
+authors, passages, and labels, with the same dependence structure and missingness.
+This changes the earlier all-passages-per-work design: the estimand is now the
+prevalence in the sampled one-passage-per-work panel, standardized across genres.
+Confidence does not weight observations. `insufficient_context` stays in the
+passage denominator; domain/internal counts require `has_obstacle='yes'`.
 
-The task estimates late-minus-early rates, averaging works equally within each
-genre and genres equally. Night controls use 1880; other tasks use 1876 as the
-period cutoff. Inferential CIs are the agent's responsibility: generation keys
-supply finite-design effects, not population confidence intervals.
+Every public year is a real source publication year. Empirical controls retain
+source dates; synthetic corpora **permute the panel's complete empirical year
+multiset**. All arms therefore share an exactly matched, many-year distribution,
+including the naturally small early-era sample. Each work appears exactly once,
+with one date. There are no 1840/1900 placeholders or repeated work occurrences.
+`--slots` was removed: size is determined by the fixed source panel, not the arm.
 
-## Thirty corpora and private keys
+## Controls and finite-design truth
 
-* **10 empirical positive controls:** four bootstrap telephone controls, three
-  night controls, three epistolary controls, retaining source work dates. Only
-  an observed contrast in the expected direction qualifies as ready. These are
-  selected empirical controls, not an independent test of literary history.
-  Repeats are correlated variants, not ten independent historical phenomena.
-  `technology_named == telephone` is the codebook's plot-relevant technology,
-  not all telephone mentions. Night is the proxy `night_function != none` with
-  missing values excluded from the numerator. Epistolary decline is an explicit
-  stub unless optional passage-level `epistolary_form` (boolean/0–1/yes) exists.
-  Absent fields, missing era/genre cells or wrong-sign contrasts produce
-  `status: unsupported`, `true_effect: null`; scoring excludes them and reports
-  their count. The fixed input schema cannot establish all ten positive controls.
-* **10 injected shifts:** within every genre, resample actual works at the low
-  and high target rates, mixing them at assigned dates 1840 and 1900. Genre
-  sample sizes match exactly across periods. Five increases and five decreases
-  target `--delta` absolute passage-rate units. `--construct` selects a count
-  suffix (default `internal`; e.g. `domains__INNER_STATE`, `telephone`, `night`).
-  Every genre must span the requested delta; otherwise generation fails visibly.
-  Keys record requested and realized effects and a conservative `1/slots`
-  quantization tolerance. `--slots` defaults to 100 occurrences per genre/era.
-  Extreme-rate resampling can substantially reduce effective sample size;
-  agents should recognize dependence and may reasonably abstain.
-* **10 confounded nulls:** two realizations per named artifact. Draw a common
-  work pool per genre and assign identical copies to each era. Its within-genre
-  and standardized effects are exactly zero. Then apply genre composition drift,
-  move above-median-rate early rows to later reprint dates, amplify late
-  above-median-rate works with repeated editions, oversample late high-memory
-  works, or retain only one late work. The memory artifact selects by the supplied
-  memorization score, not by the outcome; its crude effect can be weak or absent.
-  Other artifacts can also happen to yield weak crude changes. No contrast is
-  promised where input support cannot create one; genre drift needs distinct
-  genre base rates, and unchanged transformations fail visibly.
+* **10 empirical positive replays.** Candidates are fixed in `CANDIDATES`:
+  social-rank, communication, travel, telephone, night-function, and internal
+  obstacle rates. A candidate must have an absolute standardized contrast
+  **≥ 3 percentage points**, both eras in every genre, and a 400-draw
+  author-cluster bootstrap 95% interval excluding zero. Weak/missing candidates
+  are dropped; generation fails if none qualify. `--construct` can require a
+  particular candidate; `--minimum-effect` sets the size threshold. The largest
+  qualifying absolute effect is selected. Both directions qualify: these are
+  **exploratory empirical contrasts**, not verified causal claims or confirmation
+  of an expected literary trend. Screening intervals are descriptive and do not
+  correct for candidate selection. Ten replays of the same dated panel receive
+  independent opaque IDs/orderings; they are **not independent phenomena** and
+  must not be pooled as ten independent sensitivity trials.
+* **10 injected shifts.** Five increases and five decreases in the selected
+  target (`--delta .05` by default). Disjoint binary-outcome quotas within each
+  genre approximate the requested shift, while preserving that genre's actual
+  early/late sample sizes and years. Each key records the realized finite-panel
+  effect and a bound on rounding error. Infeasible shifts fail before writing
+  output. Passage text and labels are never invented or relabelled.
+* **10 confounded nulls.** Two nuisance-associated date permutations for each of
+  genre composition, uncertain dating/reprints, edition selection, prolific
+  authors, and origin composition. The controlled pre-artifact process randomly
+  permutes dates within genre, independently of outcomes, so its **expected**
+  standardized effect is zero. Finite random baselines fluctuate; keys record
+  their actual effects and the zero expectation separately. The artifact assigns
+  sorted source years by a noisy nuisance rank, preserving every work once and
+  the global year histogram. These are controlled analogues of contamination,
+  not claims that the measured source metadata caused a historical effect.
+  Apparent standardized/crude effects may be weak; generation does not promise
+  a strong trap. Inspect private observed effects before choosing a full study.
 
-For nulls, `true_effect = 0` refers to the controlled **pre-artifact baseline**.
-Post-artifact within-genre rates need not be zero (especially reprint dates and
-selective duplicates); these apparent changes are the trap being evaluated.
-Keys also retain `observed_effect` and private baseline work pools for audit.
-This distinguishes the historical target from the contaminated sample statistic.
-Sparse samples may have no estimable observed standardized contrast (`null`).
+Repeated-edition copies and memory/sparse-size artifacts were removed: repeated
+copies violate the one-work-once design, memorization was unmeasured, and corpus
+size/year coverage must not reveal the arm. Edition counts remain measured
+source metadata; memorization placeholders are **never exported or used**.
 
-`manifest.json` lists anonymous corpus IDs. Each public directory includes
-`works.parquet`, `works.csv`, `passages.parquet`, and `task.json`. The passage
-table contains only selected real input passages and their labels/pointers;
-original year/decade fields are removed to avoid leaking reassigned dates.
-Text is included only if supplied in the original labels. No external text
-store is fetched automatically. The private directory contains keys with process,
-seed, input SHA-256, true effect, named confound and eligibility, plus null baseline
-Parquet files. Keep `private/` away from agents; do not publish it with evaluation
-inputs. Reproducibility assumes identical input row order and library versions.
+**Every arm uses the same selected construct and cutoff (1876).** Task target,
+numbering, and file layout cannot reveal which arm is being evaluated. Specs are
+shuffled before anonymous corpus numbers are assigned. Positive replay truth is
+the observed source-date contrast; injected truth is the realized quota effect;
+null truth is zero under the pre-artifact randomization process. These are
+finite-design/control targets, not population confidence intervals.
 
-## Running agents
+## Blinding and leak tests
+
+Public files are `works.parquet`, `works.csv`, `passages.parquet`, and `task.json`.
+Allowlisted work metadata are opaque work/author IDs, assigned year/decade,
+genre, origin, edition count, date confidence, counts, and opaque evidence IDs.
+Passages contain opaque passage/work IDs and categorical labels/confidence only.
+Free text, titles, author names, source IDs, hashes, paths, offsets, original
+dates, split, strata, and other identifying metadata are excluded. IDs are
+re-keyed independently per corpus. Authors retain their grouping for inference.
+Opaque IDs resolve **only within that corpus**; they are not external pointers.
+
+`private/` contains keys, candidate validation, source hash, identity mappings,
+and null baselines. It is created with mode 0700 and is never staged for agents.
+`manifest.json` contains anonymous IDs only. Keep private artifacts and adapter
+labels out of any agent-accessible mount. Public Parquet uses plain encodings;
+passage order is stable before re-keying to avoid variable-size null/list
+encodings becoming another side channel.
+
+Tests assert uniqueness, source-label preservation through private mappings,
+matching year histograms, opaque IDs, allowlisted schemas, strong-control
+screening, injected effect tolerances, shuffled arms, and no prompt checklist.
+The structural audit checks sizes, author counts, year summaries, missingness,
+column counts, and actual file byte sizes. These features must be **identical**
+across all 30 corpora. A five-fold random-forest classifier must score at chance
+(1/3); a deliberately restored size leak must score above 90%.
+
+This is an audit of marginal structure/storage features, **not proof that no
+classifier can identify the arms**. Target trends and nuisance/year relationships
+are intentional experimental differences. Cross-corpus matching is possible
+because the source panel is shared: evaluate one isolated corpus per agent
+session and do not give it other sessions' outputs.
+
+## Real-agent study (2026-11-04)
+
+Snapshot: 15,744 valid Discovery passages / 6,766 works / 1,669 authors. The travel
+contrast fell to +2.53 pp (author-cluster interval lower bound −0.002 pp) and no
+candidate passed the 3 pp screen, so generation used the pre-named target with
+`--allow-unverified-positive`: the 10 empirical replays are generated but marked
+`unsupported` (descriptive only); the 10 injected and 10 null corpora are scored.
 
 ```bash
-uv run python -m bench.run_agents bench/generated bench/answers --backend claude --timeout 300
-uv run python -m bench.run_agents bench/generated bench/answers --backend codex --token-budget 8000
-# A shell-quoted argv template; executed without a shell:
-uv run python -m bench.run_agents bench/generated bench/answers --command 'my-cli --budget {token_budget} {prompt}'
+R=bench/runs/2026-11-04
+uv run --with pandas,numpy,pyarrow,duckdb,scikit-learn python -m bench.pilot --output $R/pilot  # adapter (fails at generation)
+uv run --with pandas,numpy,pyarrow python -m bench.generate $R/pilot/labels.parquet $R/pilot/generated \
+    --construct domains__DISTANCE_TRAVEL --allow-unverified-positive
+# Analysis venv for agents, outside the repo: pandas numpy statsmodels pyarrow
+uv run --with pandas,numpy,pyarrow python -m bench.run_agents $R/pilot/generated $R/claude_base --backend claude \
+    --timeout 1200 --seeds 3 --concurrency 6 --resume --temp-root /tmp/bench-agent-runs --extra-path /tmp/bench-agent-venv/bin
+#   ... same with --condition confound_check -> $R/claude_confound_check
+uv run --with pandas,numpy,pyarrow python -m bench.run_agents $R/pilot/generated $R/baseline \
+    --command "/tmp/bench-agent-venv/bin/python $PWD/bench/baseline.py"
+uv run --with pandas,numpy,pyarrow,matplotlib python -m bench.analyze $R/pilot/generated $R/conditions \
+    --output $R/metrics.json --rows $R/rows.csv --figs bench/figs
 ```
 
-Only run those paid backends deliberately. `claude -p` and `codex exec` are
-supported presets; customize flags to the installed CLI version. pandas, numpy
-and statsmodels must already be available to the agent's Python environment.
-The 8,000-token default covers reasoning/output by instruction. The runner sets
-`BENCH_TOKEN_BUDGET` and supports a command placeholder, but **does not claim hard
-token enforcement or verify model token use**. Use a backend-native budget flag
-where available. Every run records this limitation, elapsed time, exit code,
-stdout and stderr. Timeout terminates the POSIX process group including children.
-The runner accepts exactly one validated answer from stdout or `answer.json`.
-Malformed, failed and timed-out runs produce logs but no answer. Failed retries
-remove stale answers. Existing run outputs are intentionally replaced.
+`run.json` files keep the CLI's final result event (model, usage, cost, turns) and a
+truncated list of tool-call inputs for process-level checks; full transcripts are not
+kept. `analyze.py` reports two-stage (corpus, then repeat) bootstrap CIs. Generated
+corpora and private keys stay local (ignored by Git).
 
-Each corpus is staged in a fresh, automatically deleted temporary working
-directory. Hidden keys and other corpora are not copied. This is working-directory
-isolation, **not an OS security sandbox**: the child inherits credentials and
-filesystem/network permissions. For adversarial agents or strict tool fairness,
-run the CLI inside an independently configured container with only staged input,
-fixed dependencies and no external file/network access. The prompt fixes the
-allowed analysis tools; this runner does not intercept tool calls.
+## Agents, scoring, and limits
 
-## Scoring and gate
+```bash
+uv run python -m bench.run_agents bench/pilot/generated bench/answers --command "python $PWD/bench/dummy_agent.py"
+uv run python -m bench.score bench/pilot/generated bench/answers --output bench/scores.json
+# Paid presets: invoke only for an explicitly authorized real study.
+uv run python -m bench.run_agents bench/pilot/generated bench/answers --backend claude --timeout 300
+uv run python -m bench.run_agents bench/pilot/generated bench/answers --backend codex --token-budget 8000
+```
 
-The required JSON schema is in `agent_task.md`; `confidence` is explicitly
-P(robust historical shift), including on abstentions. Scores report:
+`agent_task.md` asks generically for uncertainty, coverage, and alternative
+explanations. It names no particular confounds or canonical answer strings.
+Analysis uses Python/pandas/numpy/statsmodels; no web, other models, external
+files, or invented quotations. Return the JSON schema in that prompt.
+`confidence` means P(robust historical shift), including on abstention.
 
-* Detection accuracy, with correct direction required for shifts; abstention and
-  missing/invalid answers are incorrect. Unsupported controls are excluded.
-* False-claim rate among eligible nulls; missing runs remain in this denominator
-  and are separately counted. It must be read alongside completion coverage.
-* Exact canonical confound identification among nulls; abstention rate; mean Brier
-  loss on valid eligible answers and its calibration denominator.
-* Evidence existence and construct-support precision on unique cited IDs per
-  answer. IDs must occur in that corpus, and labels must support its target.
-  No citations gives `null`, not perfect precision. This verifies label support,
-  not quotation accuracy or whether a passage establishes a historical trend.
-* CI coverage of the finite-design key, including abstentions without CIs as
-  uncovered. Reported effect and CI are validated but detection accuracy alone
-  is not an effect-size accuracy metric.
+The runner stages only public files in a fresh temporary directory. This is
+working-directory isolation, **not an OS sandbox**: paid CLIs inherit filesystem,
+network, and credentials. Use a separate restricted container for a real study.
+The 8,000-token reasoning/output allowance is a **prompt instruction**, not a
+metered ceiling; tool inputs and repeated context can add substantial input
+usage. The 300-second timeout kills the process group. Logs record elapsed time,
+exit status, stdout/stderr, and the lack of hard token enforcement. Token usage
+and price are not measured by the dummy and require backend usage instrumentation
+for a real run. Backend versions/flags are not verified by this free pilot.
 
-The gate requires all 20 injected/null answers valid, at least 8/10 injected
-shifts detected with correct direction, and at most 1/10 null shift claims.
-All-null abstention can meet the null threshold but cannot pass the injected
-threshold. Missing answers cannot earn a gate pass. The dummy always abstains.
-
-Tests cover deterministic 30-corpus output, effect tolerance and genre balance,
-zero baselines, artifacts, source passage preservation, unsupported stubs,
-validation, evidence, calibration, gate failures, CLI staging and timeout.
-
-## Sources checked 2026-10-31
-
-Web search via Crossref's works search resolved the paper, then its primary ACL
-Anthology abstract was read:
-[Kim, Pethe & Skiena (2020), *What time is it? Temporal Analysis of Novels*](https://aclanthology.org/2020.emnlp-main.730/).
-The abstract reports an increase in events after 10 P.M. past 1880. This motivates
-a positive control; our night-function proxy is **not a replication** of their
-clock-time measurement. Their association with lighting does not establish
-causality. Search endpoint:
-https://api.crossref.org/works?query=Kim%20Pethe%20Skiena%20time%20novels&rows=3
-
-The 1876 telephone hinge comes from the supplied plan; its suitability as a
-fictional-use breakpoint is **UNVERIFIED** here. The proposed epistolary decline
-is **UNVERIFIED** here and remains a measurement stub without enrichment.
+Scoring covers detection/direction, false claims, abstention, Brier loss,
+label-supported evidence IDs, and finite-key CI coverage. Free-form confound
+identification uses documented keyword combinations as well as canonical names;
+it needs human adjudication and is not a semantic guarantee. Missing answers
+remain in denominators; no citations give null evidence precision. Gate: all 20
+injected/null answers valid, ≥ 8/10 injected detected in the correct direction,
+and ≤ 1/10 null shift claims. An always-abstaining dummy correctly fails.

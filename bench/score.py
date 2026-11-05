@@ -2,6 +2,7 @@
 import argparse
 import json
 import math
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -41,6 +42,28 @@ def validate(answer):
     return answer
 
 
+# Free-form explanations are allowed: these rules are a reproducible heuristic,
+# with human adjudication still needed for headline confound-identification rates.
+CONFOUND_TERMS = {
+    'genre_mix_drift': [('genre', 'composition'), ('genre', 'mix')],
+    'reprint_date_contamination': [('reprint',), ('dating', 'confidence'), ('date', 'confidence')],
+    'edition_selection_bias': [('edition', 'selection'), ('edition', 'bias'), ('edition', 'amplification')],
+    'prolific_author_selection': [('prolific', 'author'), ('author', 'oversampling')],
+    'origin_composition_drift': [('origin', 'composition'), ('national', 'composition')],
+}
+
+
+def identifies_confound(key, answer):
+    name = key.get('named_confound')
+    if not name:
+        return False
+    if name in answer['named_confounds']:
+        return True
+    text = ' '.join(answer['named_confounds']+[answer['rationale']]).lower()
+    words = set(re.findall(r'[a-z]+', text))
+    return any(all(term in words for term in terms) for terms in CONFOUND_TERMS.get(name, []))
+
+
 def score_one(key, answer, passages):
     try:
         validate(answer)
@@ -78,7 +101,7 @@ def score_one(key, answer, passages):
     return {'corpus_id': key['corpus_id'], 'kind': key['kind'], 'eligible': ready,
             'valid_answer': valid, 'correct': bool(correct),
             'false_claim': bool(valid and answer['claim'] == 'shift' and key['kind'] == 'confounded_null'),
-            'confound_identified': bool(valid and key['named_confound'] in answer['named_confounds']),
+            'confound_identified': bool(valid and identifies_confound(key, answer)),
             'abstained': bool(valid and answer['claim'] == 'abstain'),
             'brier': (answer['confidence'] - int(shift))**2 if valid and ready else None,
             'evidence_cited': len(ids), 'evidence_existing': len(ids & existing),
