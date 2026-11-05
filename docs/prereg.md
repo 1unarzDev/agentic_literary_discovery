@@ -53,11 +53,41 @@ Eras use **year** cuts: E 1800–1849, M 1850–1884, L 1885–1929. The window 
 
 Wording follows methods review P1. H1 is "the locus mix of scene-level obstacles". It is *motivated by* the inward-turn literature, and the paper does not claim to test Kahler, whose thesis concerns narrative up to about 1800. TF speaks to Woolf's "materialists" charge and to the canon/mass divide (Bourdieu's restricted versus large-scale production; Moretti; Underwood).
 
-> **DECIDED (user, 2026-11-01): TWO FICTIONS is the single PRIMARY test at α = 0.05. H1 is the first secondary test,** Holm-corrected with H1|canonical and H1|non-canonical.
+> **DECIDED (user, 2026-11-01):** TF is the single primary at α = 0.05; H1 is the first secondary. This stays in force unless the proposal below is confirmed.
 >
-> Rationale (§7.7): under this design H1's E-vs-L power is about 0.02–0.10 (MDE about 15 pp with 900 expert labels). Splitting α would have cost TF about 10 points of power for almost no chance of an H1 rejection.
+> **PROPOSED v0.6 (statistician, 2026-11-04; pending user confirmation; do not treat as registered).** The proposal rests on new Discovery evidence: the full-Discovery Gemma pilot (`docs/pilot_analysis_2_two_fictions.md`) and the Claude reference labels (`docs/claude_reference_analysis.md`). It is evaluated in §7.8–7.9 under the registered design (about 900 expert and about 2,000 peer labels; corrected primary set of 4,048 Confirmation works). Choosing a statistic on Discovery and testing it on sealed Confirmation is legitimate, provided it is fixed before unsealing and does not fork on the era pattern.
 >
-> Code: `models.confirmatory(primaries=("TF",))`, the default.
+> 1. **TF test statistic: keep the joint two-sided 2-df Wald test of (Δ_material, Δ_internal)** and the symmetric classification. This is the current registration. It is *not* "material alone", which is only the MDE row quoted earlier. The substantive claim ("canonical fiction places obstacles more inward") requires the class **inward**. The **inwardness index** Δ_I = Δ_internal − Δ_material is registered as the pre-specified one-number summary, reported with its CI.
+>    - **Power at α = 0.05:**
+>
+>      | Truth | Material alone | Joint Wald | Index |
+>      |---|---|---|---|
+>      | Gemma-like raw-label truth (§7.8) | 0.24 | 0.33 | 0.40 |
+>      | Claude-construct truth (§7.9) | 0.14 | **0.53** | 0.43 |
+>
+>    - **Material alone is dominated** in every scenario.
+>    - **Wald and index are close.** The Wald test is preferred because it does not assume that both components move, and the internal share is the construct most sensitive to who labels (point 4). The index is the better choice only if the internal component is trusted to carry half the claim.
+> 2. **Weighting: keep works-weighted, main-effect TF (registered).** Era-equal weights with canon × era terms raise power (Gemma truth: index 0.40 → 0.55; Claude truth: Wald 0.53 → 0.57). But they up-weight the early and mid eras, where Discovery shows the larger gaps, which is fitting to Discovery. They are reported as a sensitivity only.
+> 3. **H1: make it a second primary under a fallback procedure** (Wiens), keeping family-wise α = 0.05:
+>    - TF is tested at α₁ = 0.04;
+>    - H1 is tested at 0.01, **or at 0.05 if TF rejects**.
+>
+>    Under the Claude construct the L − E material rise is about +13.6 pp in simulation (+17.7 pp in Discovery against Claude labels), so H1 is no longer hopeless. Power for H1, the joint Wald, under each option:
+>
+>    | Option | TF power, both effects present | H1 power, both effects present | H1 power, TF null |
+>    |---|---|---|---|
+>    | **Fallback (.04 / .01)** | **0.51** | **0.33** | **0.26** |
+>    | Fixed sequence (TF, then H1 at 0.05) | 0.53 | 0.27 | 0.02 |
+>    | Holm over the two | 0.47 | 0.35 | 0.35 |
+>    | Split 0.025 each | 0.47 | 0.27 | 0.35 |
+>    | Current (H1 secondary, Holm among 3) | 0.53 | ≈ 0.22 | ≈ 0.22 |
+>
+>    The fallback keeps TF almost at full power and gives H1 a real chance whether or not TF rejects. Simulated family-wise error under the double null is 0.07 ± 0.025 at 100 replicates. H1|canon and H1|non-canon stay secondary (Holm at 0.05).
+> 4. **Measurement risk for the internal components.** The internal share depends strongly on the annotator construct: Claude assigns internal to 6% of obstacles, the QA reviewer 11–12%, Gemma 14.5%. Both TF's internal component (and so the Wald test and the index) and H1's internal component inherit this. The expert-anchored DSL estimates whatever construct the graduate student applies. The paper will report the expert's internal rate beside the Claude and QA rates, and say plainly that the TF internal gap is construct-dependent.
+> 5. **Juvenile dependence.**
+>    - **Estimand wording:** TF compares **canonical works with all non-canonical works, juvenile fiction included.** Genre composition, juvenile included, is part of the field difference by design. Canonical works are almost never juvenile.
+>    - **Registered sensitivity:** TF on `genre ≠ juvenile` (`juvenile == False` in works_v2). In Discovery the material gap there falls to −0.9 pp while the internal gap stays +2.4 pp. Simulated power for the index on the non-juvenile subset is 0.21 under the Gemma-like truth.
+>    - The two sentences reported side by side: "canon vs the whole mass market" and "canon vs the adult mass market".
 
 **Classification** (TF and H1; v0.5 makes it symmetric, following methods review P10). It is applied only when the 2-df Wald test rejects at the test's α. Each component is judged *up*, *down* or *flat* by its **Bonferroni-adjusted CI at level 1 − α/2**, which gives directional error control across the two components (`models.classify_h1`):
 
@@ -209,9 +239,11 @@ As in v0.4, with these changes:
 Applied to the primary test(s), with the v0.4 checks. Changes in v0.5:
 - **TF permutation (check 8):** author-level canonical flags are permuted among authors within era (`battery.canon_permutation`).
 - **Replication (check 9) is optional:** it is reported when available and excluded from the denominator otherwise, never a failed check (methods review P9.5). ELTeC is optional.
-- **Two new sensitivities:**
+- **Registered sensitivities:**
   - H1 and TF with every cross-half canonical author removed;
-  - standardisation to the early-era mix.
+  - standardisation to the early-era mix;
+  - **TF on non-juvenile works** (`juvenile == False`), as proposed in v0.6;
+  - **TF with era-equal weights** and canon × era terms, as proposed in v0.6.
 - **Multiverse appendix** (Discovery only, exploratory): a specification curve of the TF and H1 estimates across model (Gemma vs Qwen), codebook version, date source, genre standard and clustering (methods review P5 and redirection D).
 
 ### 5.7 Verdict rule
@@ -297,6 +329,54 @@ The internal-share MDE for TF is 8.8 pp at α = 0.025, i.e. about 8 pp at α = 0
 2. **H1 is under-powered:** MDE about 15 pp with 900 expert labels and about 20 pp with 450. It is secondary, as decided in §1.
 3. **Expert hours were the decisive lever,** and the user adopted about 8 h (about 900 labels).
 4. **The draw uses canon strata.** Without them, TF's MDE doubles.
+
+### 7.8 TF candidate statistics under the Discovery raw-label truth (`power_tf.py`; 100 replicates)
+**Truth (`SimConfig.tf_disc`)** is calibrated to `docs/pilot_analysis_2_two_fictions.md`:
+- material gap about E −8, M −7, L −4 pp; internal gap +3 to +6 pp;
+- the late gap carried by juvenile fiction;
+- corrected primary set: Confirmation about 4,050 works, canonical 37% / 19% / 9%.
+
+The design is the registered one (about 900 expert and about 2,000 peer labels at κ ≈ 0.6; QA-level model noise). Tests are two-sided at α = 0.05.
+
+| Truth (pooled works-weighted) | Weighting | (a) Material: truth / MDE / power | Internal: truth / MDE / power | **(b) 2-df Wald power** | **(c) Index: truth / MDE / power** |
+|---|---|---|---|---|---|
+| Discovery-size (material −4.8, internal +3.9) | works, main effect (registered) | −4.8 / 10.0 / 0.24 | +3.9 / 8.3 / 0.26 | **0.33** | +8.6 / 14.5 / **0.40** |
+| same | works, + canon × era | −4.4 / 10.7 / 0.22 | +3.7 / 8.9 / 0.24 | 0.24 | +8.2 / 15.5 / 0.30 |
+| same | era-equal, + canon × era | −5.4 / 8.9 / 0.41 | +4.2 / 8.5 / 0.33 | 0.45 | +9.6 / 13.5 / 0.55 |
+| Deflated ×0.7 | works, main effect | −4.3 / 10.0 / 0.24 | +3.0 / 8.2 / 0.18 | 0.23 | +7.3 / 14.3 / 0.30 |
+| Discovery-size, **non-juvenile** works | works, main effect | −2.5 / 10.4 / 0.17 | +3.7 / 9.0 / 0.23 | 0.22 | +6.2 / 15.2 / 0.21 |
+
+The estimated correlation of the two components is about −0.2. The "scale 0" scenario (not shown) keeps a −3 pp composition gap, because canonical works are rarely juvenile: it is not a null for TF. TF's size was verified at ≤ 0.05 in §7.7.
+
+### 7.9 TF and H1 under the Claude-reference construct, plus multiplicity options (`power_claude.py`; 100 replicates)
+**Truth:** the cell rates and locus shares of the Claude reference (era × canonical):
+- TF material about −4, internal about +8, index about +12 pp;
+- H1 material L − E about +14 pp within strata.
+
+**Model error:** the Gemma-vs-Claude confusion by cell (precision about 0.71, recall about 0.90, locus accuracy 0.67–0.94). Peers are at κ ≈ 0.62, with about 900 expert labels. Tests are two-sided at α = 0.05.
+
+| Truth (TF scale, H1 scale) | TF (a) material | **TF (b) Wald** | TF (c) index | H1 (a) material | **H1 (b) Wald** | H1 (c) index |
+|---|---|---|---|---|---|---|
+| (1, 1) both present | 0.14 | **0.53** | 0.43 | 0.54 | **0.45** | 0.42 |
+| (0.7, 0.7) deflated | 0.07 | 0.32 | 0.26 | 0.30 | 0.25 | 0.22 |
+| (1, 0) TF only | 0.09 | 0.38 | 0.33 | 0.03 | 0.02 | 0.04 |
+| (0, 1) H1 only | 0.03 | 0.03 | 0.05 | 0.53 | 0.47 | 0.34 |
+| (0, 0) null | 0.06 | 0.08 | 0.06 | 0.06 | 0.06 | 0.07 |
+
+Further results:
+- **MDEs (registered TF):** material 13–14 pp, index 18–19 pp.
+- **MDEs (H1):** material 18–19 pp, index 23–25 pp.
+- **Era-equal TF:** Wald 0.57, index 0.49 when both effects are present.
+
+**Multiplicity**, with TF on the Wald test and H1 on the Wald test, both effects present / TF null with H1 present:
+
+| Option | P(TF) | P(H1) |
+|---|---|---|
+| **Fallback (TF .04, H1 .01 or .05 if TF rejects)** | 0.51 | 0.33 / 0.26 |
+| Fixed sequence | 0.53 | 0.27 / 0.02 |
+| Holm over the two | 0.47 | 0.35 / 0.35 |
+
+Family-wise error under the double null: 0.07 (Holm) and 0.04–0.07 (fallback), with Monte Carlo SE ±0.025.
 
 ### 7.6 Levers explored before v0.5 (`levers.py`; pilot-like truth; 20 replicates per cell; for the record, none adopted unless stated)
 
@@ -551,4 +631,10 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
 "2026-11-02 ~20:58 CST: during testing of the platform-migration export tool, 5 sealed (confirmation-split) model-label result blobs (job ids `v09b_w02_conf_rand_a_conf_*`, ≈2,000 passages of model labels; no human labels) were exported, encrypted to a throwaway test key and decrypted to local disk by an automated test. They were deleted within minutes. No contents were read, displayed, analysed, uploaded or committed; only job ids appeared in logs. The R2 originals are untouched. Safeguards added: real sealed blobs can only be encrypted to the owner's pinned key; dry runs are restricted to synthetic data and refuse to write under `data/`. Assessed impact on the confirmatory analysis: none (no information about results was observed)."
 
 **Sealing.** Confirmation-split model labels are stored ciphertext-only (age/X25519), encrypted to an owner-held offline key. Unsealing is a one-way operation, logged against this registration's hash. Confirmation human-audit items were drawn using metadata only (era × genre × canonical), so the draw reveals no model-label information.
+- v0.6 PROPOSAL (2026-11-04; pending the user):
+  - TF statistic kept as the joint 2-df Wald, with the inwardness index as the registered summary;
+  - H1 as a second primary under a fallback procedure (.04 / .01);
+  - juvenile sensitivity and estimand wording;
+  - internal-construct risk;
+  - §7.8–7.9 power.
 
