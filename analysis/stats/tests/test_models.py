@@ -84,7 +84,7 @@ def test_h2_and_h3_run(dsl_wd, corpus):
     for f in (models.h2a, models.h2b, models.h2c):
         e = f(dsl_wd)
         assert all(np.isfinite(c.estimate) for c in e.components)
-    tab, effs = models.confirmatory(dsl_wd, keyword_series(corpus), n_boot=200)
+    tab, effs = models.confirmatory(dsl_wd, keyword_series(corpus), n_boot=200, procedure="single")
     assert set(tab.test) == {"H1", "H2a", "H2b", "H2c", "H3", "H1-ML"}
     assert (tab[tab.test == "H1-ML"].role == "descriptive").all()
     t2 = tab[tab.role.isin(["co-primary", "secondary"])]
@@ -146,9 +146,11 @@ def test_confirmatory_primary_options():
     from analysis.stats.simulate import LLMNoise, SimConfig, simulate
     c = simulate(SimConfig.v05(n_works=3000, noise=LLMNoise.perfect(), seed=4), audit=False)
     wd = dsl.prepare(c.labels, method="oracle", truth=c.truth, targets=("locus", "comm_cause", "distance", "darkness"))
-    t1, _ = models.confirmatory(wd)
+    t1, _ = models.confirmatory(wd, procedure="single")
     assert set(t1[t1.role == "primary"].test) == {"TF"} and (t1[t1.role == "primary"].alpha == 0.05).all()
-    t2, _ = models.confirmatory(wd, primaries=("TF", "H1"))
+    t0, _ = models.confirmatory(wd)                       # registered v0.6 default: fallback
+    assert set(t0[t0.role == "primary (fallback)"].test) == {"TF", "H1"}
+    t2, _ = models.confirmatory(wd, primaries=("TF", "H1"), procedure="single")
     assert set(t2[t2.role == "co-primary"].test) == {"TF", "H1"} and (t2[t2.role == "co-primary"].alpha == 0.025).all()
 
 

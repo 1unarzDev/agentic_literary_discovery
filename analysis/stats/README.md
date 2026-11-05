@@ -60,7 +60,13 @@ Set `OMP_NUM_THREADS=1` for the multiprocess runs, because BLAS threads oversubs
   - **Registered power: TF ≈ 0.70 at α = 0.05 (MDE ≈ 9 pp material, against a ~10 pp canon gap). H1 (secondary) has an MDE of ≈ 15 pp.** Source: `out/power_v05_expert.csv`, `efrac = 0.5`.
 - **Population.** `models.apply_works_v2` maps `author_key` ← `author_group` and `split` ← `split_v2`, and keeps `primary_v2_capv2`. The CLI applies it when `--works data/work/works_v2.parquet` exists.
 - **`select_annotation.main` is retired** and raises. Queues come from `analysis/build_annotation_queues.py` via `draw_audit_metadata`.
-- **Family (decided).** TF is the single primary at 0.05 (`models.confirmatory()` default). H1 and the within-canon contrasts are secondary (Holm). TF-genre, H1-ML and composition are descriptive. H2a–c and H3 are estimation only.
+- **Family (REGISTERED, prereg v0.6).** `models.confirmatory()` defaults to `procedure="fallback"`.
+  - TF (joint 2-df Wald, works-weighted, with the inwardness-index summary from `models.tf_statistics`) is tested at α₁ = 0.04.
+  - H1 is tested at 0.01, or at 0.05 if TF rejects.
+  - H1|canon and H1|non-canon are secondary (Holm).
+  - TF-adult (`juvenile == False`) and TF-era-equal are registered sensitivities. TF-genre, H1-ML and composition are descriptive. H2a–c and H3 are estimation only.
+  - `procedure="single"` reproduces v0.5.
+- **Registration snapshot:** git tag `prereg-v0.6`. The audit frame `cell_table_hash` is `1b4580c7…24cc6` (40 cells, 1,801 items, 909 expert).
 - **Models.** `models.two_fictions`. The symmetric `classify_h1` has the classes inward, outward, socialisation, de-socialisation and indeterminate. `models.attach_canon` reads `data/work/canon.parquet` (`work_id, canonical`).
 - **Battery.** `battery.canon_permutation` serves the TF null. Replication is optional (n/a when missing).
 - **Real-data CLI:**

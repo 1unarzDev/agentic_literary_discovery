@@ -651,20 +651,21 @@ def holm(p: list[float] | np.ndarray) -> np.ndarray:
     return adj
 
 
-PRIMARIES = ("TF",)          # prereg v0.5 recommendation; ("TF", "H1") = the two-primary alternative
+PRIMARIES = ("TF",)          # used by procedure="single"; the registered v0.6 default is procedure="fallback"
 
 
 def confirmatory(wd: WorkData, keywords: pd.DataFrame | None = None, alpha: float = 0.05,
                  design: Design | None = None, n_boot: int = 2000, ref_cov: pd.DataFrame | None = None,
-                 primaries: tuple = PRIMARIES, procedure: str = "single") -> tuple[pd.DataFrame, dict[str, Effect]]:
+                 primaries: tuple = PRIMARIES, procedure: str = "fallback") -> tuple[pd.DataFrame, dict[str, Effect]]:
     """Registered v0.5 family.
       primary (Bonferroni over the primaries: alpha / len(primaries)): default TF alone at 0.05;
         primaries=("TF", "H1") gives the two-primary alternative at 0.025 each
       secondary (Holm at alpha): H1 (if not primary), H1 within canonical, H1 within non-canonical
       descriptive (CIs, Wald p, no verdict): TF genre-adjusted, H1-ML, canon composition share
       estimation only (effect + CI, no test): H2a, H2b, H2c, H3.
-    procedure="fallback" (prereg v0.6 PROPOSAL, pending): TF at 0.04; H1 primary at 0.01, or at 0.05 if
-      TF rejects (Wiens fallback, FWER 0.05); H1|canon and H1|non-canon secondary (Holm at alpha)."""
+    procedure="fallback" (REGISTERED, prereg v0.6): TF at 0.04; H1 primary at 0.01, or at 0.05 if TF
+      rejects (Wiens fallback, FWER 0.05); H1|canon and H1|non-canon secondary (Holm at alpha).
+    procedure="single" reproduces v0.5 (TF sole primary at alpha; H1 secondary)."""
     if procedure == "fallback":
         return _confirmatory_fallback(wd, keywords, alpha, design, n_boot, ref_cov)
     design = design or Design.from_data(wd)
@@ -731,7 +732,7 @@ def apply_works_v2(labels: pd.DataFrame, works: pd.DataFrame, primary_col: str |
 
 
 def _confirmatory_fallback(wd, keywords, alpha, design, n_boot, ref_cov):
-    tab, effs = confirmatory(wd, keywords, alpha, design, n_boot, ref_cov, primaries=("TF",))
+    tab, effs = confirmatory(wd, keywords, alpha, design, n_boot, ref_cov, primaries=("TF",), procedure="single")
     a_tf, a_h1_lo = 0.04, 0.01
     p_tf = effs["TF"].p
     tf_rej = p_tf < a_tf

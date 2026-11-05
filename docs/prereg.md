@@ -1,9 +1,39 @@
-# Pre-registration: What Stands in the Way (confirmatory analysis), DRAFT v0.5
+# Pre-registration: What Stands in the Way (confirmatory analysis), v0.6: REGISTRATION-READY (pending the owner actions below)
 
-**OSF registration hash:** `OSF-HASH-PLACEHOLDER` (fill in on registration; `ald sync` / `POST /v1/admin/unseal` refuse to unseal Confirmation results until this line holds the real hash)
+## OSF submission checklist (owner actions)
+
+Everything else in this document is final. Four items need the owner (the student lead) before or at submission. Each is marked **[OWNER ACTION]** where it appears.
+
+| # | Owner action | What to do | Attach to OSF |
+|---|---|---|---|
+| **A** | **Expert blindness attestation** (§3.2) | Have the graduate-student expert sign the attestation *before* they label any audit item. It states that they have not seen the hypotheses, pilot or Discovery results, showcase, reviews or this document; that they label from the codebook and guide only; and that they do not know item dates, authors or titles. | the signed attestation (PDF or scan; the name may be redacted on the public copy) |
+| **B** | **Human date sign-off** (§2) | A named human checks the agent-prepared evidence for every early-era work (year < 1850) and every work dated 1847–1853, and fills `works_v2.date_verified`. Works left unresolved or out of window are excluded. Then record the final `works_v2.parquet` SHA-256 below. | the verification table (`work_id`, verified year, source, verifier, date); the final `works_v2` SHA-256 |
+| **C** | **Seal-incident disclosure choice** (§8.1, Appendix A) | Decide whether to disclose the 2026-11-02 migration-tool incident. The orchestrator recommends yes. If yes, paste the Appendix A paragraph into the OSF "Other" field. If no, delete §8.1's row and Appendix A's incident paragraph and record the decision in §9. | nothing extra (the text goes in the form) |
+| **D** | **Register and record the hash** | Submit this file (git tag `prereg-v0.6`) on OSF, with the attachments below. Copy the OSF registration hash into the "OSF registration hash" line and fill in the registration date. Commit. Only then run the one-way unseal (`docs/migration_plan.md`); `pipeline/unseal.py` refuses until the hash matches. | see below |
+
+**Attachments for D:**
+1. This file, `docs/prereg.md`, at tag `prereg-v0.6`.
+2. `docs/codebook.md` (v0.9 production, `v09lean_r2`; model pin `41ca3c7d`).
+3. `docs/canon_measure.md`.
+4. `data/work/annotation/design_summary.json`, metadata only (SHA-256 `0a08d346db640015b2c1330417e2cae996c115e4cf0959d744f1a7819861ecbd`).
+5. The deposited audit-frame hash, **`cell_table_hash = 1b4580c7ef37703ecde956475360a096ca0b01410997b00dda4594aea6924cc6`**. Verified 2026-11-05 against `data/work/annotation/audit_frame.parquet`: 40 cells, 97,152 pool passages. Frame file SHA-256: `f34cc68c1426a7ced86a673ccd60d701c901c31045aaf70288487ac58a33f314`.
+6. The SHA-256 of the frozen metadata inputs (data are not committed by design):
+
+   | File | SHA-256 |
+   |---|---|
+   | `canon.parquet` | `a0f136e45e3b171f355e1874bc4073e2142c580559aa1144d0dc80f38edb26ff` |
+   | `genre.parquet` | `09a577c711f4d438667de3bdc6f76c15f007478bcf52ce15e1ae93579d110f26` |
+   | `works_v2.parquet`, pre-sign-off | `b70ef4baae2664c72147699e279dd9adab66cbcad79629fc3854675c3250eb1b` |
+   | `works_v2.parquet`, final | `[OWNER ACTION B]` |
+
+7. The analysis code at tag `prereg-v0.6` (`analysis/stats/`, `analysis/select_annotation.py`, `analysis/build_annotation_queues.py`), and the power outputs `analysis/stats/out/{power_v05_expert,power_tf,power_claude}.csv`.
+
+---
+
+**OSF registration hash:** `OSF-HASH-PLACEHOLDER` **[OWNER ACTION D]** (fill in on registration; `ald sync` / `POST /v1/admin/unseal` refuse to unseal Confirmation results until this line holds the real hash)
 
 **Schedule and seal:**
-- **Registration date:** _TBD (planned Nov 8–9, 2026). Confirmation labels are unsealed about Nov 9–11, for the Nov 20 submissions._
+- **Registration date:** `____-__-__` **[OWNER ACTION D]** (planned Nov 8–9, 2026). Confirmation labels are unsealed about Nov 9–11, for the Nov 20 submissions.
 - **Template:** OSF Preregistration (secondary data / observational).
 
 - **Sealed storage (from the platform migration, `docs/migration_plan.md`).**
@@ -24,8 +54,8 @@
   | English teacher | the showcase (Nov 1); gives ~8 items and draft feedback, descriptive only |
 
 **Code:**
-- `analysis/stats/` at commit _TBD_. Running `uv run python -m analysis.stats.battery labels human frame --keywords …` produces every confirmatory number.
-- Power for this design: `analysis/stats/power_v05.py`. Levers: `levers.py`. Validation: `validate.py`.
+- `analysis/stats/` at git tag **`prereg-v0.6`**. Running `uv run python -m analysis.stats.battery labels human frame --keywords …` produces every confirmatory number.
+- Power for this design: `analysis/stats/power_v05.py` (`--expert-extra`), `power_tf.py`, `power_claude.py`. Levers: `levers.py`. Validation: `validate.py`.
 
 **Related documents:**
 - `docs/plan/research_plan_v2.md`
@@ -43,9 +73,11 @@ Eras use **year** cuts: E 1800–1849, M 1850–1884, L 1885–1929. The window 
 
 | ID | Role | Hypothesis | Estimand (Confirmation half, primary set) | Test |
 |---|---|---|---|---|
-| **TF** two fictions | **PRIMARY** (α = 0.05) | Canonical and non-canonical works differ in where their obstacles' resistance comes from (locus mix) | Standardised locus shares, canonical vs non-canonical. (Δ_material, Δ_internal) = canonical − non-canonical, by g-computation over the standard population, each work at its own year. Genre is **not** adjusted: genre composition is part of what separates the two fields. | Two-sided 2-df Wald, then the symmetric classification |
-| **H1** locus shift | **SECONDARY** (Holm with H1\|canon and H1\|non-canon) | The locus mix of scene-level obstacles in PG-preserved fiction shifts between E and L, genre-standardised | v0.4 estimand: (Δ_material, Δ_internal), L − E | Two-sided 2-df Wald, then classification |
+| **TF** two fictions | **PRIMARY 1** (fallback: α₁ = 0.04) | Canonical works and **all non-canonical works (juvenile fiction included)** differ in where their obstacles' resistance comes from (locus mix). The substantive claim, "canonical fiction places obstacles more inward", requires the class *inward* | Standardised locus shares, canonical vs non-canonical. (Δ_material, Δ_internal) = canonical − non-canonical, by g-computation over the standard population, each work at its own year, works-weighted. Genre is **not** adjusted: genre composition, juvenile included, is part of what separates the two fields. **Registered one-number summary:** the inwardness index Δ_I = Δ_internal − Δ_material, with CI | Two-sided 2-df Wald, then the symmetric classification |
+| **H1** locus shift | **PRIMARY 2** (fallback: α = 0.01, **or 0.05 if TF rejects**) | The locus mix of scene-level obstacles in PG-preserved fiction shifts between E and L, genre-standardised | v0.4 estimand: (Δ_material, Δ_internal), L − E | Two-sided 2-df Wald, then classification |
 | H1\|canon, H1\|non-canon | SECONDARY (Holm) | H1's era contrast within each canon stratum | as H1, in each stratum | as H1 |
+| TF-adult | registered sensitivity | **Companion: canon vs the adult mass market** | TF on `juvenile == False` works | Wald p and CI, reported beside TF |
+| TF-era-equal | registered sensitivity | TF with era-equal weights | TF + canon × era, era-equal weights | Wald p and CI |
 | TF-genre | descriptive | TF adjusted for genre | TF + genre fixed effects | CI and Wald p, no verdict |
 | Composition | descriptive | How much of the aggregate E → L locus change is canon composition | Bennet shift-share by canonical stratum (§5.4) | CI only |
 | H1-ML | descriptive | M vs L locus contrast | as H1 | CI and Wald p, no verdict |
@@ -53,41 +85,24 @@ Eras use **year** cuts: E 1800–1849, M 1850–1884, L 1885–1929. The window 
 
 Wording follows methods review P1. H1 is "the locus mix of scene-level obstacles". It is *motivated by* the inward-turn literature, and the paper does not claim to test Kahler, whose thesis concerns narrative up to about 1800. TF speaks to Woolf's "materialists" charge and to the canon/mass divide (Bourdieu's restricted versus large-scale production; Moretti; Underwood).
 
-> **DECIDED (user, 2026-11-01):** TF is the single primary at α = 0.05; H1 is the first secondary. This stays in force unless the proposal below is confirmed.
+> **DECIDED (user, 2026-11-05): v0.6 adopted. This supersedes the v0.5 decision.**
+> - **Primary tests and multiplicity:** TF and H1 are both primary under a **fallback procedure** (Wiens): TF at α₁ = 0.04; H1 at 0.01, **or at 0.05 if TF rejects**. The family-wise α is 0.05.
+>   - Code: `models.confirmatory()`, whose default is `procedure="fallback"`.
+>   - H1|canon and H1|non-canon are secondary (Holm at 0.05).
+>   - TF-adult, TF-era-equal, TF-genre and H1-ML are sensitivities or descriptive. H2a–c and H3 are estimation only.
+> - **TF statistic:** the joint two-sided 2-df Wald test of (Δ_material, Δ_internal), then the symmetric classification.
+>   - The **inwardness index** Δ_I = Δ_internal − Δ_material is the registered one-number summary.
+>   - The estimand is works-weighted, from the main-effect model.
+>   - The estimand wording is canonical vs **all** non-canonical works, juvenile included, with the **adult-mass-market companion** (TF-adult) reported beside it.
+> - **Internal-share construct risk (flagged):** the internal share depends strongly on who labels it. Claude assigns internal to 6% of obstacles, the QA reviewer 11–12%, Gemma 14.5%. The expert's internal rate is reported beside these rates, and the TF and H1 internal components are described as construct-dependent.
+> - **Basis:** the power evidence is in §7.8–7.9, on Discovery-derived truths:
 >
-> **PROPOSED v0.6 (statistician, 2026-11-04; pending user confirmation; do not treat as registered).** The proposal rests on new Discovery evidence: the full-Discovery Gemma pilot (`docs/pilot_analysis_2_two_fictions.md`) and the Claude reference labels (`docs/claude_reference_analysis.md`). It is evaluated in §7.8–7.9 under the registered design (about 900 expert and about 2,000 peer labels; corrected primary set of 4,048 Confirmation works). Choosing a statistic on Discovery and testing it on sealed Confirmation is legitimate, provided it is fixed before unsealing and does not fork on the era pattern.
+>   | Truth | TF power (fallback, α₁ = 0.04) | H1 power, both effects present | H1 power, TF null |
+>   |---|---|---|---|
+>   | Claude construct | 0.51 | 0.33 | 0.26 |
+>   | Gemma-like raw-label truth | ≈ 0.31 | — | — |
 >
-> 1. **TF test statistic: keep the joint two-sided 2-df Wald test of (Δ_material, Δ_internal)** and the symmetric classification. This is the current registration. It is *not* "material alone", which is only the MDE row quoted earlier. The substantive claim ("canonical fiction places obstacles more inward") requires the class **inward**. The **inwardness index** Δ_I = Δ_internal − Δ_material is registered as the pre-specified one-number summary, reported with its CI.
->    - **Power at α = 0.05:**
->
->      | Truth | Material alone | Joint Wald | Index |
->      |---|---|---|---|
->      | Gemma-like raw-label truth (§7.8) | 0.24 | 0.33 | 0.40 |
->      | Claude-construct truth (§7.9) | 0.14 | **0.53** | 0.43 |
->
->    - **Material alone is dominated** in every scenario.
->    - **Wald and index are close.** The Wald test is preferred because it does not assume that both components move, and the internal share is the construct most sensitive to who labels (point 4). The index is the better choice only if the internal component is trusted to carry half the claim.
-> 2. **Weighting: keep works-weighted, main-effect TF (registered).** Era-equal weights with canon × era terms raise power (Gemma truth: index 0.40 → 0.55; Claude truth: Wald 0.53 → 0.57). But they up-weight the early and mid eras, where Discovery shows the larger gaps, which is fitting to Discovery. They are reported as a sensitivity only.
-> 3. **H1: make it a second primary under a fallback procedure** (Wiens), keeping family-wise α = 0.05. Implemented, opt-in: `models.confirmatory(procedure="fallback")`.
->    - TF is tested at α₁ = 0.04;
->    - H1 is tested at 0.01, **or at 0.05 if TF rejects**.
->
->    Under the Claude construct the L − E material rise is about +13.6 pp in simulation (+17.7 pp in Discovery against Claude labels), so H1 is no longer hopeless. Power for H1, the joint Wald, under each option:
->
->    | Option | TF power, both effects present | H1 power, both effects present | H1 power, TF null |
->    |---|---|---|---|
->    | **Fallback (.04 / .01)** | **0.51** | **0.33** | **0.26** |
->    | Fixed sequence (TF, then H1 at 0.05) | 0.53 | 0.27 | 0.02 |
->    | Holm over the two | 0.47 | 0.35 | 0.35 |
->    | Split 0.025 each | 0.47 | 0.27 | 0.35 |
->    | Current (H1 secondary, Holm among 3) | 0.53 | ≈ 0.22 | ≈ 0.22 |
->
->    The fallback keeps TF almost at full power and gives H1 a real chance whether or not TF rejects. Simulated family-wise error under the double null is 0.07 ± 0.025 at 100 replicates. H1|canon and H1|non-canon stay secondary (Holm at 0.05).
-> 4. **Measurement risk for the internal components.** The internal share depends strongly on the annotator construct: Claude assigns internal to 6% of obstacles, the QA reviewer 11–12%, Gemma 14.5%. Both TF's internal component (and so the Wald test and the index) and H1's internal component inherit this. The expert-anchored DSL estimates whatever construct the graduate student applies. The paper will report the expert's internal rate beside the Claude and QA rates, and say plainly that the TF internal gap is construct-dependent.
-> 5. **Juvenile dependence.**
->    - **Estimand wording:** TF compares **canonical works with all non-canonical works, juvenile fiction included.** Genre composition, juvenile included, is part of the field difference by design. Canonical works are almost never juvenile.
->    - **Registered sensitivity:** TF on `genre ≠ juvenile` (`juvenile == False` in works_v2). In Discovery the material gap there falls to −0.9 pp while the internal gap stays +2.4 pp. Simulated power for the index on the non-juvenile subset is 0.21 under the Gemma-like truth.
->    - The two sentences reported side by side: "canon vs the whole mass market" and "canon vs the adult mass market".
+>   The statistic was chosen on Discovery evidence and is fixed before Confirmation is unsealed. The era-equal weighting, which would fit the Discovery era pattern, was **not** adopted as primary.
 
 **Classification** (TF and H1; v0.5 makes it symmetric, following methods review P10). It is applied only when the 2-df Wald test rejects at the test's α. Each component is judged *up*, *down* or *flat* by its **Bonferroni-adjusted CI at level 1 − α/2**, which gives directional error control across the two components (`models.classify_h1`):
 
@@ -116,7 +131,7 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
   - the author cap.
 - **Dates:**
   - **Date variable:** the earliest documented book or serial publication. Composition dates are not used.
-  - **Early era:** every early-era work (year < 1850) and every work dated 1847–1853 is **hand-verified** against first-edition bibliographies (Garside/Raven/Schöwerling, ATCL, Wright). Agents prepare the evidence, and a human signs off. Works whose date cannot be resolved, or resolves outside the window, are **excluded**.
+  - **Early era [OWNER ACTION B: the human sign-off]:** every early-era work (year < 1850) and every work dated 1847–1853 is **hand-verified** against first-edition bibliographies (Garside/Raven/Schöwerling, ATCL, Wright). Agents prepare the evidence, and a human signs off. Works whose date cannot be resolved, or resolves outside the window, are **excluded**.
   - **Round-year placeholders:** years exactly 1900 (and other round hundreds) count as unverified, and those works are excluded unless verified (methods review P3.5).
   - **Tiers:** confidence tiers are redefined from the verified dates. Open Library agreement no longer defines "high".
 - **Canonicity:**
@@ -147,7 +162,12 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
 - **Strata and allocation.**
   - Strata are era (3) × genre (8) × canonical (2).
   - The budget is split equally over the 6 era × canonical cells, then proportional to N within each cell. Each cell gets at least 2 items and at most N_cell.
-  - The real draw (annotation agent, 2026-11-01) gives **41 non-empty cells** and about 1,820 unique items.
+  - **The draw is done** (2026-11-05, `analysis/build_annotation_queues.py build`, seed 20261105, `draw_audit_metadata`, era × genre × canonical, `works_v2` with `split_v2`, `primary_v2_capv2` and `year_v2`):
+    - **1,801 items drawn** (E 600 / M 600 / L 601) from a pool of 97,152 in **40 cells**;
+    - **909 expert items** (nested, fraction 0.5);
+    - peers (student, peer1, peer2, peer3) about 495 each, with 180 peer-overlap items;
+    - 8 teacher items.
+  - **Deposited frame hash:** `cell_table_hash = 1b4580c7ef37703ecde956475360a096ca0b01410997b00dda4594aea6924cc6`, with `design_summary.json` (metadata only) attached on OSF.
   - π = n_cell / N_cell is written for **every** pool passage in `audit_frame.parquet`.
   - Canon balancing is what makes TF estimable: canonical works are 4% of L. Without canon strata, TF's MDE nearly doubles (§7.7).
 - **Hash deposit.** The frame's `cell_table_hash` is deposited (OSF addendum) before anyone opens it. The counts are metadata, so they are harmless, but they are not published before registration.
@@ -159,10 +179,10 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
 - **Expert anchor (graduate student, about 8 h).**
   - **About 900 items: a stratified 50% random subsample of the audit, drawn within audit cells,** so P(expert | audit) is known per cell.
   - Every expert item is also peer-labelled (nested design). These items double as the overlap with peers for κ: about 225 shared items per peer.
-  - **REQUIRED ITEM, the blindness attestation.** Before labelling, the graduate student signs a short attestation, deposited with the OSF registration. It states that they have not seen the hypotheses, the pilot or Discovery results, the showcase, the reviews or this document; that they label from the codebook and guide only; and that they do not know the dates, authors or titles of the items. If the attestation is missing, or is breached, the TF verdict carries the flag "expert not blind", and the peers-only and expert-only estimates are reported beside it.
+  - **REQUIRED ITEM, the blindness attestation [OWNER ACTION A].** Before labelling, the graduate student signs a short attestation, deposited with the OSF registration. It states that they have not seen the hypotheses, the pilot or Discovery results, the showcase, the reviews or this document; that they label from the codebook and guide only; and that they do not know the dates, authors or titles of the items. If the attestation is missing, or is breached, the TF verdict carries the flag "expert not blind", and the peers-only and expert-only estimates are reported beside it.
 - **Teacher.** About 8 items plus draft feedback. These are **descriptive only**: teacher–expert agreement is reported, and the teacher's labels never enter an estimate.
 - **Human schema:** `has_obstacle`, a single main domain, `locus`, and `failure_cause` (communication only).
-- **Teaching set:** about 60 Discovery items, labelled by the student only.
+- **Teaching set:** **28** Discovery items, labelled by the student only. The target was 60, but fewer passages qualified.
 
 ### 3.3 Sample size
 Primary-set Confirmation:
@@ -208,6 +228,8 @@ The estimator has three levels (`dsl.pseudo_outcomes_anchored`, `dsl.prepare_anc
 
 ### 5.2 Models
 - **TF:** multinomial logit of the work-level DSL soft outcomes ~ canonical + ns(year) + origin + log length. Standardised over the standard population at each work's own year, with canonical set to 1 vs 0 (`models.two_fictions`).
+  - The test is the 2-df Wald.
+  - The inwardness index Δ_I with its delta-method CI is reported as the one-number summary (`models.tf_statistics`).
 - **H1:** as in v0.4, with genre fixed effects and spline (`models.h1`).
 - **Shared rules:**
   - logit with the registered identity-link fallback;
@@ -218,8 +240,11 @@ The estimator has three levels (`dsl.pseudo_outcomes_anchored`, `dsl.prepare_anc
 - **The STEP-1880 and LINEAR-trend contrasts explored in §7.6 are not adopted** (forking paths, methods review P5).
 
 ### 5.3 Multiplicity
-- **Primary:** TF at α = 0.05.
-- **Secondary:** Holm at 0.05 over {H1, H1|canon, H1|non-canon}.
+- **Primary (fallback procedure, family-wise α = 0.05):**
+  - TF (2-df Wald) at α₁ = 0.04.
+  - H1 (2-df Wald) at α₂ = 0.01, or at **0.05 if TF rejects**.
+- **Secondary:** Holm at 0.05 over {H1|canon, H1|non-canon}.
+- **Registered sensitivities, no multiplicity claim:** TF-adult (juvenile == False) and TF-era-equal.
 - **Descriptive and estimation analyses:** CIs only.
 - **Open discovery:** BH-corrected, at most 2 promotions.
 
@@ -242,12 +267,12 @@ Applied to the primary test(s), with the v0.4 checks. Changes in v0.5:
 - **Registered sensitivities:**
   - H1 and TF with every cross-half canonical author removed;
   - standardisation to the early-era mix;
-  - **TF on non-juvenile works** (`juvenile == False`), as proposed in v0.6;
-  - **TF with era-equal weights** and canon × era terms, as proposed in v0.6.
+  - **TF-adult:** TF on non-juvenile works (`juvenile == False`), the adult-mass-market companion;
+  - **TF-era-equal:** TF with era-equal weights and canon × era terms.
 - **Multiverse appendix** (Discovery only, exploratory): a specification curve of the TF and H1 estimates across model (Gemma vs Qwen), codebook version, date source, genre standard and clustering (methods review P5 and redirection D).
 
 ### 5.7 Verdict rule
-- **Supported:** significant at the test's α, **and** passes at least ⌈7/9 × number of applicable checks⌉, **and** has the same sign in replication *if* replication is available.
+- **Supported:** significant at its registered level (TF at 0.04; H1 at 0.01, or 0.05 if TF rejects), **and** passes at least ⌈7/9 × number of applicable checks⌉, **and** has the same sign in replication *if* replication is available.
 - **Unstable:** significant, but fails the battery or an available replication.
 - **Null:** not significant.
 
@@ -577,11 +602,12 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
   20. **v0.5, classification.** The classification is symmetric, with Bonferroni-adjusted component CIs. The social patterns are named.
   21. **v0.5, replication.** Replication is optional: it never counts as a failed check.
   22. **v0.5, codebook.** No v1.0 relabel. The v0.9 production codebook (`v09lean_r2`) is registered as the model's codebook. The planned v1.0 content in former §4.1 is not adopted.
+  24. **v0.6 (2026-11-05, decided by the user).** TF and H1 are both primary under the fallback procedure (TF .04; H1 .01 or .05 if TF rejects). The TF statistic is the joint 2-df Wald, with the inwardness index as summary. TF-adult and TF-era-equal are registered sensitivities. The internal-construct risk is flagged. This replaces item 17's family. It was decided on Discovery evidence (§7.8–7.9) before unsealing.
   23. **v0.5, levers.** The STEP-1880 and LINEAR contrasts and Neyman allocation on predicted labels were explored (§7.6) and **not adopted**. They are logged here as forks (methods review P5).
 - **Unforeseen problems.** If an analysis cannot be run as registered (e.g., an era with no audited obstacles), the nearest pre-specified fallback is used: the identity link, then the raw DSL ratio contrast without covariates. The fallback is reported as such.
 
 
-### 8.1 Seal-integrity log (factual entries; disclosure recommended by the orchestrator, final decision by the user)
+### 8.1 Seal-integrity log (factual entries; disclosure recommended by the orchestrator) [OWNER ACTION C: disclose or not]
 
 | Date | Entry | Assessed impact |
 |---|---|---|
@@ -631,10 +657,16 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
 "2026-11-02 ~20:58 CST: during testing of the platform-migration export tool, 5 sealed (confirmation-split) model-label result blobs (job ids `v09b_w02_conf_rand_a_conf_*`, ≈2,000 passages of model labels; no human labels) were exported, encrypted to a throwaway test key and decrypted to local disk by an automated test. They were deleted within minutes. No contents were read, displayed, analysed, uploaded or committed; only job ids appeared in logs. The R2 originals are untouched. Safeguards added: real sealed blobs can only be encrypted to the owner's pinned key; dry runs are restricted to synthetic data and refuse to write under `data/`. Assessed impact on the confirmatory analysis: none (no information about results was observed)."
 
 **Sealing.** Confirmation-split model labels are stored ciphertext-only (age/X25519), encrypted to an owner-held offline key. Unsealing is a one-way operation, logged against this registration's hash. Confirmation human-audit items were drawn using metadata only (era × genre × canonical), so the draw reveals no model-label information.
-- v0.6 PROPOSAL (2026-11-04; pending the user):
+- v0.6 PROPOSAL (2026-11-04), adopted 2026-11-05:
   - TF statistic kept as the joint 2-df Wald, with the inwardness index as the registered summary;
   - H1 as a second primary under a fallback procedure (.04 / .01);
   - juvenile sensitivity and estimand wording;
   - internal-construct risk;
   - §7.8–7.9 power.
+- **v0.6 (2026-11-05): REGISTRATION-READY.**
+  - User adopted the fallback (TF .04 / H1 .01 or .05), the joint Wald with the index summary, works weighting, the juvenile and era-equal sensitivities, and the internal-construct flag.
+  - Audit draw done and frame hash deposited (40 cells, 1,801 items, 909 expert); teaching set 28.
+  - Frozen-input hashes recorded.
+  - OSF submission checklist added.
+  - Remaining owner actions: A (attestation), B (date sign-off), C (disclosure choice), D (register and hash).
 
