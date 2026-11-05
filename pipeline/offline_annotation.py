@@ -314,7 +314,17 @@ def export_audit(role_dirs: dict[str, str]) -> None:
     items = json.loads(src.read_text())["items"]
     m = load_map()
     for who, dname in role_dirs.items():
-        mine = [it for it in items if who in it.get("assign", [])]
+        # main sets = audit items only; practice/cert/retake come from export-practice (adjudicated key);
+        # the student's teaching set goes to its own file.
+        teaching = [it for it in items if who in it.get("assign", []) and it.get("set") == "teaching"]
+        mine = [it for it in items if who in it.get("assign", []) and it.get("set") == "audit"]
+        if teaching:
+            trows = []
+            for n, it in enumerate(teaching, 1):
+                i = oid("t_", it["passage_id"])
+                m[i] = {"passage_id": it["passage_id"], "set": "teaching", "server_item_id": it["item_id"]}
+                trows.append({"item_id": i, "order": n, "ctx_before": it["ctx_before"], "passage": it["text"], "ctx_after": it["ctx_after"]})
+            _write_items(PK / dname, "D_teaching", trows, ITEM_COLS, LABEL_COLS, who)
         rows = []
         for n, it in enumerate(mine, 1):
             i = oid("c_", it["passage_id"])
