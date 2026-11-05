@@ -8,7 +8,8 @@ genre.parquet) and drawn with select_annotation.draw_audit_metadata (prereg v0.5
 printed or written to the summary; design_summary.json carries cell_table_hash(frame) instead.
 
 Split: data/work/works_v2.parquet when it exists: split_v2, author identity = author_group (carried in
-the `author_key` column downstream), Confirmation pool restricted to primary_v2 works, and passages
+the `author_key` column downstream), year/decade = the verified year_v2/decade_v2 (so era = era_v2),
+Confirmation pool restricted to the registered primary set (primary_v2_capv2, else primary_v2), and passages
 reassigned with pipeline.split_v2_map.SplitV2 (moved passages follow their work's split_v2). Otherwise
 the current works.parquet split with a loud warning in the summary. canonical comes from
 data/work/canon.parquet (strata era x genre x canonical; --no-canonical for era x genre).
@@ -165,7 +166,7 @@ class SplitInfo:
 
     v2 (works_v2.parquet present): split = split_v2, author identity = author_group (stored in the
     `author_key` column so every downstream use, including draw_audit's author filter, sees it),
-    primary = primary_v2; passages are reassigned with pipeline.split_v2_map.SplitV2 (by pg id), so
+    primary = primary_v2_capv2 (else primary_v2), year = year_v2; passages are reassigned with pipeline.split_v2_map.SplitV2 (by pg id), so
     passages of moved works follow their work's split_v2. v1 fallback: works.parquet split/author_key."""
     works: pd.DataFrame                      # work_id, decade, year, split, author_key, primary
     mapper: object | None = None             # SplitV2 or None
@@ -198,9 +199,16 @@ def resolve_works(works: pd.DataFrame, works_v2: pd.DataFrame | None, mapper=Non
     need = {"work_id", "split_v2", "author_group"}
     if need - set(works_v2):
         raise SystemExit(f"works_v2 lacks {need - set(works_v2)}")
-    v2 = works_v2[["work_id", "split_v2", "author_group",
-                   *(["primary_v2"] if "primary_v2" in works_v2 else []),
-                   *[c for c in ("decade", "year") if c in works_v2]]]
+    # registered population (prereg v0.5 §2): primary_v2_capv2 when present, else primary_v2; verified dates
+    # (year_v2 / decade_v2, build_works_v2.apply_verified_dates) replace the catalog year and decade.
+    pcol = next((c for c in ("primary_v2_capv2", "primary_v2") if c in works_v2), None)
+    v2 = works_v2[["work_id", "split_v2", "author_group", *([pcol] if pcol else []),
+                   *[c for c in ("decade", "year", "decade_v2", "year_v2") if c in works_v2]]].copy()
+    for c in ("year", "decade"):
+        if f"{c}_v2" in v2:
+            v2 = v2.drop(columns=[c], errors="ignore").rename(columns={f"{c}_v2": c})
+    if pcol:
+        v2 = v2.rename(columns={pcol: "primary_v2"})
     w = w.drop(columns=[c for c in ("split", "author_key", "decade", "year") if c in w and (c in v2 or c in ("split", "author_key"))])
     w = w.merge(v2, on="work_id", how="right")
     if "year" not in w:
@@ -600,7 +608,8 @@ def load_inputs(a: argparse.Namespace) -> tuple[pd.DataFrame, pd.DataFrame, Spli
     if Path(a.works_v2).exists():
         v2cols = pq.ParquetFile(a.works_v2).schema_arrow.names
         v2 = pd.read_parquet(a.works_v2, columns=[c for c in ("pg_id", "work_id", "split", "split_v2", "author_group",
-                                                              "primary_v2", "decade", "year") if c in v2cols])
+                                                              "primary_v2", "primary_v2_capv2", "decade", "year",
+                                                              "decade_v2", "year_v2") if c in v2cols])
     split = resolve_works(works, v2)
     passages = pd.read_parquet(a.passages, columns=["passage_id", "work_id", "stratum"])
     genre = pd.read_parquet(a.genre, columns=["work_id", "genre"]) if Path(a.genre).exists() else None

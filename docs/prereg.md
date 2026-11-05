@@ -91,7 +91,7 @@ For TF, "inward" means canonical fiction locates resistance more in people and m
   - **Tiers:** confidence tiers are redefined from the verified dates. Open Library agreement no longer defines "high".
 - **Canonicity:**
   - `data/work/canon.parquet` (`docs/canon_measure.md`): a **metadata-only** binary `canonical` per work, built from `downloads`, `sitelinks` and `canon_score` at the `author_group` level, with no labels. It is frozen at the registration commit.
-  - In the Confirmation primary set: **4,211 works (E 109, M 545, L 3,557)**, of which **36% / 18% / 9%** are canonical by era.
+  - In the Confirmation primary set, after the verified early dates and the 1900-placeholder exclusion (2026-11-04, `docs/canon_measure.md` §3.1): **4,048 works (E 87, M 538, L 3,423)**, of which **37% / 19% / 9%** are canonical by era. (Before the dates: 4,211.)
 - **Passages:** **12 random passages per work** (random backbone `rand_a`, k < 12). This replaces the unimplemented adaptive stopping (methods review P9). Early-era works may contribute up to 24 if those passages were labelled before the audit draw, and within-work Hájek weights handle this. Enrichment passages never enter a confirmatory estimate.
 - **Unit and SEs:** the work is the unit. SEs are author-clustered (CR1) on the new author keys.
 - **Model labels:** codebook v0.9 production (`v09lean_r2`, pinned). **There is no v1.0 relabel.** DSL is valid for any predictor; a better model buys efficiency, not validity (§7.6: model accuracy is a weak lever).
@@ -541,6 +541,7 @@ The design is §7.4's registered annotation design: about 1,760 Confirmation ite
   - `select_annotation.main` retired.
   - Registered power: TF 0.70, MDE 9 pp.
 - v0.5 (2026-11-02): seal-integrity log §8.1 (migration-tool test incident), and the ciphertext-only sealed storage with offline owner key and one-way logged unseal (header).
+- v0.5 (2026-11-04): verified early dates applied to `works_v2` (`year_v2`, `era_v2`, `date_verified`, `date_exclusion`, `placeholder_1900`); primary-set counts in §2 updated; the audit draw and `models.apply_works_v2` use `year_v2` and `primary_v2_capv2`. Metadata only. The date review is agent-conducted and still needs the human sign-off required in §2.
 
 ---
 

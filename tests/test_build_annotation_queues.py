@@ -444,3 +444,18 @@ def test_ann_items_offline_expert_export(design, tmp_path, monkeypatch):
     for it in design.items:
         if "expert1" in it["assign"]:
             assert {"item_id", "passage_id", "text", "ctx_before", "ctx_after", "set", "assign"} <= set(it)
+
+
+def test_resolve_works_uses_year_v2_and_capv2(meta):
+    """Verified dates (year_v2) drive the audit era, and the registered primary_v2_capv2 beats primary_v2."""
+    works, genre, passages = meta
+    conf = works[works.split == "confirmation"].work_id.tolist()
+    moved, capped = conf[0], conf[1]
+    v2 = works[["work_id", "pg_id", "split"]].assign(
+        split_v2=works.split, author_group=works.author_key, primary_v2=True,
+        primary_v2_capv2=~works.work_id.eq(capped), year_v2=works.year.where(~works.work_id.eq(moved), 1840.0),
+        decade_v2=works.decade.where(~works.work_id.eq(moved), 1840))
+    sp = baq.resolve_works(works, v2)
+    pool = baq.confirmation_pool(passages, sp, genre)
+    assert not pool.work_id.eq(capped).any()
+    assert pool[pool.work_id == moved].era.eq("E_1800_1849").all() and pool[pool.work_id == moved].year.eq(1840).all()

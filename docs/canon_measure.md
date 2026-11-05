@@ -202,7 +202,7 @@ The literary review's composition story holds on a proper covariate.
 | `era` | E 1800–1849, M 1850–1884, L 1885–1929 by `year`; else null |
 | `historical_setting` | genre = historical; **or**, whatever the genre precedence, LCSH "Historical fiction" or "Biographical fiction"; or an LCSH "X -- History -- &lt;period&gt; -- Fiction" heading whose period ends ≥ 25 years before the work's year (the same `genre._history_period` rule, where a heading with no period counts); or the PG "Historical Novels/Fiction" shelf. 2,711 works (genre alone gives 1,505) |
 | `juvenile` | genre = juvenile, or an LCSH juvenile heading: 4,684 |
-| `date_verified` | null placeholder, filled by the early-date verification task |
+| `date_verified` | filled from the verified early dates (§3.1) |
 | `wc_keep` | `workcheck_keep.keep` (null = no workcheck run); 857 are False |
 | `primary_v2` | `in_primary_cap AND NOT historical_setting AND wc_keep is not False`: 8,949 works |
 | `in_primary_cap_v2`, `primary_v2_capv2` | the same seeded 5-per-author-decade cap, applied to `author_group` (sensitivity; v1's cap is porous across pseudonyms): 8,725 works |
@@ -219,6 +219,55 @@ The literary review's composition story holds on a proper covariate.
 | L | discovery | 3,700 (3,468) | 341 | 4,041 (3,809) |
 
 The E era has about 34–36 canonical works per half, so a canon × era interaction in E rests on roughly 70 works.
+
+### 3.1 Verified early dates applied (2026-11-04, before the Nov 5 audit draw)
+
+Source: `data/work/date_audit/verify/early_dates.parquet` (630 works catalogued ≤ 1853; report:
+`research/date_audit/verify/report.md`). Code: `build_works_v2.apply_verified_dates` and `primary_flags`. Metadata only.
+**Caveat:** the dates are an agent-conducted source review; `human_signoff` is False for all 630 rows. The prereg
+(§2) requires a human sign-off, which is still owed.
+
+| Column | Definition |
+|---|---|
+| `year_v2` | verified first **book** year where resolved (566 works), else the catalog `year` |
+| `decade_v2`, `era_v2` | from `year_v2` (eras as above; null outside 1800–1929). `era` keeps the catalog-year era for history |
+| `date_verified` | True = in scope and resolved (566); False = in scope, unresolved (64); null = catalogued ≥ 1854 (14,881) |
+| `placeholder_1900` | `year == 1900` and not verified: 359 works (none is in the verification scope) |
+| `date_exclusion` | first reason, else null: `unresolved_early_date` 64, `out_of_window` 141 (`year_v2` outside 1800–1929, incl. 113 works catalogued 1930), `translation` 3 (+1 also unresolved), `derivative_text` 3 (`DERIVATIVE_TEXT`: a later third-party edited/condensed text), `placeholder_1900` 359. 570 works in all |
+| `primary_v2`, `primary_v2_capv2` | as before **and** `date_exclusion` is null. The cap now ranks within `author_group × decade_v2` (same seed, ranked over all works) |
+
+`historical_setting` was recomputed at `year_v2`; no work changed. 18th-century reprints flagged in the notes all
+resolve before 1800 and so fall under `out_of_window`. Author-revised later editions (e.g. *Frankenstein*, 1831 text)
+are kept, dated to the first edition. Notes that raise genre-eligibility concerns (non-fiction, drama) are left to
+workcheck (`wc_keep`).
+
+**Registered primary set (`primary_v2_capv2`), era_v2 × split_v2 × canonical** (old values, catalog era, in parentheses):
+
+| Era | Split | popular | canonical | all | canonical share |
+|---|---|---|---|---|---|
+| E | confirmation | 55 (68) | 32 (34) | **87** (102) | 37% |
+| E | discovery | 62 (72) | 27 (36) | **89** (108) | 30% |
+| M | confirmation | 437 (446) | 101 (99) | **538** (545) | 19% |
+| M | discovery | 425 (438) | 99 (99) | **524** (537) | 19% |
+| L | confirmation | 3,106 (3,187) | 317 (322) | **3,423** (3,509) | 9% |
+| L | discovery | 3,363 (3,468) | 337 (341) | **3,700** (3,809) | 9% |
+| all | | 7,448 (7,679) | 913 (931) | **8,361** (8,725 incl. 115 with no era) | |
+
+Changes against the old `primary_v2_capv2`: 380 works leave (date exclusions 375: placeholder_1900 205,
+out_of_window 120, unresolved 44, translation 3, derivative 3; cap shift 5) and 16 enter (13 Confirmation: 10 E, 3 M;
+3 Discovery), because a corrected decade frees an author's cap slot.
+
+**Era moves (catalog era → era_v2), all works:**
+
+| Split | E→M | E→L | E→out | M→E | M→L | out→E | out→L |
+|---|---|---|---|---|---|---|---|
+| confirmation | 10 | 7 | 5 | 13 | 1 | 1 | 0 |
+| discovery | 10 | 5 | 8 | 18 | 1 | 1 | 1 |
+
+**Queue consequence.** The 13 Confirmation works newly in the primary set have 156 random-backbone (rand_a, k < 12)
+passages in `v09b_w02_conf_rand_a`, of which 144 were still queued at the last status snapshot and are not in the
+re-sharded `v09b_w02p_conf_primary` wave. Ten of the 13 are early-era works, so they should be queued as a top-up
+before the unseal. The audit draw itself needs only metadata and is unaffected.
 
 ## 4. Effects on the labeling queue
 

@@ -170,3 +170,25 @@ def test_split_v2_map_and_queue_report(tmp_path, monkeypatch):
                                               "shard_key": "shards/x/j1.jsonl.gz", "has_result": 1}]}]))
     r = queue_report(jobs, m)
     assert r.n_moved.tolist() == [2] and r.n_moved_labelled.tolist() == [2] and r.moved_works.tolist() == [1]
+
+
+def test_apply_verified_dates_and_primary_flags():
+    w = pd.DataFrame({"work_id": ["a", "b", "c", "d", "e", "f", "g", "h"],
+                      "year": [1840, 1852, 1845, 1830, 1900, 1900, 1870, 1930]})
+    early = pd.DataFrame({"work_id": ["a", "b", "c", "d"], "true_book_year": pd.array([1838, 1792, None, 1831], "Int64"),
+                          "status": ["reviewed", "reviewed", "unresolved", "reviewed"],
+                          "translation": [False, None, None, True]})
+    out = B.apply_verified_dates(w, early).set_index("work_id")
+    assert out.year_v2.tolist() == [1838, 1792, 1845, 1831, 1900, 1900, 1870, 1930]
+    assert out.era_v2["a"] == "E" and pd.isna(out.era_v2["b"]) and out.era_v2["g"] == "M"
+    assert out.date_verified["a"] and not out.date_verified["c"] and pd.isna(out.date_verified["g"])
+    ex = out.date_exclusion.to_dict()
+    assert ex == {"a": None, "b": "out_of_window", "c": "unresolved_early_date", "d": "translation",
+                  "e": "placeholder_1900", "f": "placeholder_1900", "g": None, "h": "out_of_window"}
+    assert out.placeholder_1900.sum() == 2
+    out = out.reset_index().assign(author_group="x", in_primary_cap=True, historical_setting=False,
+                                   wc_keep=pd.array([True] * 8, "boolean"))
+    f = B.primary_flags(out).set_index("work_id")
+    assert f.primary_v2.to_dict() == {k: v is None for k, v in ex.items()}
+    with pytest.raises(ValueError):
+        B.apply_verified_dates(w, early.assign(work_id=["a", "b", "c", "zz"]))

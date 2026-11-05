@@ -657,11 +657,14 @@ def apply_works_v2(labels: pd.DataFrame, works: pd.DataFrame, primary_col: str |
     """Registered population (prereg v0.5 §2) from data/work/works_v2.parquet:
     author_key <- author_group (PG-agent clusters, house names merged), split <- split_v2, and keep
     only primary-set works (primary_v2_capv2 if present, else primary_v2: date resolved in window,
-    not historical_setting, author cap). date_verified is applied upstream when it is filled."""
+    not historical_setting, author cap). The verified-date exclusions are part of the primary flags
+    (build_works_v2.apply_verified_dates); year / decade are replaced by year_v2 / decade_v2 when present."""
     pcol = primary_col or next((c for c in ("primary_v2_capv2", "primary_v2") if c in works), None)
-    cols = ["work_id", "author_group", "split_v2"] + ([pcol] if pcol else [])
+    dcols = [c for c in ("year_v2", "decade_v2") if c in works]
+    cols = ["work_id", "author_group", "split_v2"] + ([pcol] if pcol else []) + dcols
     w = works[cols]
-    out = labels.merge(w, on="work_id", how="inner")
+    out = labels.drop(columns=[c[:-3] for c in dcols if c[:-3] in labels], errors="ignore").merge(w, on="work_id", how="inner")
+    out = out.rename(columns={c: c[:-3] for c in dcols})
     if pcol:
         out = out[out[pcol].fillna(False).astype(bool)].drop(columns=[pcol])
     return out.assign(author_key=out.author_group, split=out.split_v2).drop(columns=["author_group", "split_v2"])
