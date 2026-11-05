@@ -1382,8 +1382,9 @@ class Worker:
 
     def _take_directive(self, d: Any) -> None:
         if isinstance(d, dict) and d.get("gpu") in ("run", "yield", "pause"):
-            if d != self.directive:
+            if d != getattr(self, "_last_directive_seen", None):  # log changes only (run arrives every minute)
                 self.log(f"[scheduler] gpu={d.get('gpu')} until={d.get('until')} reason={d.get('reason')}")
+            self._last_directive_seen = d
             self.directive = None if d.get("gpu") == "run" else d
 
     def refresh_service_definition(self) -> None:

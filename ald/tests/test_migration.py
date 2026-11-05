@@ -187,3 +187,10 @@ def test_confirmation_stats_are_label_blind(env):
     rep = w.report()
     assert rep["schema_fail_rate"] is None and rep["quality_stage"] is None
     assert not any("[quality]" in m and "conf-1" in m for m in env.logs) or True  # local log only (acceptable)
+
+
+def test_repeated_run_directive_logged_once(env):
+    w = env.make_worker()
+    for _ in range(5):
+        w._take_directive({"gpu": "run", "until": None, "reason": ""})
+    assert sum("[scheduler] gpu=run" in m for m in env.logs) == 1
