@@ -68,7 +68,7 @@ Wording follows methods review P1. H1 is "the locus mix of scene-level obstacles
 >    - **Material alone is dominated** in every scenario.
 >    - **Wald and index are close.** The Wald test is preferred because it does not assume that both components move, and the internal share is the construct most sensitive to who labels (point 4). The index is the better choice only if the internal component is trusted to carry half the claim.
 > 2. **Weighting: keep works-weighted, main-effect TF (registered).** Era-equal weights with canon × era terms raise power (Gemma truth: index 0.40 → 0.55; Claude truth: Wald 0.53 → 0.57). But they up-weight the early and mid eras, where Discovery shows the larger gaps, which is fitting to Discovery. They are reported as a sensitivity only.
-> 3. **H1: make it a second primary under a fallback procedure** (Wiens), keeping family-wise α = 0.05:
+> 3. **H1: make it a second primary under a fallback procedure** (Wiens), keeping family-wise α = 0.05. Implemented, opt-in: `models.confirmatory(procedure="fallback")`.
 >    - TF is tested at α₁ = 0.04;
 >    - H1 is tested at 0.01, **or at 0.05 if TF rejects**.
 >

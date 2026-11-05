@@ -656,13 +656,17 @@ PRIMARIES = ("TF",)          # prereg v0.5 recommendation; ("TF", "H1") = the tw
 
 def confirmatory(wd: WorkData, keywords: pd.DataFrame | None = None, alpha: float = 0.05,
                  design: Design | None = None, n_boot: int = 2000, ref_cov: pd.DataFrame | None = None,
-                 primaries: tuple = PRIMARIES) -> tuple[pd.DataFrame, dict[str, Effect]]:
+                 primaries: tuple = PRIMARIES, procedure: str = "single") -> tuple[pd.DataFrame, dict[str, Effect]]:
     """Registered v0.5 family.
       primary (Bonferroni over the primaries: alpha / len(primaries)): default TF alone at 0.05;
         primaries=("TF", "H1") gives the two-primary alternative at 0.025 each
       secondary (Holm at alpha): H1 (if not primary), H1 within canonical, H1 within non-canonical
       descriptive (CIs, Wald p, no verdict): TF genre-adjusted, H1-ML, canon composition share
-      estimation only (effect + CI, no test): H2a, H2b, H2c, H3."""
+      estimation only (effect + CI, no test): H2a, H2b, H2c, H3.
+    procedure="fallback" (prereg v0.6 PROPOSAL, pending): TF at 0.04; H1 primary at 0.01, or at 0.05 if
+      TF rejects (Wiens fallback, FWER 0.05); H1|canon and H1|non-canon secondary (Holm at alpha)."""
+    if procedure == "fallback":
+        return _confirmatory_fallback(wd, keywords, alpha, design, n_boot, ref_cov)
     design = design or Design.from_data(wd)
     a1 = alpha / len(primaries)
     pr = "co-primary" if len(primaries) > 1 else "primary"
@@ -724,6 +728,30 @@ def apply_works_v2(labels: pd.DataFrame, works: pd.DataFrame, primary_col: str |
     if pcol:
         out = out[out[pcol].fillna(False).astype(bool)].drop(columns=[pcol])
     return out.assign(author_key=out.author_group, split=out.split_v2).drop(columns=["author_group", "split_v2"])
+
+
+def _confirmatory_fallback(wd, keywords, alpha, design, n_boot, ref_cov):
+    tab, effs = confirmatory(wd, keywords, alpha, design, n_boot, ref_cov, primaries=("TF",))
+    a_tf, a_h1_lo = 0.04, 0.01
+    p_tf = effs["TF"].p
+    tf_rej = p_tf < a_tf
+    a_h1 = alpha if tf_rej else a_h1_lo
+    design = design or Design.from_data(wd)
+    effs["H1"] = h1(wd, design, ref_cov, alpha=a_h1)
+    tab = tab.copy()
+    m_tf, m_h1 = tab.test == "TF", tab.test == "H1"
+    tab.loc[m_tf, ["role", "alpha", "p_adj"]] = ["primary (fallback)", a_tf, p_tf]
+    tab.loc[m_tf, "reject"] = tf_rej
+    tab.loc[m_h1, ["role", "alpha", "p_adj"]] = ["primary (fallback)", a_h1, effs["H1"].p]
+    tab.loc[m_h1, "reject"] = effs["H1"].p < a_h1
+    tab.loc[m_h1, "classification"] = effs["H1"].extra["classification"]
+    sec = tab.role == "secondary"
+    if sec.any():
+        names = list(dict.fromkeys(tab[sec].test))
+        adj = dict(zip(names, holm([effs[k].p for k in names])))
+        tab.loc[sec, "p_adj"] = tab[sec].test.map(adj)
+        tab.loc[sec, "reject"] = tab.loc[sec, "p_adj"] < alpha
+    return tab, effs
 
 
 def attach_canon(labels: pd.DataFrame, canon: pd.DataFrame) -> pd.DataFrame:

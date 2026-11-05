@@ -174,3 +174,14 @@ def test_tf_statistics_candidates():
     # juvenile dependence built into the truth: the non-juvenile gap is smaller
     nj = models.tf_statistics(wd.subset(wd.cov.genre.values != "juvenile"))
     assert abs(nj["d_mat"]) < abs(models.tf_statistics(wd)["d_mat"])
+
+
+def test_fallback_procedure():
+    from analysis.stats.simulate import LLMNoise, SimConfig, simulate
+    c = simulate(SimConfig.v05(n_works=3000, noise=LLMNoise.perfect(), seed=4), audit=False)
+    wd = dsl.prepare(c.labels, method="oracle", truth=c.truth, targets=("locus", "comm_cause", "distance", "darkness"))
+    t, effs = models.confirmatory(wd, procedure="fallback")
+    tf = t[t.test == "TF"].iloc[0]
+    h1 = t[t.test == "H1"].iloc[0]
+    assert tf.alpha == 0.04 and h1.alpha == (0.05 if tf.reject else 0.01)
+    assert set(t[t.role == "secondary"].test) == {"H1|canonical", "H1|non-canonical"}
